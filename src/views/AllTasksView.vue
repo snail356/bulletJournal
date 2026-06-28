@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import type { TaskStatus } from '@/types'
 import { useTaskStore } from '@/stores/taskStore'
 import { ALL_STATUSES, STATUS_BG, STATUS_COLORS, STATUS_LABELS } from '@/utils/status'
+import AppIcon from '@/components/AppIcon.vue'
 
 const store = useTaskStore()
 const router = useRouter()
@@ -80,7 +81,15 @@ function goDetail(id: string) {
               </span>
             </td>
             <td>{{ task.subtasks.length }}</td>
-            <td>{{ task.completed ? '✓' : '—' }}</td>
+            <td class="complete-cell">
+              <AppIcon
+                v-if="task.completed"
+                name="check"
+                size="xs"
+                class="done-icon"
+              />
+              <AppIcon v-else name="minus" size="xs" class="pending-icon" />
+            </td>
           </tr>
         </tbody>
       </table>
@@ -180,6 +189,19 @@ td {
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 20px;
+}
+
+.complete-cell {
+  width: 48px;
+}
+
+.done-icon {
+  color: $primary;
+}
+
+.pending-icon {
+  color: $text-muted;
+  opacity: 0.4;
 }
 
 .empty {

@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import type { TaskStatus } from '@/types'
 import { ALL_STATUSES, STATUS_BG, STATUS_COLORS, STATUS_LABELS } from '@/utils/status'
+import AppIcon from './AppIcon.vue'
 
 const props = defineProps<{
   modelValue: TaskStatus
@@ -45,7 +46,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
       @click.stop="toggle"
     >
       {{ STATUS_LABELS[modelValue] }}
-      <span class="chevron" :class="{ open }">▾</span>
+      <AppIcon name="chevron-down" size="xs" class="chevron" :class="{ open }" />
     </button>
 
     <div v-if="open" class="menu">
@@ -94,7 +95,6 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 }
 
 .chevron {
-  font-size: 10px;
   transition: transform 0.15s;
 
   &.open {

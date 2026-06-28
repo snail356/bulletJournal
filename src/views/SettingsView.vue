@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { mockLabels, mockTasks } from '@/mock/data'
 import { TASKS_KEY, LABELS_KEY, SELECTED_DATE_KEY, saveToStorage } from '@/utils/storage'
@@ -7,25 +8,58 @@ import { todayString } from '@/utils/date'
 
 const store = useTaskStore()
 const message = ref('')
+const confirmVisible = ref(false)
+const confirmTitle = ref('')
+const confirmMessage = ref('')
+const confirmDanger = ref(false)
+let confirmAction: (() => void) | null = null
+
+function openConfirm(
+  title: string,
+  msg: string,
+  action: () => void,
+  options?: { danger?: boolean },
+) {
+  confirmTitle.value = title
+  confirmMessage.value = msg
+  confirmDanger.value = options?.danger ?? false
+  confirmAction = action
+  confirmVisible.value = true
+}
+
+function onConfirm() {
+  confirmAction?.()
+}
 
 function resetMockData() {
-  if (!confirm('確定要重置為 mock 假資料？所有變更將遺失。')) return
-  store.tasks = [...mockTasks]
-  store.labels = [...mockLabels]
-  store.setSelectedDate(todayString())
-  saveToStorage(TASKS_KEY, store.tasks)
-  saveToStorage(LABELS_KEY, store.labels)
-  saveToStorage(SELECTED_DATE_KEY, store.selectedDate)
-  message.value = '已重置為 mock 資料'
-  setTimeout(() => (message.value = ''), 3000)
+  openConfirm(
+    '重置為 Mock 資料',
+    '確定要重置為 mock 假資料？所有變更將遺失。',
+    () => {
+      store.tasks = [...mockTasks]
+      store.labels = [...mockLabels]
+      store.setSelectedDate(todayString())
+      saveToStorage(TASKS_KEY, store.tasks)
+      saveToStorage(LABELS_KEY, store.labels)
+      saveToStorage(SELECTED_DATE_KEY, store.selectedDate)
+      message.value = '已重置為 mock 資料'
+      setTimeout(() => (message.value = ''), 3000)
+    },
+  )
 }
 
 function clearStorage() {
-  if (!confirm('確定要清除所有 localStorage 資料？')) return
-  localStorage.removeItem(TASKS_KEY)
-  localStorage.removeItem(LABELS_KEY)
-  localStorage.removeItem(SELECTED_DATE_KEY)
-  location.reload()
+  openConfirm(
+    '清除所有資料',
+    '確定要清除所有 localStorage 資料？此操作無法復原。',
+    () => {
+      localStorage.removeItem(TASKS_KEY)
+      localStorage.removeItem(LABELS_KEY)
+      localStorage.removeItem(SELECTED_DATE_KEY)
+      location.reload()
+    },
+    { danger: true },
+  )
 }
 </script>
 
@@ -59,6 +93,17 @@ function clearStorage() {
         <li>版本 1.0.0</li>
       </ul>
     </div>
+
+    <ConfirmDialog
+      :visible="confirmVisible"
+      :title="confirmTitle"
+      :message="confirmMessage"
+      :danger="confirmDanger"
+      confirm-label="確定"
+      cancel-label="取消"
+      @confirm="onConfirm"
+      @close="confirmVisible = false"
+    />
   </div>
 </template>
 

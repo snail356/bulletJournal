@@ -2,7 +2,11 @@
 import { ref } from 'vue'
 import type { Attachment, Note } from '@/types'
 import AttachmentList from './AttachmentList.vue'
+import ColorDotPicker from './ColorDotPicker.vue'
+import AppIcon from './AppIcon.vue'
+import InlineEditable from './InlineEditable.vue'
 import { useTaskStore } from '@/stores/taskStore'
+import { NOTE_COLOR_BG, NOTE_COLOR_DOT, NOTE_COLOR_OPTIONS } from '@/utils/noteColors'
 
 const props = defineProps<{
   note: Note
@@ -14,49 +18,20 @@ const emit = defineEmits<{
 }>()
 
 const store = useTaskStore()
-const editing = ref(false)
-const editContent = ref('')
 const hovered = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
-const showColorPicker = ref(false)
+const contentRef = ref<InstanceType<typeof InlineEditable> | null>(null)
 
-const colors: Note['color'][] = ['purple', 'orange', 'green', 'blue', 'gray']
-
-const colorMap: Record<Note['color'], string> = {
-  purple: '#ede9fe',
-  orange: '#ffedd5',
-  green: '#dcfce7',
-  blue: '#dbeafe',
-  gray: '#f3f4f6',
-}
-
-const borderMap: Record<Note['color'], string> = {
-  purple: '#c4b5fd',
-  orange: '#fdba74',
-  green: '#86efac',
-  blue: '#93c5fd',
-  gray: '#d1d5db',
-}
-
-function startEdit() {
-  editContent.value = props.note.content
-  editing.value = true
-}
-
-function saveEdit() {
-  if (editContent.value.trim()) {
-    store.updateNote(props.taskId, props.note.id, { content: editContent.value.trim() })
-  }
-  editing.value = false
+function saveContent(content: string) {
+  store.updateNote(props.taskId, props.note.id, { content })
 }
 
 function remove() {
   store.deleteNote(props.taskId, props.note.id)
 }
 
-function setColor(color: Note['color']) {
-  store.updateNote(props.taskId, props.note.id, { color })
-  showColorPicker.value = false
+function setColor(color: string) {
+  store.updateNote(props.taskId, props.note.id, { color: color as Note['color'] })
 }
 
 async function onPaste(e: ClipboardEvent) {
@@ -65,6 +40,7 @@ async function onPaste(e: ClipboardEvent) {
   for (const item of items) {
     if (item.type.startsWith('image/')) {
       e.preventDefault()
+      e.stopPropagation()
       const file = item.getAsFile()
       if (file) await store.addAttachment('note', props.note.id, file)
     }
@@ -87,21 +63,22 @@ async function onFileChange(e: Event) {
   <div
     class="note"
     :style="{
-      background: colorMap[note.color],
-      borderColor: borderMap[note.color],
+      background: NOTE_COLOR_BG[note.color],
+      borderColor: NOTE_COLOR_DOT[note.color],
     }"
     @mouseenter="hovered = true"
-    @mouseleave="hovered = false; showColorPicker = false"
+    @mouseleave="hovered = false"
     @paste="onPaste"
     @contextmenu.prevent
   >
-    <textarea
-      v-if="editing"
-      v-model="editContent"
-      class="edit-area"
-      @blur="saveEdit"
+    <InlineEditable
+      ref="contentRef"
+      :model-value="note.content"
+      tag="p"
+      class="content"
+      multiline
+      @save="saveContent"
     />
-    <p v-else class="content">{{ note.content }}</p>
 
     <AttachmentList
       :attachments="note.attachments"
@@ -109,21 +86,21 @@ async function onFileChange(e: Event) {
     />
 
     <div v-show="hovered" class="actions">
-      <button type="button" title="編輯" @click="startEdit">✏️</button>
-      <button type="button" title="貼上圖片" @click="triggerUpload">🖼️</button>
-      <button type="button" title="改變顏色" @click="showColorPicker = !showColorPicker">🎨</button>
-      <button type="button" title="刪除" @click="remove">🗑️</button>
-    </div>
-
-    <div v-if="showColorPicker" class="color-picker">
-      <button
-        v-for="c in colors"
-        :key="c"
-        type="button"
-        class="color-dot"
-        :style="{ background: borderMap[c] }"
-        @click="setColor(c)"
+      <button type="button" title="編輯" @click="contentRef?.startEditing()">
+        <AppIcon name="pen" size="xs" />
+      </button>
+      <button type="button" title="貼上圖片" @click="triggerUpload">
+        <AppIcon name="image" size="xs" />
+      </button>
+      <ColorDotPicker
+        :model-value="note.color"
+        :options="NOTE_COLOR_OPTIONS"
+        menu-align="end"
+        @update:model-value="setColor"
       />
+      <button type="button" title="刪除" @click="remove">
+        <AppIcon name="trash" size="xs" />
+      </button>
     </div>
 
     <input ref="fileInput" type="file" accept="image/*" hidden @change="onFileChange" />
@@ -147,22 +124,13 @@ async function onFileChange(e: Event) {
   line-height: 1.6;
 }
 
-.edit-area {
-  width: 100%;
-  min-height: 60px;
-  padding: 6px;
-  border: 1px solid $primary;
-  border-radius: 4px;
-  background: white;
-  resize: vertical;
-}
-
 .actions {
   position: absolute;
   top: 8px;
   right: 8px;
   display: flex;
   gap: 2px;
+  align-items: center;
   background: rgba(255, 255, 255, 0.85);
   border-radius: 6px;
   padding: 2px;
@@ -177,25 +145,5 @@ async function onFileChange(e: Event) {
       background: white;
     }
   }
-}
-
-.color-picker {
-  position: absolute;
-  top: 36px;
-  right: 8px;
-  display: flex;
-  gap: 6px;
-  background: white;
-  padding: 6px 8px;
-  border-radius: 6px;
-  box-shadow: $shadow;
-}
-
-.color-dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid white;
-  box-shadow: 0 0 0 1px $border;
 }
 </style>

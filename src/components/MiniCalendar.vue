@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { formatDate, getCalendarGrid, todayString } from '@/utils/date'
+import AppIcon from './AppIcon.vue'
 
 const store = useTaskStore()
 const viewDate = ref(new Date())
@@ -46,9 +47,13 @@ function dayClass(date: Date | null) {
 <template>
   <div class="mini-calendar">
     <div class="header">
-      <button type="button" aria-label="上個月" @click="prevMonth">‹</button>
+      <button type="button" aria-label="上個月" @click="prevMonth">
+        <AppIcon name="chevron-left" size="xs" />
+      </button>
       <span>{{ monthLabel }}</span>
-      <button type="button" aria-label="下個月" @click="nextMonth">›</button>
+      <button type="button" aria-label="下個月" @click="nextMonth">
+        <AppIcon name="chevron-right" size="xs" />
+      </button>
     </div>
     <div class="weekdays">
       <span v-for="d in weekdays" :key="d">{{ d }}</span>
@@ -91,6 +96,9 @@ function dayClass(date: Date | null) {
     height: 28px;
     border-radius: 6px;
     color: $text-muted;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 
     &:hover {
       background: $surface;

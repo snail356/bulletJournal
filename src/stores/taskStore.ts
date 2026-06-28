@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
 import { mockLabels, mockTasks } from '@/mock/data'
 import type {
+  Attachment,
   AttachmentOwnerType,
   Label,
   Note,
@@ -14,6 +15,8 @@ import { createAttachmentFromFile } from '@/utils/attachment'
 import { addDays, todayString } from '@/utils/date'
 import { generateId } from '@/utils/id'
 import {
+  EXPAND_IMAGES_KEY,
+  EXPAND_TASKS_KEY,
   LABELS_KEY,
   SELECTED_DATE_KEY,
   TASKS_KEY,
@@ -25,10 +28,40 @@ function cloneTask(task: Task): Task {
   return JSON.parse(JSON.stringify(task)) as Task
 }
 
+function normalizeSubTask(sub: SubTask): SubTask {
+  return { ...sub, note: sub.note ?? '' }
+}
+
+function normalizeTask(task: Task): Task {
+  return {
+    ...task,
+    subtasks: task.subtasks.map(normalizeSubTask),
+  }
+}
+
 function sortByCompleted<T extends { completed: boolean }>(items: T[]): T[] {
   const pending = items.filter((i) => !i.completed)
   const done = items.filter((i) => i.completed)
   return [...pending, ...done]
+}
+
+function reorderInGroup<T extends { id: string; completed: boolean }>(
+  items: T[],
+  fromId: string,
+  toId: string,
+): T[] | null {
+  const sorted = sortByCompleted([...items])
+  const fromIdx = sorted.findIndex((i) => i.id === fromId)
+  const toIdx = sorted.findIndex((i) => i.id === toId)
+  if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return null
+
+  const fromItem = sorted[fromIdx]
+  const toItem = sorted[toIdx]
+  if (fromItem.completed !== toItem.completed) return null
+
+  const [moved] = sorted.splice(fromIdx, 1)
+  sorted.splice(toIdx, 0, moved)
+  return sorted
 }
 
 export const useTaskStore = defineStore('task', () => {
@@ -36,11 +69,15 @@ export const useTaskStore = defineStore('task', () => {
   const tasks = ref<Task[]>([])
   const labels = ref<Label[]>([])
   const selectedDate = ref(todayString())
+  const expandImages = ref(loadFromStorage(EXPAND_IMAGES_KEY, false))
+  const expandAllTasks = ref(loadFromStorage(EXPAND_TASKS_KEY, true))
 
   function persist() {
     saveToStorage(TASKS_KEY, tasks.value)
     saveToStorage(LABELS_KEY, labels.value)
     saveToStorage(SELECTED_DATE_KEY, selectedDate.value)
+    saveToStorage(EXPAND_IMAGES_KEY, expandImages.value)
+    saveToStorage(EXPAND_TASKS_KEY, expandAllTasks.value)
   }
 
   function init() {
@@ -49,7 +86,7 @@ export const useTaskStore = defineStore('task', () => {
     const storedLabels = loadFromStorage<Label[] | null>(LABELS_KEY, null)
     const storedDate = loadFromStorage<string | null>(SELECTED_DATE_KEY, null)
 
-    tasks.value = storedTasks ?? [...mockTasks]
+    tasks.value = (storedTasks ?? [...mockTasks]).map(normalizeTask)
     labels.value = storedLabels ?? [...mockLabels]
     selectedDate.value = storedDate ?? todayString()
 
@@ -61,7 +98,7 @@ export const useTaskStore = defineStore('task', () => {
     persist()
   }
 
-  watch([tasks, labels, selectedDate], persist, { deep: true })
+  watch([tasks, labels, selectedDate, expandImages, expandAllTasks], persist, { deep: true })
 
   const tasksForSelectedDate = computed(() => getTasksByDate(selectedDate.value))
 
@@ -198,6 +235,22 @@ export const useTaskStore = defineStore('task', () => {
     reorderCompletedToBottom(task.date)
   }
 
+  function completeTaskWithSubtasks(taskId: string) {
+    const task = findTask(taskId)
+    if (!task) return
+    const now = new Date().toISOString()
+    const pending = task.subtasks.filter((s) => !s.completed)
+    const done = task.subtasks.filter((s) => s.completed)
+    task.subtasks = [
+      ...done,
+      ...pending.map((s) => ({ ...s, completed: true, updatedAt: now })),
+    ]
+    task.completed = true
+    task.status = 'done'
+    touchTask(task)
+    reorderCompletedToBottom(task.date)
+  }
+
   function createSubTask(taskId: string, title: string): SubTask | null {
     const task = findTask(taskId)
     if (!task) return null
@@ -206,6 +259,7 @@ export const useTaskStore = defineStore('task', () => {
       id: generateId(),
       taskId,
       title,
+      note: '',
       completed: false,
       attachments: [],
       createdAt: now,
@@ -219,7 +273,7 @@ export const useTaskStore = defineStore('task', () => {
   function updateSubTask(
     taskId: string,
     subTaskId: string,
-    payload: Partial<Pick<SubTask, 'title' | 'completed'>>,
+    payload: Partial<Pick<SubTask, 'title' | 'note' | 'completed'>>,
   ) {
     const task = findTask(taskId)
     if (!task) return
@@ -242,9 +296,18 @@ export const useTaskStore = defineStore('task', () => {
     if (!task) return
     const sub = task.subtasks.find((s) => s.id === subTaskId)
     if (!sub) return
+    const wasCompleted = sub.completed
     sub.completed = !sub.completed
     sub.updatedAt = new Date().toISOString()
-    task.subtasks = sortByCompleted(task.subtasks)
+
+    if (sub.completed && !wasCompleted) {
+      const pending = task.subtasks.filter((s) => !s.completed)
+      const done = task.subtasks.filter((s) => s.completed && s.id !== subTaskId)
+      task.subtasks = [...pending, ...done, sub]
+    } else {
+      task.subtasks = sortByCompleted(task.subtasks)
+    }
+
     touchTask(task)
   }
 
@@ -321,15 +384,68 @@ export const useTaskStore = defineStore('task', () => {
     return attachment
   }
 
-  function deleteAttachment(attachmentId: string) {
+  function findAttachment(
+    attachmentId: string,
+  ): { attachment: Attachment; task: Task } | null {
     for (const task of tasks.value) {
-      task.attachments = task.attachments.filter((a) => a.id !== attachmentId)
+      const direct = task.attachments.find((a) => a.id === attachmentId)
+      if (direct) return { attachment: direct, task }
       for (const sub of task.subtasks) {
-        sub.attachments = sub.attachments.filter((a) => a.id !== attachmentId)
+        const subAtt = sub.attachments.find((a) => a.id === attachmentId)
+        if (subAtt) return { attachment: subAtt, task }
       }
       for (const note of task.notes) {
-        note.attachments = note.attachments.filter((a) => a.id !== attachmentId)
+        const noteAtt = note.attachments.find((a) => a.id === attachmentId)
+        if (noteAtt) return { attachment: noteAtt, task }
       }
+    }
+    return null
+  }
+
+  function shouldRemoveAttachment(
+    candidate: Attachment,
+    target: Attachment,
+    parentTask: Task,
+    task: Task,
+  ): boolean {
+    if (candidate.url !== target.url) return false
+    if (candidate.ownerType === target.ownerType && candidate.ownerId === target.ownerId) {
+      return true
+    }
+    if (
+      target.ownerType !== 'task' &&
+      task.id === parentTask.id &&
+      candidate.ownerType === 'task' &&
+      candidate.ownerId === parentTask.id
+    ) {
+      return true
+    }
+    return false
+  }
+
+  function deleteAttachment(attachmentId: string) {
+    const found = findAttachment(attachmentId)
+    if (!found) return
+    const { attachment: target, task: parentTask } = found
+
+    for (const task of tasks.value) {
+      let changed = false
+      const filterList = (list: Attachment[]) => {
+        const next = list.filter(
+          (a) => !shouldRemoveAttachment(a, target, parentTask, task),
+        )
+        if (next.length !== list.length) changed = true
+        return next
+      }
+
+      task.attachments = filterList(task.attachments)
+      for (const sub of task.subtasks) {
+        sub.attachments = filterList(sub.attachments)
+      }
+      for (const note of task.notes) {
+        note.attachments = filterList(note.attachments)
+      }
+      if (changed) touchTask(task)
     }
   }
 
@@ -438,6 +554,33 @@ export const useTaskStore = defineStore('task', () => {
     })
   }
 
+  function reorderTasks(date: string, fromId: string, toId: string) {
+    const dayTasks = tasks.value.filter((t) => t.date === date)
+    const reordered = reorderInGroup(dayTasks, fromId, toId)
+    if (!reordered) return
+    const others = tasks.value.filter((t) => t.date !== date)
+    tasks.value = [...others, ...reordered]
+  }
+
+  function reorderSubTasks(taskId: string, fromId: string, toId: string) {
+    const task = findTask(taskId)
+    if (!task) return
+    const reordered = reorderInGroup(task.subtasks, fromId, toId)
+    if (!reordered) return
+    task.subtasks = reordered
+    touchTask(task)
+  }
+
+  function reorderLabels(fromId: string, toId: string) {
+    const fromIdx = labels.value.findIndex((l) => l.id === fromId)
+    const toIdx = labels.value.findIndex((l) => l.id === toId)
+    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return
+    const updated = [...labels.value]
+    const [moved] = updated.splice(fromIdx, 1)
+    updated.splice(toIdx, 0, moved)
+    labels.value = updated
+  }
+
   function getAllTasksFiltered(status?: TaskStatus | 'all') {
     let list = [...tasks.value]
     if (status && status !== 'all') {
@@ -462,6 +605,8 @@ export const useTaskStore = defineStore('task', () => {
     tasks,
     labels,
     selectedDate,
+    expandImages,
+    expandAllTasks,
     tasksForSelectedDate,
     todayProgress,
     init,
@@ -472,6 +617,7 @@ export const useTaskStore = defineStore('task', () => {
     duplicateTask,
     moveTask,
     toggleTask,
+    completeTaskWithSubtasks,
     createSubTask,
     updateSubTask,
     deleteSubTask,
@@ -488,6 +634,9 @@ export const useTaskStore = defineStore('task', () => {
     createLabel,
     updateLabel,
     deleteLabel,
+    reorderTasks,
+    reorderSubTasks,
+    reorderLabels,
     getAllTasksFiltered,
     getTaskStats,
     findTask,

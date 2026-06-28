@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import type { Attachment, Task, TaskStatus } from '@/types'
+import { computed, inject, nextTick, provide, ref, watch } from 'vue'
+import type { Attachment, SubTask, Task, TaskStatus } from '@/types'
 import SubTaskItem from './SubTaskItem.vue'
 import NoteBlock from './NoteBlock.vue'
 import AttachmentList from './AttachmentList.vue'
@@ -9,6 +9,11 @@ import type { ContextMenuItem } from './TaskContextMenu.vue'
 import TaskFormModal from './TaskFormModal.vue'
 import TaskStatusDropdown from './TaskStatusDropdown.vue'
 import QuickInputModal from './QuickInputModal.vue'
+import ConfirmDialog from './ConfirmDialog.vue'
+import AppIcon from './AppIcon.vue'
+import InlineEditable from './InlineEditable.vue'
+import { SUBTASK_DRAG_KEY, TASK_DRAG_KEY } from '@/composables/taskDrag'
+import { useReorderDrag } from '@/composables/useReorderDrag'
 import { useTaskStore } from '@/stores/taskStore'
 
 const props = defineProps<{
@@ -21,28 +26,55 @@ const emit = defineEmits<{
 }>()
 
 const store = useTaskStore()
+const taskDrag = inject(TASK_DRAG_KEY, null)
+
+const isTaskDragging = computed(() => taskDrag?.draggingId.value === props.task.id)
+const isTaskDragOver = computed(() => taskDrag?.dragOverId.value === props.task.id)
+
+const subtaskDrag = useReorderDrag<SubTask>(
+  () => props.task.subtasks,
+  (fromId, toId) => store.reorderSubTasks(props.task.id, fromId, toId),
+)
+provide(SUBTASK_DRAG_KEY, subtaskDrag)
+
 const menuVisible = ref(false)
 const menuX = ref(0)
 const menuY = ref(0)
 const showEditModal = ref(false)
-const showSubtaskModal = ref(false)
 const showNoteModal = ref(false)
 const showMoveDate = ref(false)
+const showCompleteConfirm = ref(false)
+const pendingFocusSubtaskId = ref<string | null>(null)
 const moveDateValue = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
-const expanded = ref(true)
+const expanded = ref(store.expandAllTasks)
 
-const labelNames = computed(() =>
-  props.task.labels
-    .map((id) => store.labels.find((l) => l.id === id)?.name)
-    .filter(Boolean),
+watch(
+  () => store.expandAllTasks,
+  (v) => {
+    expanded.value = v
+  },
 )
+
+function toggleExpanded() {
+  expanded.value = !expanded.value
+}
 
 const subtaskProgress = computed(() => {
   const total = props.task.subtasks.length
   const done = props.task.subtasks.filter((s) => s.completed).length
   return { total, done }
 })
+
+const incompleteSubtaskCount = computed(
+  () => props.task.subtasks.filter((s) => !s.completed).length,
+)
+
+const labelNames = computed(() =>
+  props.task.labels
+    .map((id) => store.labels.find((l) => l.id === id)?.name)
+    .filter(Boolean),
+)
 
 const menuItems: ContextMenuItem[] = [
   { key: 'edit', label: '編輯任務' },
@@ -65,8 +97,39 @@ function onContextMenu(e: MouseEvent) {
   openMenu(e)
 }
 
-function toggleComplete() {
-  store.toggleTask(props.task.id)
+function saveTitle(title: string) {
+  store.updateTask(props.task.id, { title })
+}
+
+function addSubtaskInline() {
+  const sub = store.createSubTask(props.task.id, '')
+  if (sub) {
+    pendingFocusSubtaskId.value = sub.id
+    nextTick(() => {
+      pendingFocusSubtaskId.value = null
+    })
+  }
+}
+
+function saveEmptyNote(content: string) {
+  store.createNote(props.task.id, content)
+}
+
+function onCompleteChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  if (input.checked) {
+    if (incompleteSubtaskCount.value > 0) {
+      showCompleteConfirm.value = true
+      return
+    }
+    store.toggleTask(props.task.id)
+  } else {
+    store.toggleTask(props.task.id)
+  }
+}
+
+function confirmCompleteWithSubtasks() {
+  store.completeTaskWithSubtasks(props.task.id)
 }
 
 function onMenuSelect(key: string) {
@@ -76,7 +139,7 @@ function onMenuSelect(key: string) {
       showEditModal.value = true
       break
     case 'add-subtask':
-      showSubtaskModal.value = true
+      addSubtaskInline()
       break
     case 'add-note':
       showNoteModal.value = true
@@ -105,10 +168,6 @@ function onStatusChange(status: TaskStatus) {
   if (status === 'done') store.reorderCompletedToBottom(props.task.date)
 }
 
-function addSubtask(title: string) {
-  store.createSubTask(props.task.id, title)
-}
-
 function addNote(content: string) {
   store.createNote(props.task.id, content)
 }
@@ -121,6 +180,9 @@ function confirmMove() {
 }
 
 async function onPaste(e: ClipboardEvent) {
+  const target = e.target as HTMLElement
+  if (target.closest('.subtask') || target.closest('.note')) return
+
   const items = e.clipboardData?.items
   if (!items) return
   for (const item of items) {
@@ -160,18 +222,42 @@ async function onContextPaste() {
 <template>
   <article
     class="task-card"
-    :class="{ completed: task.completed }"
+    :class="{
+      completed: task.completed,
+      dragging: isTaskDragging,
+      'drag-over': isTaskDragOver,
+    }"
     @contextmenu="onContextMenu"
     @paste="onPaste"
+    @dragover="taskDrag?.onDragOver($event, task.id)"
+    @drop="taskDrag?.onDrop($event, task.id)"
   >
     <header class="header">
+      <span
+        v-if="taskDrag"
+        class="drag-handle"
+        draggable="true"
+        aria-label="拖曳排序"
+        @dragstart="taskDrag.onDragStart($event, task.id)"
+        @dragend="taskDrag.onDragEnd"
+      >
+        <AppIcon name="grip-vertical" />
+      </span>
+
       <label class="check-wrap">
-        <input type="checkbox" :checked="task.completed" @change="toggleComplete" />
-        <span class="check" />
+        <input type="checkbox" :checked="task.completed" @change="onCompleteChange" />
+        <span class="check" :class="{ checked: task.completed }">
+          <AppIcon v-if="task.completed" name="check" size="xs" class="check-icon" />
+        </span>
       </label>
 
       <div class="title-area">
-        <h3 class="title">{{ task.title }}</h3>
+        <InlineEditable
+          :model-value="task.title"
+          tag="h3"
+          class="title"
+          @save="saveTitle"
+        />
         <div class="meta">
           <TaskStatusDropdown
             :model-value="task.status"
@@ -187,11 +273,13 @@ async function onContextPaste() {
           type="button"
           class="expand-btn"
           :aria-expanded="expanded"
-          @click="expanded = !expanded"
+          @click="toggleExpanded"
         >
-          {{ expanded ? '▾' : '▸' }}
+          <AppIcon :name="expanded ? 'chevron-down' : 'chevron-right'" />
         </button>
-        <button type="button" class="menu-btn" aria-label="更多操作" @click="openMenu">⋯</button>
+        <button type="button" class="menu-btn" aria-label="更多操作" @click="openMenu">
+          <AppIcon name="ellipsis" />
+        </button>
       </div>
     </header>
 
@@ -209,7 +297,7 @@ async function onContextPaste() {
               {{ subtaskProgress.done }}/{{ subtaskProgress.total }}
             </span>
           </p>
-          <button type="button" class="add-btn" @click="showSubtaskModal = true">
+          <button type="button" class="add-btn" @click="addSubtaskInline">
             + 新增
           </button>
         </div>
@@ -218,9 +306,9 @@ async function onContextPaste() {
           :key="sub.id"
           :subtask="sub"
           :task-id="task.id"
+          :autofocus="pendingFocusSubtaskId === sub.id"
           @preview="emit('preview', $event)"
         />
-        <p v-if="!task.subtasks.length" class="empty-hint">尚無子任務</p>
       </div>
 
       <div class="section">
@@ -237,7 +325,15 @@ async function onContextPaste() {
           :task-id="task.id"
           @preview="emit('preview', $event)"
         />
-        <p v-if="!task.notes.length" class="empty-hint">尚無備註</p>
+        <InlineEditable
+          v-if="!task.notes.length"
+          model-value=""
+          tag="p"
+          class="empty-hint"
+          hint
+          placeholder="尚無備註"
+          @save="saveEmptyNote"
+        />
       </div>
     </div>
 
@@ -258,12 +354,14 @@ async function onContextPaste() {
       @saved="showEditModal = false"
     />
 
-    <QuickInputModal
-      :visible="showSubtaskModal"
-      title="新增子任務"
-      placeholder="輸入子任務標題..."
-      @confirm="addSubtask"
-      @close="showSubtaskModal = false"
+    <ConfirmDialog
+      :visible="showCompleteConfirm"
+      title="尚有未完成的子任務"
+      :message="`此任務還有 ${incompleteSubtaskCount} 項子任務未完成，是否一併標記為已完成？`"
+      confirm-label="是"
+      cancel-label="否"
+      @confirm="confirmCompleteWithSubtasks"
+      @close="showCompleteConfirm = false"
     />
 
     <QuickInputModal
@@ -301,7 +399,16 @@ async function onContextPaste() {
   box-shadow: $shadow;
   padding: 16px 18px;
   border: 1px solid $border;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.15s;
+
+  &.dragging {
+    opacity: 0.45;
+  }
+
+  &.drag-over {
+    transform: translateY(2px);
+    box-shadow: $shadow, 0 -2px 0 0 $primary inset;
+  }
 
   &.completed {
     opacity: 0.72;
@@ -316,7 +423,26 @@ async function onContextPaste() {
 .header {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
+}
+
+.drag-handle {
+  padding-top: 4px;
+  color: $text-muted;
+  font-size: 16px;
+  cursor: grab;
+  opacity: 0.4;
+  line-height: 1;
+  flex-shrink: 0;
+  user-select: none;
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .check-wrap {
@@ -333,24 +459,18 @@ async function onContextPaste() {
   height: 20px;
   border: 2px solid #d1d5db;
   border-radius: 6px;
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &.checked {
+    background: $primary;
+    border-color: $primary;
+  }
 }
 
-input:checked + .check {
-  background: $primary;
-  border-color: $primary;
-  position: relative;
-
-  &::after {
-    content: '✓';
-    position: absolute;
-    inset: 0;
-    color: white;
-    font-size: 13px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+.check-icon {
+  color: white;
 }
 
 .title-area {
@@ -397,6 +517,9 @@ input:checked + .check {
   border-radius: 6px;
   color: $text-muted;
   font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   &:hover {
     background: $bg;
@@ -448,7 +571,6 @@ input:checked + .check {
 
 .empty-hint {
   font-size: 12px;
-  color: $text-muted;
   padding: 4px 0;
 }
 

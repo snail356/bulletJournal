@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
 import type { Attachment } from '@/types'
+import AppIcon from './AppIcon.vue'
 
 defineProps<{
   attachment: Attachment | null
@@ -21,7 +22,9 @@ onUnmounted(() => window.removeEventListener('keydown', onKey))
 <template>
   <Teleport to="body">
     <div v-if="attachment" class="lightbox" @click.self="emit('close')">
-      <button type="button" class="close" aria-label="關閉" @click="emit('close')">✕</button>
+      <button type="button" class="close" aria-label="關閉" @click="emit('close')">
+        <AppIcon name="xmark" />
+      </button>
       <img :src="attachment.url" :alt="attachment.fileName" />
       <p class="caption">{{ attachment.fileName }}</p>
     </div>

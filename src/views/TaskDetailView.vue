@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import type { Attachment } from '@/types'
 import TaskCard from '@/components/TaskCard.vue'
 import AttachmentPreview from '@/components/AttachmentPreview.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import { useTaskStore } from '@/stores/taskStore'
 
 const route = useRoute()
@@ -20,7 +21,10 @@ function onDeleted() {
 
 <template>
   <div class="detail-view">
-    <button type="button" class="back" @click="router.back()">← 返回</button>
+    <button type="button" class="back" @click="router.back()">
+      <AppIcon name="arrow-left" size="xs" />
+      返回
+    </button>
 
     <template v-if="task">
       <header class="page-header">
@@ -50,6 +54,9 @@ function onDeleted() {
 @use '@/styles/variables' as *;
 
 .back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: $text-muted;
   font-size: 13px;
   margin-bottom: 16px;

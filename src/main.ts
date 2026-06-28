@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import { useTaskStore } from './stores/taskStore'
+import './plugins/fontawesome'
 import './styles/global.scss'
 
 const app = createApp(App)

@@ -1,10 +1,14 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, provide, ref } from 'vue'
 import type { Attachment, Task } from '@/types'
 import TaskCard from '@/components/TaskCard.vue'
 import TaskFormModal from '@/components/TaskFormModal.vue'
 import AttachmentPreview from '@/components/AttachmentPreview.vue'
 import ConfirmOrUndoToast from '@/components/ConfirmOrUndoToast.vue'
+import AppIcon from '@/components/AppIcon.vue'
+import AppSwitch from '@/components/AppSwitch.vue'
+import { TASK_DRAG_KEY } from '@/composables/taskDrag'
+import { useReorderDrag } from '@/composables/useReorderDrag'
 import { useTaskStore } from '@/stores/taskStore'
 import { formatDisplayDate } from '@/utils/date'
 
@@ -18,6 +22,12 @@ const deletedTaskBackup = ref<Task | null>(null)
 const tasks = computed(() => store.getTasksByDate(store.selectedDate))
 const dateLabel = computed(() => formatDisplayDate(store.selectedDate))
 const progress = computed(() => store.todayProgress)
+
+const taskDrag = useReorderDrag<Task>(
+  () => tasks.value,
+  (fromId, toId) => store.reorderTasks(store.selectedDate, fromId, toId),
+)
+provide(TASK_DRAG_KEY, taskDrag)
 
 function onTaskDeleted(task: Task) {
   deletedTaskBackup.value = JSON.parse(JSON.stringify(task)) as Task
@@ -43,9 +53,21 @@ function undoDelete() {
           {{ progress.completed }} / {{ progress.total }} 項任務已完成
         </p>
       </div>
-      <button type="button" class="btn-primary" @click="showCreateModal = true">
-        + 新增任務
-      </button>
+      <div class="header-actions">
+        <AppSwitch
+          :model-value="store.expandAllTasks"
+          label="展開任務"
+          @update:model-value="store.expandAllTasks = $event"
+        />
+        <AppSwitch
+          :model-value="store.expandImages"
+          label="展開圖片"
+          @update:model-value="store.expandImages = $event"
+        />
+        <button type="button" class="btn-primary" @click="showCreateModal = true">
+          + 新增任務
+        </button>
+      </div>
     </header>
 
     <div v-if="tasks.length" class="task-list">
@@ -59,7 +81,7 @@ function undoDelete() {
     </div>
 
     <div v-else class="empty">
-      <span class="empty-icon">📝</span>
+      <AppIcon name="clipboard-list" size="lg" class="empty-icon" />
       <p>今天還沒有任務</p>
       <button type="button" class="btn-primary" @click="showCreateModal = true">
         建立第一個任務
@@ -115,6 +137,13 @@ function undoDelete() {
   margin-top: 4px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 .btn-primary {
   padding: 10px 18px;
   background: $primary;
@@ -144,7 +173,9 @@ function undoDelete() {
   .empty-icon {
     font-size: 48px;
     display: block;
-    margin-bottom: 12px;
+    margin: 0 auto 12px;
+    color: $text-muted;
+    opacity: 0.5;
   }
 
   p {

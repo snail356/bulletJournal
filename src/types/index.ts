@@ -34,6 +34,7 @@ export interface SubTask {
   id: string
   taskId: string
   title: string
+  note: string
   completed: boolean
   attachments: Attachment[]
   createdAt: string

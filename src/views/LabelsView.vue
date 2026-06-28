@@ -1,10 +1,23 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import ColorDotPicker from '@/components/ColorDotPicker.vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import AppIcon from '@/components/AppIcon.vue'
 import { useTaskStore } from '@/stores/taskStore'
+import { useSimpleReorderDrag } from '@/composables/useReorderDrag'
+import { DEFAULT_LABEL_COLOR, LABEL_COLOR_OPTIONS } from '@/utils/labelColors'
 
 const store = useTaskStore()
 const newName = ref('')
-const newColor = ref('#7c3aed')
+const newColor = ref(DEFAULT_LABEL_COLOR)
+const confirmVisible = ref(false)
+const pendingDeleteId = ref<string | null>(null)
+
+const { draggingId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd } =
+  useSimpleReorderDrag(
+    () => store.labels,
+    (fromId, toId) => store.reorderLabels(fromId, toId),
+  )
 
 function addLabel() {
   if (!newName.value.trim()) return
@@ -13,7 +26,15 @@ function addLabel() {
 }
 
 function removeLabel(id: string) {
-  if (confirm('確定刪除此標籤？')) store.deleteLabel(id)
+  pendingDeleteId.value = id
+  confirmVisible.value = true
+}
+
+function confirmRemoveLabel() {
+  if (pendingDeleteId.value) {
+    store.deleteLabel(pendingDeleteId.value)
+    pendingDeleteId.value = null
+  }
 }
 </script>
 
@@ -21,18 +42,41 @@ function removeLabel(id: string) {
   <div class="labels-view">
     <header class="page-header">
       <h1>標籤管理</h1>
-      <p class="subtitle">管理任務標籤分類</p>
+      <p class="subtitle">管理任務標籤分類，拖曳可調整順序</p>
     </header>
 
     <div class="add-form">
-      <input v-model="newName" type="text" placeholder="新標籤名稱" />
-      <input v-model="newColor" type="color" />
+      <input v-model="newName" type="text" placeholder="新標籤名稱" @keyup.enter="addLabel" />
+      <ColorDotPicker v-model="newColor" :options="LABEL_COLOR_OPTIONS" />
       <button type="button" class="btn-primary" @click="addLabel">新增標籤</button>
     </div>
 
     <div class="label-grid">
-      <div v-for="label in store.labels" :key="label.id" class="label-card">
-        <span class="dot" :style="{ background: label.color }" />
+      <div
+        v-for="label in store.labels"
+        :key="label.id"
+        class="label-card"
+        :class="{
+          dragging: draggingId === label.id,
+          'drag-over': dragOverId === label.id,
+        }"
+        @dragover="onDragOver($event, label.id)"
+        @drop="onDrop($event, label.id)"
+      >
+        <span
+          class="drag-handle"
+          draggable="true"
+          aria-label="拖曳排序"
+          @dragstart="onDragStart($event, label.id)"
+          @dragend="onDragEnd"
+        >
+          <AppIcon name="grip-vertical" />
+        </span>
+        <ColorDotPicker
+          :model-value="label.color"
+          :options="LABEL_COLOR_OPTIONS"
+          @update:model-value="(color) => store.updateLabel(label.id, { color })"
+        />
         <span class="name">{{ label.name }}</span>
         <span class="count">
           {{ store.tasks.filter((t) => t.labels.includes(label.id)).length }} 項任務
@@ -40,6 +84,17 @@ function removeLabel(id: string) {
         <button type="button" class="delete" @click="removeLabel(label.id)">刪除</button>
       </div>
     </div>
+
+    <ConfirmDialog
+      :visible="confirmVisible"
+      title="刪除標籤"
+      message="確定刪除此標籤？使用中的任務將移除此標籤。"
+      confirm-label="確定"
+      cancel-label="取消"
+      danger
+      @confirm="confirmRemoveLabel"
+      @close="confirmVisible = false"
+    />
   </div>
 </template>
 
@@ -66,6 +121,7 @@ function removeLabel(id: string) {
   gap: 10px;
   margin-bottom: 24px;
   flex-wrap: wrap;
+  align-items: center;
 
   input[type='text'] {
     flex: 1;
@@ -73,13 +129,6 @@ function removeLabel(id: string) {
     padding: 10px 12px;
     border: 1px solid $border;
     border-radius: $radius-sm;
-  }
-
-  input[type='color'] {
-    width: 44px;
-    height: 40px;
-    border: none;
-    cursor: pointer;
   }
 }
 
@@ -106,12 +155,32 @@ function removeLabel(id: string) {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
+  transition: box-shadow 0.15s, opacity 0.15s;
+  position: relative;
+
+  &.dragging {
+    opacity: 0.45;
+  }
+
+  &.drag-over {
+    box-shadow: $shadow, inset 0 -2px 0 $primary;
+  }
 }
 
-.dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
+.drag-handle {
+  color: $text-muted;
+  font-size: 14px;
+  cursor: grab;
+  opacity: 0.4;
+  line-height: 1;
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &:active {
+    cursor: grabbing;
+  }
 }
 
 .name {
@@ -123,6 +192,7 @@ function removeLabel(id: string) {
   width: 100%;
   font-size: 12px;
   color: $text-muted;
+  padding-left: 22px;
 }
 
 .delete {

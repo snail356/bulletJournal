@@ -3,17 +3,19 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import MiniCalendar from './MiniCalendar.vue'
 import TodayProgress from './TodayProgress.vue'
+import AppIcon from './AppIcon.vue'
+import type { AppIconName } from '@/plugins/fontawesome'
 import { useTaskStore } from '@/stores/taskStore'
 
 const route = useRoute()
 const store = useTaskStore()
 
-const navItems = [
-  { path: '/today', label: '今日任務', icon: '☀️' },
-  { path: '/tasks', label: '所有任務', icon: '📋' },
-  { path: '/labels', label: '標籤管理', icon: '🏷️' },
-  { path: '/stats', label: '統計分析', icon: '📊' },
-  { path: '/settings', label: '設定', icon: '⚙️' },
+const navItems: { path: string; label: string; icon: AppIconName }[] = [
+  { path: '/today', label: '今日任務', icon: 'sun' },
+  { path: '/tasks', label: '所有任務', icon: 'list-check' },
+  { path: '/labels', label: '標籤管理', icon: 'tags' },
+  { path: '/stats', label: '統計分析', icon: 'chart-column' },
+  { path: '/settings', label: '設定', icon: 'gear' },
 ]
 
 const progress = computed(() => store.todayProgress)
@@ -26,7 +28,9 @@ function isActive(path: string) {
 <template>
   <aside class="sidebar">
     <div class="brand">
-      <span class="brand-icon">📓</span>
+      <span class="brand-icon">
+        <AppIcon name="book" size="lg" />
+      </span>
       <div>
         <h1>Bullet Journal</h1>
         <p>工作狀態紀錄</p>
@@ -41,7 +45,9 @@ function isActive(path: string) {
         class="nav-item"
         :class="{ active: isActive(item.path) }"
       >
-        <span class="nav-icon">{{ item.icon }}</span>
+        <span class="nav-icon">
+          <AppIcon :name="item.icon" />
+        </span>
         {{ item.label }}
       </RouterLink>
     </nav>
@@ -94,7 +100,8 @@ function isActive(path: string) {
 }
 
 .brand-icon {
-  font-size: 28px;
+  color: $primary;
+  display: flex;
 }
 
 .nav {
@@ -126,7 +133,10 @@ function isActive(path: string) {
 }
 
 .nav-icon {
-  font-size: 16px;
+  width: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar-widgets {
