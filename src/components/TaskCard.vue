@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, provide, ref, watch } from 'vue'
 import type { Attachment, SubTask, Task, TaskStatus } from '@/types'
+import { formatDisplayDate } from '@/utils/date'
 import SubTaskItem from './SubTaskItem.vue'
 import NoteBlock from './NoteBlock.vue'
 import AttachmentList from './AttachmentList.vue'
@@ -18,6 +19,7 @@ import { useTaskStore } from '@/stores/taskStore'
 
 const props = defineProps<{
   task: Task
+  migratedAway?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -76,6 +78,15 @@ const labelNames = computed(() =>
     .filter(Boolean),
 )
 
+const isMigrated = computed(() => props.migratedAway === true)
+
+const migratedTargetLabel = computed(() => formatDisplayDate(props.task.date))
+
+function goToCurrentDate() {
+  if (!isMigrated.value) return
+  store.setSelectedDate(props.task.date)
+}
+
 const menuItems: ContextMenuItem[] = [
   { key: 'edit', label: '編輯任務' },
   { key: 'add-subtask', label: '新增子任務' },
@@ -93,11 +104,13 @@ function openMenu(e: MouseEvent) {
 }
 
 function onContextMenu(e: MouseEvent) {
+  if (isMigrated.value) return
   e.preventDefault()
   openMenu(e)
 }
 
 function saveTitle(title: string) {
+  if (isMigrated.value) return
   store.updateTask(props.task.id, { title })
 }
 
@@ -223,18 +236,20 @@ async function onContextPaste() {
   <article
     class="task-card"
     :class="{
-      completed: task.completed,
+      completed: task.completed && !isMigrated,
+      migrated: isMigrated,
       dragging: isTaskDragging,
       'drag-over': isTaskDragOver,
     }"
     @contextmenu="onContextMenu"
     @paste="onPaste"
-    @dragover="taskDrag?.onDragOver($event, task.id)"
-    @drop="taskDrag?.onDrop($event, task.id)"
+    @click="goToCurrentDate"
+    @dragover="!isMigrated && taskDrag?.onDragOver($event, task.id)"
+    @drop="!isMigrated && taskDrag?.onDrop($event, task.id)"
   >
     <header class="header">
       <span
-        v-if="taskDrag"
+        v-if="taskDrag && !isMigrated"
         class="drag-handle"
         draggable="true"
         aria-label="拖曳排序"
@@ -244,31 +259,41 @@ async function onContextPaste() {
         <AppIcon name="grip-vertical" />
       </span>
 
-      <label class="check-wrap">
+      <label v-if="!isMigrated" class="check-wrap">
         <input type="checkbox" :checked="task.completed" @change="onCompleteChange" />
         <span class="check" :class="{ checked: task.completed }">
           <AppIcon v-if="task.completed" name="check" size="xs" class="check-icon" />
         </span>
       </label>
 
+      <span v-else class="migrated-indicator" title="已遷移至目前排程日期">
+        <AppIcon name="arrow-right" size="xs" />
+      </span>
+
       <div class="title-area">
+        <h3 v-if="isMigrated" class="title">{{ task.title }}</h3>
         <InlineEditable
+          v-else
           :model-value="task.title"
           tag="h3"
           class="title"
           @save="saveTitle"
         />
         <div class="meta">
-          <TaskStatusDropdown
-            :model-value="task.status"
-            @update:model-value="onStatusChange"
-          />
-          <span v-for="name in labelNames" :key="name" class="label-tag">{{ name }}</span>
-          <span v-if="task.carriedFromDate" class="carried">延續自 {{ task.carriedFromDate }}</span>
+          <template v-if="isMigrated">
+            <span class="migrated-tag">已遷移 → {{ migratedTargetLabel }}</span>
+          </template>
+          <template v-else>
+            <TaskStatusDropdown
+              :model-value="task.status"
+              @update:model-value="onStatusChange"
+            />
+            <span v-for="name in labelNames" :key="name" class="label-tag">{{ name }}</span>
+          </template>
         </div>
       </div>
 
-      <div class="header-actions">
+      <div v-if="!isMigrated" class="header-actions">
         <button
           type="button"
           class="expand-btn"
@@ -283,7 +308,7 @@ async function onContextPaste() {
       </div>
     </header>
 
-    <div v-show="expanded" class="body">
+    <div v-show="expanded && !isMigrated" class="body">
       <AttachmentList
         :attachments="task.attachments"
         @preview="emit('preview', $event)"
@@ -418,6 +443,21 @@ async function onContextPaste() {
       text-decoration: line-through;
     }
   }
+
+  &.migrated {
+    opacity: 0.55;
+    cursor: pointer;
+    background: $bg;
+
+    .title {
+      color: $text-muted;
+      text-decoration: none;
+    }
+
+    &:hover {
+      opacity: 0.7;
+    }
+  }
 }
 
 .header {
@@ -500,6 +540,23 @@ async function onContextPaste() {
 }
 
 .carried {
+  font-size: 11px;
+  color: $text-muted;
+  font-style: italic;
+}
+
+.migrated-indicator {
+  width: 20px;
+  height: 20px;
+  padding-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: $text-muted;
+  flex-shrink: 0;
+}
+
+.migrated-tag {
   font-size: 11px;
   color: $text-muted;
   font-style: italic;

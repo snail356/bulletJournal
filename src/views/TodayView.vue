@@ -19,12 +19,15 @@ const toastVisible = ref(false)
 const toastMessage = ref('')
 const deletedTaskBackup = ref<Task | null>(null)
 
-const tasks = computed(() => store.getTasksByDate(store.selectedDate))
+const taskViews = computed(() => store.getTasksByDate(store.selectedDate))
+const activeTasks = computed(() =>
+  taskViews.value.filter((v) => !v.migratedAway).map((v) => v.task),
+)
 const dateLabel = computed(() => formatDisplayDate(store.selectedDate))
 const progress = computed(() => store.todayProgress)
 
 const taskDrag = useReorderDrag<Task>(
-  () => tasks.value,
+  () => activeTasks.value,
   (fromId, toId) => store.reorderTasks(store.selectedDate, fromId, toId),
 )
 provide(TASK_DRAG_KEY, taskDrag)
@@ -70,11 +73,12 @@ function undoDelete() {
       </div>
     </header>
 
-    <div v-if="tasks.length" class="task-list">
+    <div v-if="taskViews.length" class="task-list">
       <TaskCard
-        v-for="task in tasks"
-        :key="task.id"
-        :task="task"
+        v-for="view in taskViews"
+        :key="view.migratedAway ? `${view.task.id}-migrated` : view.task.id"
+        :task="view.task"
+        :migrated-away="view.migratedAway"
         @preview="previewAttachment = $event"
         @deleted="onTaskDeleted"
       />

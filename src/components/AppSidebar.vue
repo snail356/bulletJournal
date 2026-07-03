@@ -23,6 +23,10 @@ const progress = computed(() => store.todayProgress)
 function isActive(path: string) {
   return route.path === path || route.path.startsWith(path + '/')
 }
+
+function openMigrationReview() {
+  store.openMigrationReview()
+}
 </script>
 
 <template>
@@ -50,6 +54,18 @@ function isActive(path: string) {
         </span>
         {{ item.label }}
       </RouterLink>
+      <button
+        v-if="store.overdueTaskCount > 0"
+        type="button"
+        class="nav-item migration-btn"
+        @click="openMigrationReview"
+      >
+        <span class="nav-icon">
+          <AppIcon name="arrow-right" />
+        </span>
+        處理延期任務
+        <span class="badge">{{ store.overdueTaskCount }}</span>
+      </button>
     </nav>
 
     <div class="sidebar-widgets">
@@ -130,6 +146,32 @@ function isActive(path: string) {
     color: $primary;
     font-weight: 600;
   }
+}
+
+.migration-btn {
+  width: 100%;
+  text-align: left;
+  border: 1px dashed rgba($primary, 0.35);
+  margin-top: 4px;
+
+  &:hover {
+    border-color: $primary;
+  }
+}
+
+.badge {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: $primary;
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .nav-icon {

@@ -15,11 +15,7 @@ const grid = computed(() => getCalendarGrid(year.value, month.value))
 const weekdays = ['日', '一', '二', '三', '四', '五', '六']
 const today = todayString()
 
-const taskDates = computed(() => {
-  const set = new Set<string>()
-  store.tasks.forEach((t) => set.add(t.date))
-  return set
-})
+const taskDates = computed(() => store.getTaskDatesWithActivity())
 
 function prevMonth() {
   viewDate.value = new Date(year.value, month.value - 1, 1)

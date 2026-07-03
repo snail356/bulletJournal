@@ -1,5 +1,24 @@
 <script setup lang="ts">
+import { onMounted, onUnmounted } from 'vue'
 import AppSidebar from '@/components/AppSidebar.vue'
+import MigrationReviewModal from '@/components/MigrationReviewModal.vue'
+import { useTaskStore } from '@/stores/taskStore'
+
+const store = useTaskStore()
+
+function onVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    store.checkMigrationReview()
+  }
+}
+
+onMounted(() => {
+  document.addEventListener('visibilitychange', onVisibilityChange)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', onVisibilityChange)
+})
 </script>
 
 <template>
@@ -8,6 +27,14 @@ import AppSidebar from '@/components/AppSidebar.vue'
     <main class="main">
       <RouterView />
     </main>
+
+    <MigrationReviewModal
+      :visible="store.migrationReviewVisible"
+      :candidates="store.migrationCandidates"
+      @confirm="store.applyMigrationReview"
+      @snooze="store.snoozeMigrationReview"
+      @close="store.snoozeMigrationReview"
+    />
   </div>
 </template>
 

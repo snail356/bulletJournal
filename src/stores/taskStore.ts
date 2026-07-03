@@ -5,21 +5,28 @@ import type {
   Attachment,
   AttachmentOwnerType,
   Label,
+  MigrationCandidate,
+  MigrationRecord,
+  MigrationReviewAction,
+  MigrationReviewState,
   Note,
   SubTask,
   Task,
+  TaskDayView,
   TaskStatus,
   TodayProgress,
 } from '@/types'
 import { createAttachmentFromFile } from '@/utils/attachment'
-import { addDays, todayString } from '@/utils/date'
+import { daysBetween, todayString } from '@/utils/date'
 import { generateId } from '@/utils/id'
 import {
   EXPAND_IMAGES_KEY,
   EXPAND_TASKS_KEY,
   LABELS_KEY,
+  MIGRATION_REVIEW_KEY,
   SELECTED_DATE_KEY,
   TASKS_KEY,
+  defaultMigrationReviewState,
   loadFromStorage,
   saveToStorage,
 } from '@/utils/storage'
@@ -32,11 +39,74 @@ function normalizeSubTask(sub: SubTask): SubTask {
   return { ...sub, note: sub.note ?? '' }
 }
 
-function normalizeTask(task: Task): Task {
+function normalizeTask(task: Task & { carriedFromDate?: string }): Task {
+  const migrationHistory = task.migrationHistory ?? []
+  if (task.carriedFromDate && !migrationHistory.length) {
+    migrationHistory.push({
+      fromDate: task.carriedFromDate,
+      toDate: task.date,
+      migratedAt: task.updatedAt,
+    })
+  }
+  const { carriedFromDate: _, ...rest } = task
   return {
-    ...task,
+    ...rest,
+    migrationHistory,
     subtasks: task.subtasks.map(normalizeSubTask),
   }
+}
+
+function isMigratedAwayFromDate(task: Task, date: string): boolean {
+  return task.date !== date && task.migrationHistory.some((m) => m.fromDate === date)
+}
+
+function migrateLegacyDuplicates(taskList: Task[]): Task[] {
+  const normalized = taskList.map(normalizeTask)
+  const carried = normalized.filter((t) =>
+    t.migrationHistory.some(
+      (m) => m.toDate === t.date && normalized.some(
+        (other) =>
+          other.id !== t.id &&
+          other.date === m.fromDate &&
+          other.title === t.title &&
+          !other.completed,
+      ),
+    ),
+  )
+  const idsToRemove = new Set<string>()
+
+  for (const copy of carried) {
+    const lastMigration = copy.migrationHistory[copy.migrationHistory.length - 1]
+    if (!lastMigration) continue
+    const source = normalized.find(
+      (t) =>
+        t.id !== copy.id &&
+        !idsToRemove.has(t.id) &&
+        t.date === lastMigration.fromDate &&
+        t.title === copy.title &&
+        !t.completed,
+    )
+    if (!source) continue
+
+    source.date = copy.date
+    source.migrationHistory = [
+      ...source.migrationHistory,
+      { ...lastMigration, migratedAt: copy.createdAt },
+    ]
+    source.subtasks = copy.subtasks.map((s) => ({ ...s, taskId: source.id }))
+    source.notes = copy.notes.map((n) => ({ ...n, taskId: source.id }))
+    source.attachments = copy.attachments.map((a) => ({
+      ...a,
+      ownerId: source.id,
+      ownerType: 'task' as const,
+    }))
+    source.status = copy.status
+    source.labels = [...copy.labels]
+    source.updatedAt = copy.updatedAt
+    idsToRemove.add(copy.id)
+  }
+
+  return normalized.filter((t) => !idsToRemove.has(t.id))
 }
 
 function sortByCompleted<T extends { completed: boolean }>(items: T[]): T[] {
@@ -71,6 +141,14 @@ export const useTaskStore = defineStore('task', () => {
   const selectedDate = ref(todayString())
   const expandImages = ref(loadFromStorage(EXPAND_IMAGES_KEY, false))
   const expandAllTasks = ref(loadFromStorage(EXPAND_TASKS_KEY, true))
+  const migrationReviewState = ref<MigrationReviewState>(
+    loadFromStorage(MIGRATION_REVIEW_KEY, defaultMigrationReviewState),
+  )
+  const migrationReviewVisible = ref(false)
+
+  function persistMigrationReviewState() {
+    saveToStorage(MIGRATION_REVIEW_KEY, migrationReviewState.value)
+  }
 
   function persist() {
     saveToStorage(TASKS_KEY, tasks.value)
@@ -86,13 +164,11 @@ export const useTaskStore = defineStore('task', () => {
     const storedLabels = loadFromStorage<Label[] | null>(LABELS_KEY, null)
     const storedDate = loadFromStorage<string | null>(SELECTED_DATE_KEY, null)
 
-    tasks.value = (storedTasks ?? [...mockTasks]).map(normalizeTask)
+    tasks.value = migrateLegacyDuplicates(storedTasks ?? [...mockTasks])
     labels.value = storedLabels ?? [...mockLabels]
     selectedDate.value = storedDate ?? todayString()
 
-    const today = todayString()
-    const yesterday = addDays(today, -1)
-    carryOverUnfinishedTasks(yesterday, today)
+    checkMigrationReview()
 
     initialized.value = true
     persist()
@@ -116,9 +192,110 @@ export const useTaskStore = defineStore('task', () => {
 
   const todayProgress = computed(() => calcProgress(selectedDate.value))
 
-  function getTasksByDate(date: string): Task[] {
-    const list = tasks.value.filter((t) => t.date === date)
-    return sortByCompleted([...list])
+  function getTasksByDate(date: string): TaskDayView[] {
+    const active = tasks.value.filter((t) => t.date === date)
+    const migrated = tasks.value.filter((t) => isMigratedAwayFromDate(t, date))
+    const views: TaskDayView[] = [
+      ...sortByCompleted([...active]).map((task) => ({ task, migratedAway: false })),
+      ...migrated.map((task) => ({ task, migratedAway: true })),
+    ]
+    return views
+  }
+
+  function getTaskDatesWithActivity(): Set<string> {
+    const set = new Set<string>()
+    for (const task of tasks.value) {
+      set.add(task.date)
+      for (const record of task.migrationHistory) {
+        set.add(record.fromDate)
+      }
+    }
+    return set
+  }
+
+  function getMigrationCandidates(today: string = todayString()): MigrationCandidate[] {
+    const kept = new Set(migrationReviewState.value.keptTodayTaskIds[today] ?? [])
+    return tasks.value
+      .filter((t) => !t.completed && t.date < today && !kept.has(t.id))
+      .map((task) => ({
+        task,
+        overdueFrom: task.date,
+        daysOverdue: daysBetween(task.date, today),
+      }))
+      .sort((a, b) => a.overdueFrom.localeCompare(b.overdueFrom))
+  }
+
+  const migrationCandidates = computed(() => getMigrationCandidates())
+
+  const overdueTaskCount = computed(() => migrationCandidates.value.length)
+
+  function shouldShowMigrationReview(today: string = todayString()): boolean {
+    if (migrationReviewState.value.snoozedUntil === today) return false
+    return getMigrationCandidates(today).length > 0
+  }
+
+  function checkMigrationReview() {
+    if (shouldShowMigrationReview()) {
+      migrationReviewVisible.value = true
+    }
+  }
+
+  function openMigrationReview() {
+    if (getMigrationCandidates().length > 0) {
+      migrationReviewVisible.value = true
+    }
+  }
+
+  function snoozeMigrationReview() {
+    migrationReviewState.value.snoozedUntil = todayString()
+    persistMigrationReviewState()
+    migrationReviewVisible.value = false
+  }
+
+  function applyMigrationReview(actions: MigrationReviewAction[]) {
+    const today = todayString()
+    const keptIds: string[] = []
+
+    for (const { taskId, action, targetDate } of actions) {
+      const task = findTask(taskId)
+      if (!task) continue
+      switch (action) {
+        case 'migrate':
+          rescheduleTask(task, targetDate ?? today)
+          break
+        case 'complete':
+          task.completed = true
+          task.status = 'done'
+          touchTask(task)
+          reorderCompletedToBottom(task.date)
+          break
+        case 'keep':
+          keptIds.push(taskId)
+          break
+      }
+    }
+
+    if (keptIds.length) {
+      const existing = migrationReviewState.value.keptTodayTaskIds[today] ?? []
+      migrationReviewState.value.keptTodayTaskIds[today] = [...existing, ...keptIds]
+    }
+
+    migrationReviewState.value.lastReviewedDate = today
+    migrationReviewState.value.snoozedUntil = null
+    persistMigrationReviewState()
+    migrationReviewVisible.value = false
+  }
+
+  function rescheduleTask(task: Task, newDate: string) {
+    if (task.date === newDate) return
+    const record: MigrationRecord = {
+      fromDate: task.date,
+      toDate: newDate,
+      migratedAt: new Date().toISOString(),
+    }
+    task.migrationHistory.push(record)
+    task.date = newDate
+    touchTask(task)
   }
 
   function findTask(taskId: string): Task | undefined {
@@ -146,6 +323,7 @@ export const useTaskStore = defineStore('task', () => {
       notes: [],
       attachments: [],
       labels: payload.labels ?? [],
+      migrationHistory: [],
       createdAt: now,
       updatedAt: now,
     }
@@ -156,7 +334,13 @@ export const useTaskStore = defineStore('task', () => {
   function updateTask(id: string, payload: Partial<Omit<Task, 'id'>>) {
     const task = findTask(id)
     if (!task) return
-    Object.assign(task, payload)
+    if (payload.date && payload.date !== task.date) {
+      rescheduleTask(task, payload.date)
+      const { date: _, ...rest } = payload
+      Object.assign(task, rest)
+    } else {
+      Object.assign(task, payload)
+    }
     touchTask(task)
   }
 
@@ -172,6 +356,7 @@ export const useTaskStore = defineStore('task', () => {
     const newId = generateId()
     copy.id = newId
     copy.date = targetDate ?? source.date
+    copy.migrationHistory = []
     copy.completed = false
     copy.createdAt = now
     copy.updatedAt = now
@@ -219,7 +404,9 @@ export const useTaskStore = defineStore('task', () => {
   }
 
   function moveTask(taskId: string, newDate: string) {
-    updateTask(taskId, { date: newDate })
+    const task = findTask(taskId)
+    if (!task) return
+    rescheduleTask(task, newDate)
   }
 
   function toggleTask(taskId: string) {
@@ -449,6 +636,15 @@ export const useTaskStore = defineStore('task', () => {
     }
   }
 
+  function catchUpUnfinishedTasksToToday(today: string = todayString()) {
+    const unfinished = tasks.value.filter(
+      (t) => !t.completed && t.date < today,
+    )
+    for (const task of unfinished) {
+      rescheduleTask(task, today)
+    }
+  }
+
   function carryOverUnfinishedTasks(fromDate: string, toDate: string) {
     if (fromDate === toDate) return
 
@@ -456,57 +652,12 @@ export const useTaskStore = defineStore('task', () => {
       (t) => t.date === fromDate && !t.completed,
     )
 
-    for (const source of unfinished) {
-      const alreadyCarried = tasks.value.some(
-        (t) =>
-          t.date === toDate &&
-          t.carriedFromDate === fromDate &&
-          t.title === source.title,
+    for (const task of unfinished) {
+      const alreadyMigrated = task.migrationHistory.some(
+        (m) => m.fromDate === fromDate && m.toDate === toDate,
       )
-      if (alreadyCarried) continue
-
-      const now = new Date().toISOString()
-      const newId = generateId()
-      const carried: Task = {
-        ...cloneTask(source),
-        id: newId,
-        date: toDate,
-        carriedFromDate: fromDate,
-        createdAt: now,
-        updatedAt: now,
-        subtasks: source.subtasks.map((s) => {
-          const subId = generateId()
-          return {
-            ...s,
-            id: subId,
-            taskId: newId,
-            attachments: s.attachments.map((a) => ({
-              ...a,
-              id: generateId(),
-              ownerId: subId,
-            })),
-          }
-        }),
-        notes: source.notes.map((n) => {
-          const noteId = generateId()
-          return {
-            ...n,
-            id: noteId,
-            taskId: newId,
-            attachments: n.attachments.map((a) => ({
-              ...a,
-              id: generateId(),
-              ownerId: noteId,
-            })),
-          }
-        }),
-        attachments: source.attachments.map((a) => ({
-          ...a,
-          id: generateId(),
-          ownerId: newId,
-        })),
-      }
-      tasks.value.push(carried)
+      if (alreadyMigrated) continue
+      rescheduleTask(task, toDate)
     }
   }
 
@@ -607,10 +758,19 @@ export const useTaskStore = defineStore('task', () => {
     selectedDate,
     expandImages,
     expandAllTasks,
-    tasksForSelectedDate,
-    todayProgress,
+    migrationReviewVisible,
+    migrationCandidates,
+    overdueTaskCount,
     init,
     getTasksByDate,
+    getTaskDatesWithActivity,
+    getMigrationCandidates,
+    checkMigrationReview,
+    openMigrationReview,
+    snoozeMigrationReview,
+    applyMigrationReview,
+    tasksForSelectedDate,
+    todayProgress,
     createTask,
     updateTask,
     deleteTask,
@@ -628,6 +788,7 @@ export const useTaskStore = defineStore('task', () => {
     addAttachment,
     deleteAttachment,
     carryOverUnfinishedTasks,
+    catchUpUnfinishedTasksToToday,
     reorderCompletedToBottom,
     getTodayProgress,
     setSelectedDate,

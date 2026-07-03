@@ -20,6 +20,13 @@ export function addDays(dateStr: string, days: number): string {
   return formatDate(date)
 }
 
+export function daysBetween(fromDateStr: string, toDateStr: string): number {
+  const from = parseDateString(fromDateStr)
+  const to = parseDateString(toDateStr)
+  const msPerDay = 86_400_000
+  return Math.round((to.getTime() - from.getTime()) / msPerDay)
+}
+
 export function isSameDate(a: string, b: string): boolean {
   return a === b
 }
