@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import type { Attachment } from '@/types'
+import type { Attachment, Task } from '@/types'
 import TaskCard from '@/components/TaskCard.vue'
 import AttachmentPreview from '@/components/AttachmentPreview.vue'
 import AppIcon from '@/components/AppIcon.vue'
@@ -14,7 +14,8 @@ const previewAttachment = ref<Attachment | null>(null)
 
 const task = computed(() => store.findTask(route.params.id as string))
 
-function onDeleted() {
+function onDeleted(task: Task) {
+  store.deleteTask(task.id)
   router.push('/tasks')
 }
 </script>

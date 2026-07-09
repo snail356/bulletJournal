@@ -46,6 +46,7 @@ const showEditModal = ref(false)
 const showNoteModal = ref(false)
 const showMoveDate = ref(false)
 const showCompleteConfirm = ref(false)
+const showDeleteConfirm = ref(false)
 const pendingFocusSubtaskId = ref<string | null>(null)
 const moveDateValue = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
@@ -145,6 +146,15 @@ function confirmCompleteWithSubtasks() {
   store.completeTaskWithSubtasks(props.task.id)
 }
 
+function confirmDelete() {
+  emit('deleted', props.task)
+  showDeleteConfirm.value = false
+}
+
+function requestDelete() {
+  showDeleteConfirm.value = true
+}
+
 function onMenuSelect(key: string) {
   menuVisible.value = false
   switch (key) {
@@ -168,7 +178,7 @@ function onMenuSelect(key: string) {
       showMoveDate.value = true
       break
     case 'delete':
-      emit('deleted', props.task)
+      requestDelete()
       break
   }
 }
@@ -294,13 +304,20 @@ async function onContextPaste() {
       </div>
 
       <div v-if="!isMigrated" class="header-actions">
-        <button
-          type="button"
-          class="expand-btn"
+        <button type="button" class="expand-btn"
           :aria-expanded="expanded"
           @click="toggleExpanded"
         >
           <AppIcon :name="expanded ? 'chevron-down' : 'chevron-right'" />
+        </button>
+        <button
+          type="button"
+          class="delete-btn"
+          aria-label="刪除任務"
+          title="刪除任務"
+          @click="requestDelete"
+        >
+          <AppIcon name="trash" />
         </button>
         <button type="button" class="menu-btn" aria-label="更多操作" @click="openMenu">
           <AppIcon name="ellipsis" />
@@ -377,6 +394,17 @@ async function onContextPaste() {
       :task="task"
       @close="showEditModal = false"
       @saved="showEditModal = false"
+    />
+
+    <ConfirmDialog
+      :visible="showDeleteConfirm"
+      title="刪除任務"
+      :message="`確定要刪除「${task.title}」嗎？此操作將一併刪除所有子任務、備註與附件。`"
+      confirm-label="刪除"
+      cancel-label="取消"
+      danger
+      @confirm="confirmDelete"
+      @close="showDeleteConfirm = false"
     />
 
     <ConfirmDialog
@@ -568,6 +596,7 @@ async function onContextPaste() {
 }
 
 .expand-btn,
+.delete-btn,
 .menu-btn {
   width: 32px;
   height: 32px;
@@ -582,6 +611,11 @@ async function onContextPaste() {
     background: $bg;
     color: $primary;
   }
+}
+
+.delete-btn:hover {
+  color: #ef4444;
+  background: #fef2f2;
 }
 
 .body {

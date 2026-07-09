@@ -12,17 +12,19 @@ const confirmVisible = ref(false)
 const confirmTitle = ref('')
 const confirmMessage = ref('')
 const confirmDanger = ref(false)
+const confirmLabel = ref('確定')
 let confirmAction: (() => void) | null = null
 
 function openConfirm(
   title: string,
   msg: string,
   action: () => void,
-  options?: { danger?: boolean },
+  options?: { danger?: boolean; confirmLabel?: string },
 ) {
   confirmTitle.value = title
   confirmMessage.value = msg
   confirmDanger.value = options?.danger ?? false
+  confirmLabel.value = options?.confirmLabel ?? '確定'
   confirmAction = action
   confirmVisible.value = true
 }
@@ -48,17 +50,16 @@ function resetMockData() {
   )
 }
 
-function clearStorage() {
+function clearAllData() {
   openConfirm(
     '清除所有資料',
-    '確定要清除所有 localStorage 資料？此操作無法復原。',
+    '確定要清除所有任務、標籤與偏好設定？此操作無法復原，且不會還原為示範資料。',
     () => {
-      localStorage.removeItem(TASKS_KEY)
-      localStorage.removeItem(LABELS_KEY)
-      localStorage.removeItem(SELECTED_DATE_KEY)
-      location.reload()
+      store.clearAllData()
+      message.value = '已清除所有資料'
+      setTimeout(() => (message.value = ''), 3000)
     },
-    { danger: true },
+    { danger: true, confirmLabel: '全部清除' },
   )
 }
 </script>
@@ -77,7 +78,7 @@ function clearStorage() {
         <button type="button" class="btn-secondary" @click="resetMockData">
           重置為 Mock 資料
         </button>
-        <button type="button" class="btn-danger" @click="clearStorage">
+        <button type="button" class="btn-danger" @click="clearAllData">
           清除所有資料
         </button>
       </div>
@@ -99,7 +100,7 @@ function clearStorage() {
       :title="confirmTitle"
       :message="confirmMessage"
       :danger="confirmDanger"
-      confirm-label="確定"
+      :confirm-label="confirmLabel"
       cancel-label="取消"
       @confirm="onConfirm"
       @close="confirmVisible = false"

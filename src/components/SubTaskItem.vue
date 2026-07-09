@@ -1,109 +1,113 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
-import type { Attachment, SubTask } from '@/types'
-import AttachmentList from './AttachmentList.vue'
-import AppIcon from './AppIcon.vue'
-import InlineEditable from './InlineEditable.vue'
-import { SUBTASK_DRAG_KEY } from '@/composables/taskDrag'
-import { useTaskStore } from '@/stores/taskStore'
+import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
+import type { Attachment, SubTask } from "@/types";
+import AttachmentList from "./AttachmentList.vue";
+import AppIcon from "./AppIcon.vue";
+import InlineEditable from "./InlineEditable.vue";
+import { SUBTASK_DRAG_KEY } from "@/composables/taskDrag";
+import { useTaskStore } from "@/stores/taskStore";
 
 const props = defineProps<{
-  subtask: SubTask
-  taskId: string
-  autofocus?: boolean
-}>()
+  subtask: SubTask;
+  taskId: string;
+  autofocus?: boolean;
+}>();
 
 const emit = defineEmits<{
-  preview: [attachment: Attachment]
-}>()
+  preview: [attachment: Attachment];
+}>();
 
-const store = useTaskStore()
-const subtaskDrag = inject(SUBTASK_DRAG_KEY, null)
-const isDragging = computed(() => subtaskDrag?.draggingId.value === props.subtask.id)
-const isDragOver = computed(() => subtaskDrag?.dragOverId.value === props.subtask.id)
-const hasNote = computed(() => props.subtask.note.trim().length > 0)
-const editing = ref(false)
-const noteEditing = ref(false)
-const hovered = ref(false)
-const noteExpanded = ref(hasNote.value)
-const fileInput = ref<HTMLInputElement | null>(null)
-const titleRef = ref<InstanceType<typeof InlineEditable> | null>(null)
-const noteRef = ref<InstanceType<typeof InlineEditable> | null>(null)
-const subtaskEl = ref<HTMLElement | null>(null)
+const store = useTaskStore();
+const subtaskDrag = inject(SUBTASK_DRAG_KEY, null);
+const isDragging = computed(
+  () => subtaskDrag?.draggingId.value === props.subtask.id,
+);
+const isDragOver = computed(
+  () => subtaskDrag?.dragOverId.value === props.subtask.id,
+);
+const hasNote = computed(() => props.subtask.note.trim().length > 0);
+const editing = ref(false);
+const noteEditing = ref(false);
+const hovered = ref(false);
+const noteExpanded = ref(hasNote.value);
+const fileInput = ref<HTMLInputElement | null>(null);
+const titleRef = ref<InstanceType<typeof InlineEditable> | null>(null);
+const noteRef = ref<InstanceType<typeof InlineEditable> | null>(null);
+const subtaskEl = ref<HTMLElement | null>(null);
 
 watch(
   () => props.autofocus,
   (v) => {
-    if (v) nextTick(() => titleRef.value?.startEditing())
+    if (v) nextTick(() => titleRef.value?.startEditing());
   },
   { immediate: true },
-)
+);
 
 onMounted(() => {
-  if (props.autofocus) subtaskEl.value?.focus()
-})
+  if (props.autofocus) subtaskEl.value?.focus();
+});
 
 watch(
   () => props.subtask.note,
   (note) => {
-    if (note.trim()) noteExpanded.value = true
+    if (note.trim()) noteExpanded.value = true;
   },
-)
+);
 
 function saveTitle(title: string) {
   if (!title.trim()) {
-    remove()
-    return
+    remove();
+    return;
   }
-  store.updateSubTask(props.taskId, props.subtask.id, { title })
+  store.updateSubTask(props.taskId, props.subtask.id, { title });
 }
 
 function saveNote(note: string) {
-  store.updateSubTask(props.taskId, props.subtask.id, { note })
+  store.updateSubTask(props.taskId, props.subtask.id, { note });
 }
 
 function toggleNote() {
-  noteExpanded.value = !noteExpanded.value
+  noteExpanded.value = !noteExpanded.value;
   if (noteExpanded.value && !hasNote.value) {
-    noteRef.value?.startEditing()
+    noteRef.value?.startEditing();
   }
 }
 
 function toggle() {
-  store.toggleSubTask(props.taskId, props.subtask.id)
+  store.toggleSubTask(props.taskId, props.subtask.id);
 }
 
 function remove() {
-  store.deleteSubTask(props.taskId, props.subtask.id)
+  store.deleteSubTask(props.taskId, props.subtask.id);
 }
 
 async function onPaste(e: ClipboardEvent) {
-  const items = e.clipboardData?.items
-  if (!items) return
+  const items = e.clipboardData?.items;
+  if (!items) return;
   for (const item of items) {
-    if (item.type.startsWith('image/')) {
-      e.preventDefault()
-      e.stopPropagation()
-      const file = item.getAsFile()
-      if (file) await store.addAttachment('subtask', props.subtask.id, file)
-      return
+    if (item.type.startsWith("image/")) {
+      e.preventDefault();
+      e.stopPropagation();
+      const file = item.getAsFile();
+      if (file) await store.addAttachment("subtask", props.subtask.id, file);
+      return;
     }
   }
 }
 
 function focusSubtask() {
-  subtaskEl.value?.focus()
+  subtaskEl.value?.focus();
 }
 
 function triggerUpload() {
-  fileInput.value?.click()
+  fileInput.value?.click();
 }
 
 async function onFileChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (file) await store.addAttachment('subtask', props.subtask.id, file)
-  input.value = ''
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) await store.addAttachment("subtask", props.subtask.id, file);
+  input.value = "";
 }
 </script>
 
@@ -139,7 +143,12 @@ async function onFileChange(e: Event) {
     <label class="check-wrap">
       <input type="checkbox" :checked="subtask.completed" @change="toggle" />
       <span class="check" :class="{ checked: subtask.completed }">
-        <AppIcon v-if="subtask.completed" name="check" size="xs" class="check-icon" />
+        <AppIcon
+          v-if="subtask.completed"
+          name="check"
+          size="xs"
+          class="check-icon"
+        />
       </span>
     </label>
 
@@ -173,14 +182,20 @@ async function onFileChange(e: Event) {
       />
     </div>
 
-    <div class="actions" :class="{ visible: hovered && !editing && !noteEditing }">
+    <div
+      class="actions"
+      :class="{ visible: hovered && !editing && !noteEditing }"
+    >
       <button
         type="button"
         class="note-toggle"
         :title="noteExpanded ? '收合備註' : '展開備註'"
         @click="toggleNote"
       >
-        <AppIcon :name="noteExpanded ? 'chevron-down' : 'chevron-right'" size="xs" />
+        <AppIcon
+          :name="noteExpanded ? 'chevron-down' : 'chevron-right'"
+          size="xs"
+        />
         <span v-if="hasNote && !noteExpanded" class="note-dot" />
       </button>
       <button type="button" title="貼上圖片" @click="triggerUpload">
@@ -191,12 +206,18 @@ async function onFileChange(e: Event) {
       </button>
     </div>
 
-    <input ref="fileInput" type="file" accept="image/*" hidden @change="onFileChange" />
+    <input
+      ref="fileInput"
+      type="file"
+      accept="image/*"
+      hidden
+      @change="onFileChange"
+    />
   </div>
 </template>
 
 <style scoped lang="scss">
-@use '@/styles/variables' as *;
+@use "@/styles/variables" as *;
 
 .subtask {
   position: relative;
@@ -205,7 +226,10 @@ async function onFileChange(e: Event) {
   gap: 6px;
   padding: 8px 100px 8px 4px;
   border-radius: $radius-sm;
-  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  transition:
+    background 0.15s,
+    transform 0.15s,
+    box-shadow 0.15s;
   outline: none;
 
   &:hover {
