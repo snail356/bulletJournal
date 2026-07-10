@@ -1,11 +1,12 @@
+import type { MigrationReviewState } from '@/types'
+
 const TASKS_KEY = 'bullet-journal-tasks'
 const LABELS_KEY = 'bullet-journal-labels'
 const SELECTED_DATE_KEY = 'bullet-journal-selected-date'
 const EXPAND_IMAGES_KEY = 'bullet-journal-expand-images'
 const EXPAND_TASKS_KEY = 'bullet-journal-expand-tasks'
 const MIGRATION_REVIEW_KEY = 'bullet-journal-migration-review'
-
-import type { MigrationReviewState } from '@/types'
+const DIFFICULTY_NOTES_KEY = 'bullet-journal-difficulty-notes'
 
 const defaultMigrationReviewState: MigrationReviewState = {
   snoozedUntil: null,
@@ -27,4 +28,13 @@ export function saveToStorage<T>(key: string, value: T): void {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
-export { TASKS_KEY, LABELS_KEY, SELECTED_DATE_KEY, EXPAND_IMAGES_KEY, EXPAND_TASKS_KEY, MIGRATION_REVIEW_KEY, defaultMigrationReviewState }
+export {
+  TASKS_KEY,
+  LABELS_KEY,
+  SELECTED_DATE_KEY,
+  EXPAND_IMAGES_KEY,
+  EXPAND_TASKS_KEY,
+  MIGRATION_REVIEW_KEY,
+  DIFFICULTY_NOTES_KEY,
+  defaultMigrationReviewState,
+}

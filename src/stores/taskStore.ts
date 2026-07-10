@@ -4,6 +4,7 @@ import { mockLabels, mockTasks } from "@/mock/data";
 import type {
   Attachment,
   AttachmentOwnerType,
+  DifficultyNoteRecord,
   Label,
   MigrationCandidate,
   MigrationRecord,
@@ -20,6 +21,7 @@ import { createAttachmentFromFile } from "@/utils/attachment";
 import { daysBetween, todayString } from "@/utils/date";
 import { generateId } from "@/utils/id";
 import {
+  DIFFICULTY_NOTES_KEY,
   EXPAND_IMAGES_KEY,
   EXPAND_TASKS_KEY,
   LABELS_KEY,
@@ -52,6 +54,8 @@ function normalizeTask(task: Task & { carriedFromDate?: string }): Task {
   return {
     ...rest,
     migrationHistory,
+    statusHours: task.statusHours ?? null,
+    difficultyNote: task.difficultyNote ?? "",
     subtasks: task.subtasks.map(normalizeSubTask),
   };
 }
@@ -150,6 +154,13 @@ export const useTaskStore = defineStore("task", () => {
     loadFromStorage(MIGRATION_REVIEW_KEY, defaultMigrationReviewState),
   );
   const migrationReviewVisible = ref(false);
+  const difficultyNoteRecords = ref<DifficultyNoteRecord[]>(
+    loadFromStorage(DIFFICULTY_NOTES_KEY, [] as DifficultyNoteRecord[]),
+  );
+
+  function persistDifficultyNotes() {
+    saveToStorage(DIFFICULTY_NOTES_KEY, difficultyNoteRecords.value);
+  }
 
   function persistMigrationReviewState() {
     saveToStorage(MIGRATION_REVIEW_KEY, migrationReviewState.value);
@@ -172,6 +183,8 @@ export const useTaskStore = defineStore("task", () => {
     tasks.value = migrateLegacyDuplicates(storedTasks ?? [...mockTasks]);
     labels.value = storedLabels ?? [...mockLabels];
     selectedDate.value = storedDate ?? todayString();
+
+    syncDifficultyNotesFromTasks();
 
     checkMigrationReview();
 
@@ -317,6 +330,63 @@ export const useTaskStore = defineStore("task", () => {
     touchTask(task);
   }
 
+  function registerDifficultyNote(content: string, options?: { bumpUsage?: boolean }) {
+    const trimmed = content.trim();
+    if (!trimmed) return;
+    const now = new Date().toISOString();
+    const existing = difficultyNoteRecords.value.find(
+      (record) => record.content === trimmed,
+    );
+    if (existing) {
+      if (options?.bumpUsage !== false) {
+        existing.usageCount += 1;
+        existing.lastUsedAt = now;
+        persistDifficultyNotes();
+      }
+      return;
+    }
+    difficultyNoteRecords.value.push({
+      id: generateId(),
+      content: trimmed,
+      usageCount: 1,
+      createdAt: now,
+      lastUsedAt: now,
+    });
+    persistDifficultyNotes();
+  }
+
+  function syncDifficultyNotesFromTasks() {
+    for (const task of tasks.value) {
+      registerDifficultyNote(task.difficultyNote, { bumpUsage: false });
+    }
+  }
+
+  function getDifficultyNoteOptions(query = ""): string[] {
+    const normalizedQuery = query.trim().toLowerCase();
+    const sorted = [...difficultyNoteRecords.value].sort((a, b) => {
+      if (b.usageCount !== a.usageCount) {
+        return b.usageCount - a.usageCount;
+      }
+      return b.lastUsedAt.localeCompare(a.lastUsedAt);
+    });
+    const contents = sorted.map((record) => record.content);
+    if (!normalizedQuery) return contents;
+    return contents.filter((content) =>
+      content.toLowerCase().includes(normalizedQuery),
+    );
+  }
+
+  const difficultyNoteOptions = computed(() => getDifficultyNoteOptions());
+
+  function setTaskStatusHours(taskId: string, hours: number | null) {
+    updateTask(taskId, { statusHours: hours });
+  }
+
+  function setTaskDifficultyNote(taskId: string, content: string) {
+    updateTask(taskId, { difficultyNote: content });
+    registerDifficultyNote(content);
+  }
+
   function findTask(taskId: string): Task | undefined {
     return tasks.value.find((t) => t.id === taskId);
   }
@@ -337,6 +407,8 @@ export const useTaskStore = defineStore("task", () => {
       date: payload.date,
       title: payload.title,
       status: payload.status ?? "in_progress",
+      statusHours: null,
+      difficultyNote: "",
       completed: false,
       subtasks: [],
       notes: [],
@@ -804,8 +876,10 @@ export const useTaskStore = defineStore("task", () => {
     expandAllTasks.value = true;
     migrationReviewState.value = { ...defaultMigrationReviewState };
     migrationReviewVisible.value = false;
+    difficultyNoteRecords.value = [];
     persist();
     persistMigrationReviewState();
+    persistDifficultyNotes();
   }
 
   return {
@@ -817,10 +891,16 @@ export const useTaskStore = defineStore("task", () => {
     migrationReviewVisible,
     migrationCandidates,
     overdueTaskCount,
+    difficultyNoteRecords,
+    difficultyNoteOptions,
     init,
     getTasksByDate,
     getTaskDatesWithActivity,
     getMigrationCandidates,
+    getDifficultyNoteOptions,
+    registerDifficultyNote,
+    setTaskStatusHours,
+    setTaskDifficultyNote,
     checkMigrationReview,
     openMigrationReview,
     snoozeMigrationReview,

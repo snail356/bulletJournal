@@ -47,7 +47,6 @@ function style() {
       <template v-for="item in items" :key="item.key">
         <hr v-if="item.divider" />
         <button
-          v-else
           type="button"
           :class="{ danger: item.danger }"
           @click="emit('select', item.key)"

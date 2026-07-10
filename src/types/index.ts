@@ -67,12 +67,24 @@ export interface MigrationReviewState {
   lastReviewedDate: string | null
 }
 
+export interface DifficultyNoteRecord {
+  id: string
+  content: string
+  usageCount: number
+  createdAt: string
+  lastUsedAt: string
+}
+
 export interface Task {
   id: string
   /** 計畫執行日期（scheduled date） */
   date: string
   title: string
   status: TaskStatus
+  /** 此狀態累計／估計時數 */
+  statusHours: number | null
+  /** 困難點備註（可從歷史紀錄選取） */
+  difficultyNote: string
   completed: boolean
   subtasks: SubTask[]
   notes: Note[]

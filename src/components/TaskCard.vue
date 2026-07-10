@@ -9,6 +9,7 @@ import TaskContextMenu from './TaskContextMenu.vue'
 import type { ContextMenuItem } from './TaskContextMenu.vue'
 import TaskFormModal from './TaskFormModal.vue'
 import TaskStatusDropdown from './TaskStatusDropdown.vue'
+import SearchableCombobox from './SearchableCombobox.vue'
 import QuickInputModal from './QuickInputModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import AppIcon from './AppIcon.vue'
@@ -82,6 +83,55 @@ const labelNames = computed(() =>
 const isMigrated = computed(() => props.migratedAway === true)
 
 const migratedTargetLabel = computed(() => formatDisplayDate(props.task.date))
+
+const difficultyOptions = computed(() =>
+  store.getDifficultyNoteOptions(props.task.difficultyNote),
+)
+
+const hoursDraft = ref(formatHoursDraft(props.task.statusHours))
+
+watch(
+  () => props.task.statusHours,
+  (hours) => {
+    hoursDraft.value = formatHoursDraft(hours)
+  },
+)
+
+function formatHoursDraft(hours: number | null): string {
+  return hours != null ? String(hours) : ''
+}
+
+function commitHours() {
+  const raw = hoursDraft.value.trim()
+  if (raw === '') {
+    store.setTaskStatusHours(props.task.id, null)
+    hoursDraft.value = ''
+    return
+  }
+  const hours = Number(raw)
+  if (Number.isNaN(hours) || hours < 0) {
+    hoursDraft.value = formatHoursDraft(props.task.statusHours)
+    return
+  }
+  store.setTaskStatusHours(props.task.id, hours)
+  hoursDraft.value = String(hours)
+}
+
+function onHoursKeydown(e: KeyboardEvent) {
+  if (e.key === 'Enter') {
+    e.preventDefault()
+    commitHours()
+    ;(e.target as HTMLInputElement).blur()
+  }
+}
+
+function onDifficultyNoteInput(value: string) {
+  store.updateTask(props.task.id, { difficultyNote: value })
+}
+
+function onDifficultyNoteCommit(value: string) {
+  store.setTaskDifficultyNote(props.task.id, value)
+}
 
 function goToCurrentDate() {
   if (!isMigrated.value) return
@@ -294,11 +344,43 @@ async function onContextPaste() {
             <span class="migrated-tag">已遷移 → {{ migratedTargetLabel }}</span>
           </template>
           <template v-else>
-            <TaskStatusDropdown
-              :model-value="task.status"
-              @update:model-value="onStatusChange"
-            />
-            <span v-for="name in labelNames" :key="name" class="label-tag">{{ name }}</span>
+            <div class="meta-primary">
+              <div class="status-row">
+                <TaskStatusDropdown
+                  :model-value="task.status"
+                  @update:model-value="onStatusChange"
+                />
+                <div class="status-hours">
+                  <input
+                    v-model="hoursDraft"
+                    type="number"
+                    class="hours-input"
+                    min="0"
+                    step="0.5"
+                    placeholder="0"
+                    aria-label="狀態時數"
+                    @click.stop
+                    @blur="commitHours"
+                    @keydown="onHoursKeydown"
+                  />
+                  <span class="hours-unit">h</span>
+                </div>
+              </div>
+              <span v-for="name in labelNames" :key="name" class="label-tag">{{ name }}</span>
+            </div>
+            <div class="difficulty-row" @click.stop>
+              <span class="difficulty-label">困難點</span>
+              <SearchableCombobox
+                class="difficulty-note"
+                :model-value="task.difficultyNote"
+                :options="difficultyOptions"
+                placeholder="輸入或選擇歷史紀錄…"
+                empty-text="尚無歷史紀錄"
+                @update:model-value="onDifficultyNoteInput"
+                @commit="onDifficultyNoteCommit"
+                @select="onDifficultyNoteCommit"
+              />
+            </div>
           </template>
         </div>
       </div>
@@ -312,14 +394,10 @@ async function onContextPaste() {
         </button>
         <button
           type="button"
-          class="delete-btn"
-          aria-label="刪除任務"
-          title="刪除任務"
-          @click="requestDelete"
+          class="menu-btn"
+          aria-label="更多操作"
+          @click.stop="openMenu"
         >
-          <AppIcon name="trash" />
-        </button>
-        <button type="button" class="menu-btn" aria-label="更多操作" @click="openMenu">
           <AppIcon name="ellipsis" />
         </button>
       </div>
@@ -554,9 +632,86 @@ async function onContextPaste() {
 
 .meta {
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meta-primary {
+  display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+}
+
+.status-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-hours {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 20px;
+  background: $bg;
+  border: 1px solid $border;
+
+  &:focus-within {
+    border-color: $primary;
+    box-shadow: 0 0 0 2px $primary-light;
+  }
+}
+
+.hours-input {
+  width: 48px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  color: $text;
+  text-align: right;
+
+  &:focus {
+    outline: none;
+  }
+
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.hours-unit {
+  font-size: 11px;
+  font-weight: 600;
+  color: $text-muted;
+}
+
+.difficulty-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.difficulty-label {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  color: $text-muted;
+  white-space: nowrap;
+}
+
+.difficulty-note {
+  flex: 1;
+  min-width: 0;
 }
 
 .label-tag {
@@ -596,7 +751,6 @@ async function onContextPaste() {
 }
 
 .expand-btn,
-.delete-btn,
 .menu-btn {
   width: 32px;
   height: 32px;
@@ -611,11 +765,6 @@ async function onContextPaste() {
     background: $bg;
     color: $primary;
   }
-}
-
-.delete-btn:hover {
-  color: #ef4444;
-  background: #fef2f2;
 }
 
 .body {
