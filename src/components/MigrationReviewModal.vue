@@ -239,4 +239,44 @@ function confirm() {
     background: $primary-light;
   }
 }
+
+@media (max-width: $breakpoint-sm) {
+  .overlay {
+    padding: 12px;
+    align-items: flex-end;
+  }
+
+  .modal {
+    max-height: 90vh;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .action-select {
+    max-width: none;
+    width: 100%;
+  }
+
+  .actions {
+    flex-wrap: wrap;
+    padding: 12px 16px 16px;
+  }
+
+  .btn-text {
+    margin-right: 0;
+    flex: 1 1 100%;
+    text-align: center;
+  }
+
+  .btn-secondary,
+  .btn-primary {
+    flex: 1 1 auto;
+  }
+}
 </style>

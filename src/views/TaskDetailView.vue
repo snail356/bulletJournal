@@ -93,4 +93,8 @@ function onDeleted(task: Task) {
     font-weight: 600;
   }
 }
+
+.detail-view {
+  width: 100%;
+}
 </style>

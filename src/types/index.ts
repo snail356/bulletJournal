@@ -107,6 +107,14 @@ export interface Label {
   color: string
 }
 
+/** 任務狀態下拉選單的標籤項目 */
+export interface StatusItem {
+  id: TaskStatus
+  name: string
+  color: string
+  bgColor: string
+}
+
 export interface TodayProgress {
   total: number
   completed: number

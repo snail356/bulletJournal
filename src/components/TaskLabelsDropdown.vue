@@ -1,30 +1,57 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
-import type { TaskStatus } from '@/types'
 import { useTaskStore } from '@/stores/taskStore'
+import { getLabelBgForColor } from '@/utils/labelColors'
 import AppIcon from './AppIcon.vue'
 
 const props = defineProps<{
-  modelValue: TaskStatus
+  modelValue: string[]
 }>()
 
 const emit = defineEmits<{
-  'update:modelValue': [value: TaskStatus]
+  'update:modelValue': [value: string[]]
 }>()
 
 const store = useTaskStore()
 const open = ref(false)
 const rootRef = ref<HTMLElement | null>(null)
 
-const current = computed(() => store.getStatusItem(props.modelValue))
+const selectedItems = computed(() =>
+  props.modelValue
+    .map((id) => store.labels.find((label) => label.id === id))
+    .filter((label): label is NonNullable<typeof label> => Boolean(label)),
+)
+
+const triggerStyle = computed(() => {
+  if (!selectedItems.value.length) {
+    return { color: '#9ca3af', background: '#f3f4f6' }
+  }
+  const first = selectedItems.value[0]
+  return {
+    color: first.color,
+    background: getLabelBgForColor(first.color),
+  }
+})
+
+const triggerText = computed(() => {
+  if (!selectedItems.value.length) return '標籤'
+  return selectedItems.value.map((label) => label.name).join('、')
+})
+
+function isSelected(id: string) {
+  return props.modelValue.includes(id)
+}
 
 function toggle() {
   open.value = !open.value
 }
 
-function select(status: TaskStatus) {
-  emit('update:modelValue', status)
-  open.value = false
+function toggleLabel(id: string) {
+  const next = [...props.modelValue]
+  const idx = next.indexOf(id)
+  if (idx >= 0) next.splice(idx, 1)
+  else next.push(id)
+  emit('update:modelValue', next)
 }
 
 function onClickOutside(e: MouseEvent) {
@@ -38,35 +65,32 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 </script>
 
 <template>
-  <div ref="rootRef" class="status-dropdown">
+  <div v-if="store.labels.length" ref="rootRef" class="status-dropdown">
     <button
       type="button"
       class="trigger"
-      :style="{
-        color: current.color,
-        background: current.bgColor,
-      }"
+      :style="triggerStyle"
       @click.stop="toggle"
     >
-      {{ current.name }}
+      {{ triggerText }}
       <AppIcon name="chevron-down" size="xs" class="chevron" :class="{ open }" />
     </button>
 
     <div v-if="open" class="menu">
       <button
-        v-for="item in store.statusItems"
-        :key="item.id"
+        v-for="label in store.labels"
+        :key="label.id"
         type="button"
         class="option"
-        :class="{ active: modelValue === item.id }"
+        :class="{ active: isSelected(label.id) }"
         :style="{
-          '--c': item.color,
-          '--bg': item.bgColor,
+          '--c': label.color,
+          '--bg': getLabelBgForColor(label.color),
         }"
-        @click="select(item.id)"
+        @click.stop="toggleLabel(label.id)"
       >
         <span class="dot" />
-        {{ item.name }}
+        {{ label.name }}
       </button>
     </div>
   </div>
@@ -91,6 +115,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
   border: 1px solid transparent;
   cursor: pointer;
   transition: border-color 0.15s;
+  max-width: 100%;
 
   &:hover {
     border-color: currentColor;
@@ -111,6 +136,8 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
   left: 0;
   z-index: 100;
   min-width: 160px;
+  max-height: 240px;
+  overflow-y: auto;
   background: $surface;
   border: 1px solid $border;
   border-radius: $radius-sm;

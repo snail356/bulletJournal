@@ -9,6 +9,7 @@ import TaskContextMenu from './TaskContextMenu.vue'
 import type { ContextMenuItem } from './TaskContextMenu.vue'
 import TaskFormModal from './TaskFormModal.vue'
 import TaskStatusDropdown from './TaskStatusDropdown.vue'
+import TaskLabelsDropdown from './TaskLabelsDropdown.vue'
 import SearchableCombobox from './SearchableCombobox.vue'
 import QuickInputModal from './QuickInputModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
@@ -74,12 +75,6 @@ const incompleteSubtaskCount = computed(
   () => props.task.subtasks.filter((s) => !s.completed).length,
 )
 
-const labelNames = computed(() =>
-  props.task.labels
-    .map((id) => store.labels.find((l) => l.id === id)?.name)
-    .filter(Boolean),
-)
-
 const isMigrated = computed(() => props.migratedAway === true)
 
 const migratedTargetLabel = computed(() => formatDisplayDate(props.task.date))
@@ -102,7 +97,7 @@ function formatHoursDraft(hours: number | null): string {
 }
 
 function commitHours() {
-  const raw = hoursDraft.value.trim()
+  const raw = String(hoursDraft.value ?? '').trim()
   if (raw === '') {
     store.setTaskStatusHours(props.task.id, null)
     hoursDraft.value = ''
@@ -241,6 +236,10 @@ function onStatusChange(status: TaskStatus) {
   if (status === 'done') store.reorderCompletedToBottom(props.task.date)
 }
 
+function onLabelsChange(labels: string[]) {
+  store.updateTask(props.task.id, { labels })
+}
+
 function addNote(content: string) {
   store.createNote(props.task.id, content)
 }
@@ -307,7 +306,7 @@ async function onContextPaste() {
     @dragover="!isMigrated && taskDrag?.onDragOver($event, task.id)"
     @drop="!isMigrated && taskDrag?.onDrop($event, task.id)"
   >
-    <header class="header">
+    <header class="header" :class="{ 'has-actions': !isMigrated }">
       <span
         v-if="taskDrag && !isMigrated"
         class="drag-handle"
@@ -330,7 +329,7 @@ async function onContextPaste() {
         <AppIcon name="arrow-right" size="xs" />
       </span>
 
-      <div class="title-area">
+      <div class="title-cell">
         <h3 v-if="isMigrated" class="title">{{ task.title }}</h3>
         <InlineEditable
           v-else
@@ -339,50 +338,6 @@ async function onContextPaste() {
           class="title"
           @save="saveTitle"
         />
-        <div class="meta">
-          <template v-if="isMigrated">
-            <span class="migrated-tag">已遷移 → {{ migratedTargetLabel }}</span>
-          </template>
-          <template v-else>
-            <div class="meta-primary">
-              <div class="status-row">
-                <TaskStatusDropdown
-                  :model-value="task.status"
-                  @update:model-value="onStatusChange"
-                />
-                <div class="status-hours">
-                  <input
-                    v-model="hoursDraft"
-                    type="number"
-                    class="hours-input"
-                    min="0"
-                    step="0.5"
-                    placeholder="0"
-                    aria-label="狀態時數"
-                    @click.stop
-                    @blur="commitHours"
-                    @keydown="onHoursKeydown"
-                  />
-                  <span class="hours-unit">h</span>
-                </div>
-              </div>
-              <span v-for="name in labelNames" :key="name" class="label-tag">{{ name }}</span>
-            </div>
-            <div class="difficulty-row" @click.stop>
-              <span class="difficulty-label">困難點</span>
-              <SearchableCombobox
-                class="difficulty-note"
-                :model-value="task.difficultyNote"
-                :options="difficultyOptions"
-                placeholder="輸入或選擇歷史紀錄…"
-                empty-text="尚無歷史紀錄"
-                @update:model-value="onDifficultyNoteInput"
-                @commit="onDifficultyNoteCommit"
-                @select="onDifficultyNoteCommit"
-              />
-            </div>
-          </template>
-        </div>
       </div>
 
       <div v-if="!isMigrated" class="header-actions">
@@ -400,6 +355,53 @@ async function onContextPaste() {
         >
           <AppIcon name="ellipsis" />
         </button>
+      </div>
+
+      <div class="meta-cell">
+        <template v-if="isMigrated">
+          <span class="migrated-tag">已遷移 → {{ migratedTargetLabel }}</span>
+        </template>
+        <template v-else>
+          <div class="meta-primary">
+            <div class="status-row">
+              <TaskStatusDropdown
+                :model-value="task.status"
+                @update:model-value="onStatusChange"
+              />
+              <TaskLabelsDropdown
+                :model-value="task.labels"
+                @update:model-value="onLabelsChange"
+              />
+              <div class="status-hours">
+                <input
+                  v-model="hoursDraft"
+                  type="text"
+                  inputmode="decimal"
+                  class="hours-input"
+                  placeholder="0"
+                  aria-label="狀態時數"
+                  @click.stop
+                  @blur="commitHours"
+                  @keydown="onHoursKeydown"
+                />
+                <span class="hours-unit">h</span>
+              </div>
+            </div>
+          </div>
+          <div class="difficulty-row" @click.stop>
+            <span class="difficulty-label">困難點</span>
+            <SearchableCombobox
+              class="difficulty-note"
+              :model-value="task.difficultyNote"
+              :options="difficultyOptions"
+              placeholder="輸入或選擇歷史紀錄…"
+              empty-text="尚無歷史紀錄"
+              @update:model-value="onDifficultyNoteInput"
+              @commit="onDifficultyNoteCommit"
+              @select="onDifficultyNoteCommit"
+            />
+          </div>
+        </template>
       </div>
     </header>
 
@@ -525,6 +527,8 @@ async function onContextPaste() {
 @use '@/styles/variables' as *;
 
 .task-card {
+  width: 100%;
+  box-sizing: border-box;
   background: $surface;
   border-radius: $radius;
   box-shadow: $shadow;
@@ -567,12 +571,24 @@ async function onContextPaste() {
 }
 
 .header {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'drag check title actions'
+    '. meta meta meta';
+  align-items: start;
+  gap: 6px 8px;
+}
+
+.header:not(.has-actions) {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    'check title'
+    '. meta';
 }
 
 .drag-handle {
+  grid-area: drag;
   padding-top: 4px;
   color: $text-muted;
   font-size: 16px;
@@ -592,6 +608,7 @@ async function onContextPaste() {
 }
 
 .check-wrap {
+  grid-area: check;
   padding-top: 4px;
   cursor: pointer;
 
@@ -619,21 +636,24 @@ async function onContextPaste() {
   color: white;
 }
 
-.title-area {
-  flex: 1;
+.title-cell {
+  grid-area: title;
   min-width: 0;
+}
+
+.meta-cell {
+  grid-area: meta;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
 }
 
 .title {
   font-size: 15px;
   font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.meta {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  margin-bottom: 0;
 }
 
 .meta-primary {
@@ -641,12 +661,15 @@ async function onContextPaste() {
   flex-wrap: wrap;
   gap: 6px;
   align-items: center;
+  width: 100%;
 }
 
 .status-row {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  max-width: 100%;
 }
 
 .status-hours {
@@ -714,14 +737,6 @@ async function onContextPaste() {
   min-width: 0;
 }
 
-.label-tag {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 20px;
-  background: $bg;
-  color: $text-muted;
-}
-
 .carried {
   font-size: 11px;
   color: $text-muted;
@@ -729,6 +744,7 @@ async function onContextPaste() {
 }
 
 .migrated-indicator {
+  grid-area: check;
   width: 20px;
   height: 20px;
   padding-top: 4px;
@@ -746,8 +762,10 @@ async function onContextPaste() {
 }
 
 .header-actions {
+  grid-area: actions;
   display: flex;
   gap: 4px;
+  flex-shrink: 0;
 }
 
 .expand-btn,
@@ -855,6 +873,50 @@ async function onContextPaste() {
     color: white;
     padding: 6px 14px;
     border-radius: $radius-sm;
+  }
+}
+
+@media (max-width: $breakpoint-sm) {
+  .task-card {
+    padding: 14px 12px;
+  }
+
+  .header.has-actions {
+    grid-template-columns: auto auto 1fr;
+    grid-template-areas:
+      'drag check actions'
+      'title title title'
+      '. meta meta';
+  }
+
+  .body {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: $breakpoint-xs) {
+  .meta-primary {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .status-row {
+    width: 100%;
+  }
+
+  .difficulty-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+
+  .difficulty-label {
+    font-size: 10px;
+  }
+
+  .header-actions {
+    align-self: start;
   }
 }
 </style>

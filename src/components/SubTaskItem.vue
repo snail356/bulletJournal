@@ -377,4 +377,22 @@ async function onFileChange(e: Event) {
   border-radius: 50%;
   background: $primary;
 }
+
+@media (max-width: $breakpoint-sm) {
+  .subtask {
+    flex-wrap: wrap;
+    padding: 8px 4px 40px;
+  }
+
+  .actions {
+    top: auto;
+    bottom: 4px;
+    right: 4px;
+    left: 4px;
+    justify-content: flex-end;
+    opacity: 1;
+    pointer-events: auto;
+    background: transparent;
+  }
+}
 </style>

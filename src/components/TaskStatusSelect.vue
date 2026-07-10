@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { TaskStatus } from '@/types'
-import { ALL_STATUSES, STATUS_BG, STATUS_COLORS, STATUS_LABELS } from '@/utils/status'
+import { useTaskStore } from '@/stores/taskStore'
 
 defineProps<{
   modelValue: TaskStatus
@@ -9,24 +9,26 @@ defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: TaskStatus]
 }>()
+
+const store = useTaskStore()
 </script>
 
 <template>
   <div class="status-select">
     <button
-      v-for="status in ALL_STATUSES"
-      :key="status"
+      v-for="item in store.statusItems"
+      :key="item.id"
       type="button"
       class="status-option"
-      :class="{ active: modelValue === status }"
+      :class="{ active: modelValue === item.id }"
       :style="{
-        '--c': STATUS_COLORS[status],
-        '--bg': STATUS_BG[status],
+        '--c': item.color,
+        '--bg': item.bgColor,
       }"
-      @click="emit('update:modelValue', status)"
+      @click="emit('update:modelValue', item.id)"
     >
       <span class="dot" />
-      {{ STATUS_LABELS[status] }}
+      {{ item.name }}
     </button>
   </div>
 </template>

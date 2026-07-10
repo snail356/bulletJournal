@@ -315,4 +315,15 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
     }
   }
 }
+
+@media (max-width: $breakpoint-xs) {
+  .input {
+    font-size: 16px;
+    padding: 8px 10px;
+  }
+
+  .options {
+    max-height: min(180px, 40vh);
+  }
+}
 </style>

@@ -118,7 +118,8 @@ function undoDelete() {
 @use '@/styles/variables' as *;
 
 .today-view {
-  max-width: 800px;
+  width: 100%;
+  max-width: none;
 }
 
 .page-header {
@@ -165,6 +166,7 @@ function undoDelete() {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  width: 100%;
 }
 
 .empty {
@@ -185,6 +187,33 @@ function undoDelete() {
   p {
     color: $text-muted;
     margin-bottom: 16px;
+  }
+}
+
+@media (max-width: $breakpoint-md) {
+  .page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .btn-primary {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (max-width: $breakpoint-xs) {
+  .page-header h1 {
+    font-size: 20px;
+  }
+
+  .header-actions {
+    gap: 8px;
   }
 }
 </style>

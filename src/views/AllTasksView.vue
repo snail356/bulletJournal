@@ -3,7 +3,6 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { TaskStatus } from '@/types'
 import { useTaskStore } from '@/stores/taskStore'
-import { ALL_STATUSES, STATUS_BG, STATUS_COLORS, STATUS_LABELS } from '@/utils/status'
 import AppIcon from '@/components/AppIcon.vue'
 
 const store = useTaskStore()
@@ -34,18 +33,18 @@ function goDetail(id: string) {
         全部
       </button>
       <button
-        v-for="status in ALL_STATUSES"
-        :key="status"
+        v-for="item in store.statusItems"
+        :key="item.id"
         type="button"
         class="filter-chip"
-        :class="{ active: filter === status }"
+        :class="{ active: filter === item.id }"
         :style="{
-          '--c': STATUS_COLORS[status],
-          '--bg': STATUS_BG[status],
+          '--c': item.color,
+          '--bg': item.bgColor,
         }"
-        @click="filter = status"
+        @click="filter = item.id"
       >
-        {{ STATUS_LABELS[status] }}
+        {{ item.name }}
       </button>
     </div>
 
@@ -73,11 +72,11 @@ function goDetail(id: string) {
               <span
                 class="status-tag"
                 :style="{
-                  color: STATUS_COLORS[task.status],
-                  background: STATUS_BG[task.status],
+                  color: store.getStatusItem(task.status).color,
+                  background: store.getStatusItem(task.status).bgColor,
                 }"
               >
-                {{ STATUS_LABELS[task.status] }}
+                {{ store.getStatusItem(task.status).name }}
               </span>
             </td>
             <td>{{ task.subtasks.length }}</td>
@@ -148,7 +147,7 @@ function goDetail(id: string) {
   background: $surface;
   border-radius: $radius;
   box-shadow: $shadow;
-  overflow: hidden;
+  overflow-x: auto;
 }
 
 table {
@@ -208,5 +207,22 @@ td {
   padding: 40px;
   text-align: center;
   color: $text-muted;
+}
+
+@media (max-width: $breakpoint-sm) {
+  .filters {
+    gap: 6px;
+  }
+
+  .filter-chip {
+    padding: 5px 10px;
+    font-size: 11px;
+  }
+
+  th,
+  td {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
 }
 </style>

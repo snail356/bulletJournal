@@ -21,6 +21,7 @@ body {
   color: $text;
   background: $bg;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 
 button {

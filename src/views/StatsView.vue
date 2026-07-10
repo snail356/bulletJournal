@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useTaskStore } from '@/stores/taskStore'
-import { ALL_STATUSES, STATUS_COLORS, STATUS_LABELS } from '@/utils/status'
 
 const store = useTaskStore()
 const stats = computed(() => store.getTaskStats())
@@ -42,18 +41,18 @@ function barWidth(count: number) {
     <div class="chart-card">
       <h2>狀態分佈</h2>
       <div class="bars">
-        <div v-for="status in ALL_STATUSES" :key="status" class="bar-row">
-          <span class="bar-label">{{ STATUS_LABELS[status] }}</span>
+        <div v-for="item in store.statusItems" :key="item.id" class="bar-row">
+          <span class="bar-label">{{ item.name }}</span>
           <div class="bar-track">
             <div
               class="bar-fill"
               :style="{
-                width: barWidth(stats.byStatus[status] ?? 0),
-                background: STATUS_COLORS[status],
+                width: barWidth(stats.byStatus[item.id] ?? 0),
+                background: item.color,
               }"
             />
           </div>
-          <span class="bar-count">{{ stats.byStatus[status] ?? 0 }}</span>
+          <span class="bar-count">{{ stats.byStatus[item.id] ?? 0 }}</span>
         </div>
       </div>
     </div>

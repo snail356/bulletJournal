@@ -7,6 +7,7 @@ const EXPAND_IMAGES_KEY = 'bullet-journal-expand-images'
 const EXPAND_TASKS_KEY = 'bullet-journal-expand-tasks'
 const MIGRATION_REVIEW_KEY = 'bullet-journal-migration-review'
 const DIFFICULTY_NOTES_KEY = 'bullet-journal-difficulty-notes'
+const STATUS_ITEMS_KEY = 'bullet-journal-status-items'
 
 const defaultMigrationReviewState: MigrationReviewState = {
   snoozedUntil: null,
@@ -36,5 +37,6 @@ export {
   EXPAND_TASKS_KEY,
   MIGRATION_REVIEW_KEY,
   DIFFICULTY_NOTES_KEY,
+  STATUS_ITEMS_KEY,
   defaultMigrationReviewState,
 }

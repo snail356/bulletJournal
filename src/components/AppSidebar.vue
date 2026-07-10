@@ -189,4 +189,73 @@ function openMigrationReview() {
   padding-top: 20px;
   flex-shrink: 0;
 }
+
+@media (max-width: $breakpoint-md) {
+  .sidebar {
+    width: 100%;
+    min-width: 0;
+    height: auto;
+    position: static;
+    border-right: none;
+    border-bottom: 1px solid $border;
+    padding: 16px;
+  }
+
+  .brand {
+    margin-bottom: 12px;
+  }
+
+  .nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .nav-item {
+    flex: 1 1 auto;
+    min-width: fit-content;
+    padding: 8px 10px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .migration-btn {
+    flex: 1 1 100%;
+    margin-top: 0;
+  }
+
+  .sidebar-widgets {
+    margin-top: 16px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: 12px;
+    padding-top: 0;
+
+    > * {
+      flex: 1 1 220px;
+      min-width: 0;
+    }
+  }
+}
+
+@media (max-width: $breakpoint-xs) {
+  .sidebar {
+    padding: 12px;
+  }
+
+  .nav-item {
+    flex: 1 1 calc(50% - 6px);
+    justify-content: center;
+  }
+
+  .sidebar-widgets {
+    flex-direction: column;
+
+    > * {
+      flex: 1 1 auto;
+      width: 100%;
+    }
+  }
+}
 </style>

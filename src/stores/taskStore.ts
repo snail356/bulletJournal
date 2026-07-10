@@ -11,6 +11,7 @@ import type {
   MigrationReviewAction,
   MigrationReviewState,
   Note,
+  StatusItem,
   SubTask,
   Task,
   TaskDayView,
@@ -27,11 +28,17 @@ import {
   LABELS_KEY,
   MIGRATION_REVIEW_KEY,
   SELECTED_DATE_KEY,
+  STATUS_ITEMS_KEY,
   TASKS_KEY,
   defaultMigrationReviewState,
   loadFromStorage,
   saveToStorage,
 } from "@/utils/storage";
+import {
+  createDefaultStatusItems,
+  getStatusBgForColor,
+  normalizeStatusItems,
+} from "@/utils/status";
 
 function cloneTask(task: Task): Task {
   return JSON.parse(JSON.stringify(task)) as Task;
@@ -110,6 +117,8 @@ function migrateLegacyDuplicates(taskList: Task[]): Task[] {
       ownerType: "task" as const,
     }));
     source.status = copy.status;
+    source.statusHours = copy.statusHours;
+    source.difficultyNote = copy.difficultyNote;
     source.labels = [...copy.labels];
     source.updatedAt = copy.updatedAt;
     idsToRemove.add(copy.id);
@@ -157,9 +166,18 @@ export const useTaskStore = defineStore("task", () => {
   const difficultyNoteRecords = ref<DifficultyNoteRecord[]>(
     loadFromStorage(DIFFICULTY_NOTES_KEY, [] as DifficultyNoteRecord[]),
   );
+  const statusItems = ref<StatusItem[]>(
+    normalizeStatusItems(
+      loadFromStorage<StatusItem[] | null>(STATUS_ITEMS_KEY, null),
+    ),
+  );
 
   function persistDifficultyNotes() {
     saveToStorage(DIFFICULTY_NOTES_KEY, difficultyNoteRecords.value);
+  }
+
+  function persistStatusItems() {
+    saveToStorage(STATUS_ITEMS_KEY, statusItems.value);
   }
 
   function persistMigrationReviewState() {
@@ -195,6 +213,8 @@ export const useTaskStore = defineStore("task", () => {
   watch([tasks, labels, selectedDate, expandImages, expandAllTasks], persist, {
     deep: true,
   });
+
+  watch(statusItems, persistStatusItems, { deep: true });
 
   const tasksForSelectedDate = computed(() =>
     getTasksByDate(selectedDate.value),
@@ -848,6 +868,40 @@ export const useTaskStore = defineStore("task", () => {
     labels.value = updated;
   }
 
+  function getStatusItem(id: TaskStatus): StatusItem {
+    return (
+      statusItems.value.find((item) => item.id === id) ??
+      createDefaultStatusItems().find((item) => item.id === id)!
+    );
+  }
+
+  function updateStatusItem(
+    id: TaskStatus,
+    payload: Partial<Pick<StatusItem, "name" | "color" | "bgColor">>,
+  ) {
+    const item = statusItems.value.find((s) => s.id === id);
+    if (!item) return;
+    const next = { ...payload };
+    if (next.color && next.bgColor === undefined) {
+      next.bgColor = getStatusBgForColor(next.color);
+    }
+    Object.assign(item, next);
+  }
+
+  function reorderStatusItems(fromId: TaskStatus, toId: TaskStatus) {
+    const fromIdx = statusItems.value.findIndex((item) => item.id === fromId);
+    const toIdx = statusItems.value.findIndex((item) => item.id === toId);
+    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+    const updated = [...statusItems.value];
+    const [moved] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, moved);
+    statusItems.value = updated;
+  }
+
+  function getStatusTaskCount(id: TaskStatus): number {
+    return tasks.value.filter((task) => task.status === id).length;
+  }
+
   function getAllTasksFiltered(status?: TaskStatus | "all") {
     let list = [...tasks.value];
     if (status && status !== "all") {
@@ -877,14 +931,17 @@ export const useTaskStore = defineStore("task", () => {
     migrationReviewState.value = { ...defaultMigrationReviewState };
     migrationReviewVisible.value = false;
     difficultyNoteRecords.value = [];
+    statusItems.value = createDefaultStatusItems();
     persist();
     persistMigrationReviewState();
     persistDifficultyNotes();
+    persistStatusItems();
   }
 
   return {
     tasks,
     labels,
+    statusItems,
     selectedDate,
     expandImages,
     expandAllTasks,
@@ -934,6 +991,10 @@ export const useTaskStore = defineStore("task", () => {
     reorderTasks,
     reorderSubTasks,
     reorderLabels,
+    getStatusItem,
+    updateStatusItem,
+    reorderStatusItems,
+    getStatusTaskCount,
     getAllTasksFiltered,
     getTaskStats,
     findTask,
