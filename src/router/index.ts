@@ -32,6 +32,18 @@ const router = createRouter({
       meta: { title: '標籤管理' },
     },
     {
+      path: '/difficulty-notes',
+      name: 'difficulty-notes',
+      component: () => import('@/views/DifficultyNotesView.vue'),
+      meta: { title: '困難點資料' },
+    },
+    {
+      path: '/reflections',
+      name: 'reflections',
+      component: () => import('@/views/ReflectionLogView.vue'),
+      meta: { title: '回顧日誌' },
+    },
+    {
       path: '/stats',
       name: 'stats',
       component: () => import('@/views/StatsView.vue'),

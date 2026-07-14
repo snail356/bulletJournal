@@ -66,9 +66,39 @@ function onImageClick(att: Attachment) {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 
   &.expanded {
     align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+
+    .thumb {
+      cursor: default;
+      width: 100%;
+      max-width: 320px;
+      min-width: 0;
+      box-sizing: border-box;
+    }
+
+    .img-wrap {
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      box-sizing: border-box;
+    }
+
+    .img-wrap img {
+      width: 100%;
+      height: auto;
+      max-width: 100%;
+      max-height: 240px;
+      object-fit: contain;
+      object-position: left center;
+    }
   }
 }
 
@@ -91,20 +121,6 @@ function onImageClick(att: Attachment) {
     width: 72px;
     height: 72px;
     object-fit: cover;
-  }
-}
-
-.expanded {
-  .thumb {
-    cursor: default;
-  }
-
-  .img-wrap img {
-    width: auto;
-    height: auto;
-    max-width: min(100%, 320px);
-    max-height: 240px;
-    object-fit: contain;
   }
 }
 

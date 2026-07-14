@@ -55,7 +55,7 @@ function confirm() {
     <div v-if="visible" class="overlay" @click.self="emit('snooze')">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="migration-review-title">
         <header class="header">
-          <h2 id="migration-review-title">每日回顧 · {{ formatDisplayDate(todayString()) }}</h2>
+          <h2 id="migration-review-title">延期任務處理 · {{ formatDisplayDate(todayString()) }}</h2>
           <p class="subtitle">
             你有 {{ candidates.length }} 項未完成的延期任務，請決定如何處理
           </p>

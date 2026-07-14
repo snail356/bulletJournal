@@ -26,6 +26,8 @@ const rootRef = ref<HTMLElement | null>(null)
 const open = ref(false)
 const inputValue = ref(props.modelValue)
 const activeIndex = ref(-1)
+/** 透過右側箭頭展開時，忽略輸入內容顯示全部選項 */
+const browseAll = ref(false)
 
 watch(
   () => props.modelValue,
@@ -36,7 +38,7 @@ watch(
 
 const filteredOptions = computed(() => {
   const query = inputValue.value.trim().toLowerCase()
-  if (!query) {
+  if (browseAll.value || !query) {
     return [...props.options]
   }
   return props.options.filter((option) => option.toLowerCase().includes(query))
@@ -56,10 +58,21 @@ function openDropdown() {
 function closeDropdown() {
   open.value = false
   activeIndex.value = -1
+  browseAll.value = false
+}
+
+function toggleBrowseAll() {
+  if (open.value) {
+    closeDropdown()
+    return
+  }
+  browseAll.value = true
+  openDropdown()
 }
 
 function emitInput(value: string) {
   inputValue.value = value
+  browseAll.value = false
   emit('update:modelValue', value)
   openDropdown()
 }
@@ -72,12 +85,18 @@ function selectOption(option: string) {
   inputValue.value = option
   emit('update:modelValue', option)
   emit('select', option)
-  emit('commit', option)
   closeDropdown()
 }
 
 function commitCurrent() {
-  emit('commit', inputValue.value.trim())
+  const value = inputValue.value.trim()
+  // 內容未變則不重複送出，避免 blur / outside 雙觸發造成使用次數膨脹
+  if (value === props.modelValue.trim()) {
+    closeDropdown()
+    return
+  }
+  emit('update:modelValue', value)
+  emit('commit', value)
   closeDropdown()
 }
 
@@ -134,7 +153,8 @@ function onKeydown(e: KeyboardEvent) {
 
 function onClickOutside(e: MouseEvent) {
   if (rootRef.value && !rootRef.value.contains(e.target as Node)) {
-    commitCurrent()
+    // 由 blur 統一 commit，這裡只關選單避免雙重送出
+    if (open.value) closeDropdown()
   }
 }
 
@@ -166,14 +186,14 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
         tabindex="-1"
         aria-label="展開選項"
         @mousedown.prevent
-        @click="open ? closeDropdown() : openDropdown()"
+        @click="toggleBrowseAll"
       >
         ▾
       </button>
     </div>
 
     <ul v-if="open" class="options" role="listbox">
-      <li v-if="inputValue.trim() && !hasExactMatch" class="option hint">
+      <li v-if="!browseAll && inputValue.trim() && !hasExactMatch" class="option hint">
         使用新內容：「{{ inputValue.trim() }}」
       </li>
       <li

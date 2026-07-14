@@ -99,6 +99,18 @@ function focusSubtask() {
   subtaskEl.value?.focus();
 }
 
+function onSubtaskMouseDown(e: MouseEvent) {
+  const target = e.target as HTMLElement | null;
+  if (
+    target?.closest(
+      ".inline-editable, [contenteditable], input, button, label, .drag-handle, a",
+    )
+  ) {
+    return;
+  }
+  focusSubtask();
+}
+
 function triggerUpload() {
   fileInput.value?.click();
 }
@@ -123,7 +135,7 @@ async function onFileChange(e: Event) {
     }"
     @mouseenter="hovered = true"
     @mouseleave="hovered = false"
-    @mousedown="focusSubtask"
+    @mousedown="onSubtaskMouseDown"
     @paste.capture="onPaste"
     @contextmenu.prevent
     @dragover="subtaskDrag?.onDragOver($event, subtask.id)"

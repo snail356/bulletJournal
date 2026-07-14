@@ -75,6 +75,32 @@ export interface DifficultyNoteRecord {
   lastUsedAt: string
 }
 
+/** 每日回顧日誌（一天一份） */
+export interface DailyReflection {
+  id: string
+  date: string
+  morningContent: string
+  afternoon1to3Content: string
+  afternoonAfter3Content: string
+  /** draft＝暫存；submitted＝完成提交後進入回顧日誌 */
+  status: 'draft' | 'submitted'
+  createdAt: string
+  updatedAt: string
+}
+
+export type TodayJournalState = 'new' | 'edit' | 'done'
+
+export interface DailyReflectionInput {
+  morningContent: string
+  afternoon1to3Content: string
+  afternoonAfter3Content: string
+}
+
+export interface ReflectionPromptState {
+  snoozedUntil: string | null
+  lastReflectedDate: string | null
+}
+
 export interface Task {
   id: string
   /** 計畫執行日期（scheduled date） */

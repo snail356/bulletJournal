@@ -26,6 +26,22 @@ const activeTasks = computed(() =>
 const dateLabel = computed(() => formatDisplayDate(store.selectedDate))
 const progress = computed(() => store.todayProgress)
 
+const journalButtonLabel = computed(() => {
+  switch (store.todayJournalState) {
+    case 'edit':
+      return '編輯日誌'
+    case 'done':
+      return '已完成日誌'
+    default:
+      return '新增日誌'
+  }
+})
+
+function onJournalClick() {
+  if (store.todayJournalState === 'done') return
+  store.openTodayReflectionEditor()
+}
+
 const taskDrag = useReorderDrag<Task>(
   () => activeTasks.value,
   (fromId, toId) => store.reorderTasks(store.selectedDate, fromId, toId),
@@ -67,6 +83,15 @@ function undoDelete() {
           label="展開圖片"
           @update:model-value="store.expandImages = $event"
         />
+        <button
+          type="button"
+          class="btn-secondary"
+          :class="{ done: store.todayJournalState === 'done' }"
+          :disabled="store.todayJournalState === 'done'"
+          @click="onJournalClick"
+        >
+          {{ journalButtonLabel }}
+        </button>
         <button type="button" class="btn-primary" @click="showCreateModal = true">
           + 新增任務
         </button>
@@ -162,6 +187,27 @@ function undoDelete() {
   }
 }
 
+.btn-secondary {
+  padding: 10px 18px;
+  color: $primary;
+  border: 1px solid $primary;
+  border-radius: $radius-sm;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: $primary-light;
+  }
+
+  &.done,
+  &:disabled {
+    color: $text-muted;
+    border-color: $border;
+    background: $bg;
+    cursor: default;
+  }
+}
+
 .task-list {
   display: flex;
   flex-direction: column;
@@ -201,7 +247,8 @@ function undoDelete() {
     justify-content: flex-start;
   }
 
-  .btn-primary {
+  .btn-primary,
+  .btn-secondary {
     width: 100%;
     text-align: center;
   }

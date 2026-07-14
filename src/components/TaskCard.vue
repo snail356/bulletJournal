@@ -79,9 +79,7 @@ const isMigrated = computed(() => props.migratedAway === true)
 
 const migratedTargetLabel = computed(() => formatDisplayDate(props.task.date))
 
-const difficultyOptions = computed(() =>
-  store.getDifficultyNoteOptions(props.task.difficultyNote),
-)
+const difficultyOptions = computed(() => store.getDifficultyNoteOptions())
 
 const hoursDraft = ref(formatHoursDraft(props.task.statusHours))
 
@@ -118,10 +116,6 @@ function onHoursKeydown(e: KeyboardEvent) {
     commitHours()
     ;(e.target as HTMLInputElement).blur()
   }
-}
-
-function onDifficultyNoteInput(value: string) {
-  store.updateTask(props.task.id, { difficultyNote: value })
 }
 
 function onDifficultyNoteCommit(value: string) {
@@ -233,7 +227,11 @@ function onStatusChange(status: TaskStatus) {
     status,
     completed: status === 'done',
   })
-  if (status === 'done') store.reorderCompletedToBottom(props.task.date)
+  if (status === 'done') {
+    store.reorderCompletedToBottom(props.task.date)
+  } else if (status === 'waiting_pm') {
+    store.moveTaskToPendingBottom(props.task.id)
+  }
 }
 
 function onLabelsChange(labels: string[]) {
@@ -388,7 +386,7 @@ async function onContextPaste() {
               </div>
             </div>
           </div>
-          <div class="difficulty-row" @click.stop>
+          <div v-show="expanded" class="difficulty-row" @click.stop>
             <span class="difficulty-label">困難點</span>
             <SearchableCombobox
               class="difficulty-note"
@@ -396,7 +394,6 @@ async function onContextPaste() {
               :options="difficultyOptions"
               placeholder="輸入或選擇歷史紀錄…"
               empty-text="尚無歷史紀錄"
-              @update:model-value="onDifficultyNoteInput"
               @commit="onDifficultyNoteCommit"
               @select="onDifficultyNoteCommit"
             />
@@ -788,6 +785,9 @@ async function onContextPaste() {
 .body {
   margin-top: 12px;
   padding-left: 32px;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .section {

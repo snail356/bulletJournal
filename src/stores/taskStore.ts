@@ -4,6 +4,8 @@ import { mockLabels, mockTasks } from "@/mock/data";
 import type {
   Attachment,
   AttachmentOwnerType,
+  DailyReflection,
+  DailyReflectionInput,
   DifficultyNoteRecord,
   Label,
   MigrationCandidate,
@@ -11,26 +13,32 @@ import type {
   MigrationReviewAction,
   MigrationReviewState,
   Note,
+  ReflectionPromptState,
   StatusItem,
   SubTask,
   Task,
   TaskDayView,
   TaskStatus,
+  TodayJournalState,
   TodayProgress,
 } from "@/types";
 import { createAttachmentFromFile } from "@/utils/attachment";
-import { daysBetween, todayString } from "@/utils/date";
+import { addDays, daysBetween, todayString } from "@/utils/date";
 import { generateId } from "@/utils/id";
 import {
+  DAILY_REFLECTIONS_KEY,
   DIFFICULTY_NOTES_KEY,
   EXPAND_IMAGES_KEY,
   EXPAND_TASKS_KEY,
   LABELS_KEY,
   MIGRATION_REVIEW_KEY,
+  REFLECTION_PROMPT_KEY,
   SELECTED_DATE_KEY,
   STATUS_ITEMS_KEY,
   TASKS_KEY,
   defaultMigrationReviewState,
+  defaultReflectionPromptState,
+  hasStorageKey,
   loadFromStorage,
   saveToStorage,
 } from "@/utils/storage";
@@ -71,6 +79,15 @@ function isMigratedAwayFromDate(task: Task, date: string): boolean {
   return (
     task.date !== date && task.migrationHistory.some((m) => m.fromDate === date)
   );
+}
+
+function normalizeDailyReflection(
+  reflection: DailyReflection & { status?: DailyReflection["status"] },
+): DailyReflection {
+  return {
+    ...reflection,
+    status: reflection.status ?? "submitted",
+  };
 }
 
 function migrateLegacyDuplicates(taskList: Task[]): Task[] {
@@ -166,6 +183,18 @@ export const useTaskStore = defineStore("task", () => {
   const difficultyNoteRecords = ref<DifficultyNoteRecord[]>(
     loadFromStorage(DIFFICULTY_NOTES_KEY, [] as DifficultyNoteRecord[]),
   );
+  const dailyReflections = ref<DailyReflection[]>(
+    loadFromStorage(DAILY_REFLECTIONS_KEY, [] as DailyReflection[]).map(
+      normalizeDailyReflection,
+    ),
+  );
+  const reflectionPromptState = ref<ReflectionPromptState>(
+    loadFromStorage(REFLECTION_PROMPT_KEY, defaultReflectionPromptState),
+  );
+  const reflectionModalVisible = ref(false);
+  /** 彈窗正在編輯的日誌日期（prompt 為昨日；手動新增為當日） */
+  const reflectionModalDate = ref(addDays(todayString(), -1));
+  const reflectionModalMode = ref<"prompt" | "manual">("prompt");
   const statusItems = ref<StatusItem[]>(
     normalizeStatusItems(
       loadFromStorage<StatusItem[] | null>(STATUS_ITEMS_KEY, null),
@@ -182,6 +211,14 @@ export const useTaskStore = defineStore("task", () => {
 
   function persistMigrationReviewState() {
     saveToStorage(MIGRATION_REVIEW_KEY, migrationReviewState.value);
+  }
+
+  function persistDailyReflections() {
+    saveToStorage(DAILY_REFLECTIONS_KEY, dailyReflections.value);
+  }
+
+  function persistReflectionPromptState() {
+    saveToStorage(REFLECTION_PROMPT_KEY, reflectionPromptState.value);
   }
 
   function persist() {
@@ -202,9 +239,15 @@ export const useTaskStore = defineStore("task", () => {
     labels.value = storedLabels ?? [...mockLabels];
     selectedDate.value = storedDate ?? todayString();
 
-    syncDifficultyNotesFromTasks();
+    // 困難點資料頁為單一資料來源，僅在首次（尚無獨立儲存）時從既有任務匯入一次
+    if (!hasStorageKey(DIFFICULTY_NOTES_KEY)) {
+      syncDifficultyNotesFromTasks();
+    } else {
+      // 校正過去因重複 commit 膨脹的使用次數
+      reconcileDifficultyNoteUsage();
+    }
 
-    checkMigrationReview();
+    checkDailyPrompts();
 
     initialized.value = true;
     persist();
@@ -289,8 +332,19 @@ export const useTaskStore = defineStore("task", () => {
     }
   }
 
+  /** 優先處理延期任務；完成後再觸發每日回顧 */
+  function checkDailyPrompts() {
+    if (shouldShowMigrationReview()) {
+      reflectionModalVisible.value = false;
+      migrationReviewVisible.value = true;
+      return;
+    }
+    checkReflectionPrompt();
+  }
+
   function openMigrationReview() {
     if (getMigrationCandidates().length > 0) {
+      reflectionModalVisible.value = false;
       migrationReviewVisible.value = true;
     }
   }
@@ -336,6 +390,123 @@ export const useTaskStore = defineStore("task", () => {
     migrationReviewState.value.snoozedUntil = null;
     persistMigrationReviewState();
     migrationReviewVisible.value = false;
+    checkReflectionPrompt();
+  }
+
+  function getReflectionByDate(date: string): DailyReflection | undefined {
+    return dailyReflections.value.find((item) => item.date === date);
+  }
+
+  const dailyReflectionsSorted = computed(() =>
+    [...dailyReflections.value]
+      .filter((item) => item.status === "submitted")
+      .sort((a, b) => b.date.localeCompare(a.date)),
+  );
+
+  const todayJournalState = computed<TodayJournalState>(() => {
+    const reflection = getReflectionByDate(todayString());
+    if (!reflection) return "new";
+    if (reflection.status === "submitted") return "done";
+    return "edit";
+  });
+
+  function yesterdayString(today: string = todayString()): string {
+    return addDays(today, -1);
+  }
+
+  function shouldShowReflectionPrompt(today: string = todayString()): boolean {
+    const yesterday = yesterdayString(today);
+    // 前一日已有日誌（含暫存），隔日不再彈窗
+    if (getReflectionByDate(yesterday)) return false;
+    if (reflectionPromptState.value.lastReflectedDate === today) return false;
+    if (reflectionPromptState.value.snoozedUntil === today) return false;
+    // 仍有未處理的延期任務時，先等遷移完成再回顧
+    if (getMigrationCandidates(today).length > 0) return false;
+    return true;
+  }
+
+  function openReflectionModal(
+    date: string,
+    mode: "prompt" | "manual" = "manual",
+  ) {
+    reflectionModalDate.value = date;
+    reflectionModalMode.value = mode;
+    reflectionModalVisible.value = true;
+  }
+
+  function openTodayReflectionEditor() {
+    if (todayJournalState.value === "done") return;
+    openReflectionModal(todayString(), "manual");
+  }
+
+  function checkReflectionPrompt() {
+    if (migrationReviewVisible.value) return;
+    if (!shouldShowReflectionPrompt()) return;
+    openReflectionModal(yesterdayString(), "prompt");
+  }
+
+  function snoozeReflectionPrompt() {
+    if (reflectionModalMode.value === "prompt") {
+      reflectionPromptState.value.snoozedUntil = todayString();
+      persistReflectionPromptState();
+    }
+    reflectionModalVisible.value = false;
+  }
+
+  function upsertDailyReflection(
+    date: string,
+    input: DailyReflectionInput,
+    status: DailyReflection["status"],
+  ) {
+    const now = new Date().toISOString();
+    const existing = getReflectionByDate(date);
+
+    if (existing) {
+      existing.morningContent = input.morningContent;
+      existing.afternoon1to3Content = input.afternoon1to3Content;
+      existing.afternoonAfter3Content = input.afternoonAfter3Content;
+      existing.status = status;
+      existing.updatedAt = now;
+    } else {
+      dailyReflections.value.push({
+        id: generateId(),
+        date,
+        morningContent: input.morningContent,
+        afternoon1to3Content: input.afternoon1to3Content,
+        afternoonAfter3Content: input.afternoonAfter3Content,
+        status,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    persistDailyReflections();
+  }
+
+  function saveDailyReflectionDraft(input: DailyReflectionInput) {
+    upsertDailyReflection(reflectionModalDate.value, input, "draft");
+    reflectionModalVisible.value = false;
+  }
+
+  function submitDailyReflection(input: DailyReflectionInput) {
+    const date = reflectionModalDate.value;
+    const today = todayString();
+    upsertDailyReflection(date, input, "submitted");
+
+    if (reflectionModalMode.value === "prompt") {
+      reflectionPromptState.value.lastReflectedDate = today;
+      reflectionPromptState.value.snoozedUntil = null;
+      persistReflectionPromptState();
+    }
+
+    reflectionModalVisible.value = false;
+  }
+
+  function deleteDailyReflection(id: string) {
+    dailyReflections.value = dailyReflections.value.filter(
+      (item) => item.id !== id,
+    );
+    persistDailyReflections();
   }
 
   function rescheduleTask(task: Task, newDate: string) {
@@ -354,21 +525,23 @@ export const useTaskStore = defineStore("task", () => {
     const trimmed = content.trim();
     if (!trimmed) return;
     const now = new Date().toISOString();
+    const taskCount = getDifficultyNoteTaskCount(trimmed);
     const existing = difficultyNoteRecords.value.find(
       (record) => record.content === trimmed,
     );
     if (existing) {
+      // 使用次數以「目前綁定此困難點的任務數」為準
+      existing.usageCount = taskCount;
       if (options?.bumpUsage !== false) {
-        existing.usageCount += 1;
         existing.lastUsedAt = now;
-        persistDifficultyNotes();
       }
+      persistDifficultyNotes();
       return;
     }
     difficultyNoteRecords.value.push({
       id: generateId(),
       content: trimmed,
-      usageCount: 1,
+      usageCount: Math.max(taskCount, 1),
       createdAt: now,
       lastUsedAt: now,
     });
@@ -376,9 +549,43 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function syncDifficultyNotesFromTasks() {
+    const contents = new Set<string>();
     for (const task of tasks.value) {
-      registerDifficultyNote(task.difficultyNote, { bumpUsage: false });
+      const trimmed = task.difficultyNote.trim();
+      if (trimmed) contents.add(trimmed);
     }
+    for (const content of contents) {
+      registerDifficultyNote(content, { bumpUsage: false });
+    }
+    reconcileDifficultyNoteUsage();
+  }
+
+  function reconcileDifficultyNoteUsage() {
+    for (const record of difficultyNoteRecords.value) {
+      record.usageCount = getDifficultyNoteTaskCount(record.content);
+    }
+    persistDifficultyNotes();
+  }
+
+  function deleteDifficultyNote(id: string) {
+    difficultyNoteRecords.value = difficultyNoteRecords.value.filter(
+      (record) => record.id !== id,
+    );
+    persistDifficultyNotes();
+  }
+
+  const difficultyNoteRecordsSorted = computed(() =>
+    [...difficultyNoteRecords.value].sort((a, b) => {
+      if (b.usageCount !== a.usageCount) return b.usageCount - a.usageCount;
+      return b.lastUsedAt.localeCompare(a.lastUsedAt);
+    }),
+  );
+
+  function getDifficultyNoteTaskCount(content: string): number {
+    const trimmed = content.trim();
+    if (!trimmed) return 0;
+    return tasks.value.filter((task) => task.difficultyNote.trim() === trimmed)
+      .length;
   }
 
   function getDifficultyNoteOptions(query = ""): string[] {
@@ -403,8 +610,26 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function setTaskDifficultyNote(taskId: string, content: string) {
-    updateTask(taskId, { difficultyNote: content });
-    registerDifficultyNote(content);
+    const task = findTask(taskId);
+    if (!task) return;
+    const trimmed = content.trim();
+    const previous = task.difficultyNote.trim();
+    updateTask(taskId, { difficultyNote: trimmed });
+
+    if (previous && previous !== trimmed) {
+      // 同步舊內容的使用次數（可能變 0）
+      const prevRecord = difficultyNoteRecords.value.find(
+        (record) => record.content === previous,
+      );
+      if (prevRecord) {
+        prevRecord.usageCount = getDifficultyNoteTaskCount(previous);
+        persistDifficultyNotes();
+      }
+    }
+
+    if (trimmed) {
+      registerDifficultyNote(trimmed, { bumpUsage: trimmed !== previous });
+    }
   }
 
   function findTask(taskId: string): Task | undefined {
@@ -438,7 +663,7 @@ export const useTaskStore = defineStore("task", () => {
       createdAt: now,
       updatedAt: now,
     };
-    tasks.value.push(task);
+    tasks.value.unshift(task);
     return task;
   }
 
@@ -576,7 +801,11 @@ export const useTaskStore = defineStore("task", () => {
       createdAt: now,
       updatedAt: now,
     };
-    task.subtasks.push(sub);
+    task.subtasks = [
+      ...task.subtasks.filter((s) => !s.completed),
+      sub,
+      ...task.subtasks.filter((s) => s.completed),
+    ];
     touchTask(task);
     return sub;
   }
@@ -794,6 +1023,19 @@ export const useTaskStore = defineStore("task", () => {
     }
   }
 
+  /** 將任務移至該日「未完成任務」的最下方（仍在已完成任務之上） */
+  function moveTaskToPendingBottom(taskId: string) {
+    const task = findTask(taskId);
+    if (!task || task.completed) return;
+    const date = task.date;
+    const others = tasks.value.filter((t) => t.date !== date);
+    const dayTasks = tasks.value.filter((t) => t.date === date);
+    const rest = dayTasks.filter((t) => t.id !== taskId);
+    const pending = rest.filter((t) => !t.completed);
+    const done = rest.filter((t) => t.completed);
+    tasks.value = [...others, ...pending, task, ...done];
+  }
+
   function reorderCompletedToBottom(date?: string) {
     if (date) {
       const dayTasks = tasks.value.filter((t) => t.date === date);
@@ -931,10 +1173,15 @@ export const useTaskStore = defineStore("task", () => {
     migrationReviewState.value = { ...defaultMigrationReviewState };
     migrationReviewVisible.value = false;
     difficultyNoteRecords.value = [];
+    dailyReflections.value = [];
+    reflectionPromptState.value = { ...defaultReflectionPromptState };
+    reflectionModalVisible.value = false;
     statusItems.value = createDefaultStatusItems();
     persist();
     persistMigrationReviewState();
     persistDifficultyNotes();
+    persistDailyReflections();
+    persistReflectionPromptState();
     persistStatusItems();
   }
 
@@ -949,19 +1196,36 @@ export const useTaskStore = defineStore("task", () => {
     migrationCandidates,
     overdueTaskCount,
     difficultyNoteRecords,
+    difficultyNoteRecordsSorted,
     difficultyNoteOptions,
+    dailyReflections,
+    dailyReflectionsSorted,
+    todayJournalState,
+    reflectionModalVisible,
+    reflectionModalDate,
+    reflectionModalMode,
     init,
     getTasksByDate,
     getTaskDatesWithActivity,
     getMigrationCandidates,
     getDifficultyNoteOptions,
+    getDifficultyNoteTaskCount,
     registerDifficultyNote,
+    deleteDifficultyNote,
     setTaskStatusHours,
     setTaskDifficultyNote,
     checkMigrationReview,
+    checkDailyPrompts,
     openMigrationReview,
     snoozeMigrationReview,
     applyMigrationReview,
+    getReflectionByDate,
+    checkReflectionPrompt,
+    openTodayReflectionEditor,
+    snoozeReflectionPrompt,
+    saveDailyReflectionDraft,
+    submitDailyReflection,
+    deleteDailyReflection,
     tasksForSelectedDate,
     todayProgress,
     createTask,
@@ -983,6 +1247,7 @@ export const useTaskStore = defineStore("task", () => {
     carryOverUnfinishedTasks,
     catchUpUnfinishedTasksToToday,
     reorderCompletedToBottom,
+    moveTaskToPendingBottom,
     getTodayProgress,
     setSelectedDate,
     createLabel,

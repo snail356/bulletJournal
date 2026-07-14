@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
 import MigrationReviewModal from '@/components/MigrationReviewModal.vue'
+import ReflectionModal from '@/components/ReflectionModal.vue'
 import { useTaskStore } from '@/stores/taskStore'
+import type { DailyReflectionInput } from '@/types'
 
 const store = useTaskStore()
+const router = useRouter()
 
 function onVisibilityChange() {
   if (document.visibilityState === 'visible') {
-    store.checkMigrationReview()
+    store.checkDailyPrompts()
   }
+}
+
+function onReflectionSubmit(input: DailyReflectionInput) {
+  store.submitDailyReflection(input)
+  router.push('/reflections')
 }
 
 onMounted(() => {
@@ -34,6 +43,16 @@ onUnmounted(() => {
       @confirm="store.applyMigrationReview"
       @snooze="store.snoozeMigrationReview"
       @close="store.snoozeMigrationReview"
+    />
+
+    <ReflectionModal
+      :visible="store.reflectionModalVisible"
+      :date="store.reflectionModalDate"
+      :mode="store.reflectionModalMode"
+      :existing="store.getReflectionByDate(store.reflectionModalDate)"
+      @submit="onReflectionSubmit"
+      @save="store.saveDailyReflectionDraft"
+      @cancel="store.snoozeReflectionPrompt"
     />
   </div>
 </template>
