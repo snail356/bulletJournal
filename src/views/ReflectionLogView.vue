@@ -13,6 +13,16 @@ const store = useTaskStore()
 const selectedDate = ref<string | null>(null)
 const confirmVisible = ref(false)
 const pendingDelete = ref<DailyReflection | null>(null)
+const detailScrollRef = ref<HTMLElement | null>(null)
+const showBackToTop = ref(false)
+
+function onDetailScroll() {
+  showBackToTop.value = (detailScrollRef.value?.scrollTop ?? 0) > 200
+}
+
+function scrollDetailToTop() {
+  detailScrollRef.value?.scrollTo({ top: 0, behavior: 'smooth' })
+}
 
 const aiConfirmVisible = ref(false)
 const aiError = ref('')
@@ -63,6 +73,8 @@ watch(
 function selectDate(date: string) {
   selectedDate.value = date
   aiError.value = ''
+  detailScrollRef.value?.scrollTo({ top: 0 })
+  showBackToTop.value = false
 }
 
 function previewText(reflection: DailyReflection): string {
@@ -151,6 +163,7 @@ async function confirmAiAdvice() {
       </aside>
 
       <section v-if="selected" class="detail">
+        <div ref="detailScrollRef" class="detail-scroll" @scroll.passive="onDetailScroll">
         <div class="detail-header">
           <div>
             <h2>{{ formatDisplayDate(selected.date) }}</h2>
@@ -222,6 +235,19 @@ async function confirmAiAdvice() {
             </p>
           </section>
         </article>
+        </div>
+
+        <Transition name="fade">
+          <button
+            v-if="showBackToTop"
+            type="button"
+            class="back-to-top"
+            aria-label="回到最上方"
+            @click="scrollDetailToTop"
+          >
+            <AppIcon name="arrow-up" size="sm" />
+          </button>
+        </Transition>
       </section>
     </div>
 
@@ -323,11 +349,55 @@ async function confirmAiAdvice() {
 }
 
 .detail {
+  position: relative;
   background: $surface;
   border-radius: $radius;
   box-shadow: $shadow;
-  padding: 24px;
   min-height: 360px;
+  // 高度與左側日期列表一致，內容改在卡片內滾動
+  max-height: calc(100vh - 180px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.detail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+  scrollbar-gutter: stable;
+}
+
+.back-to-top {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: $primary;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: $shadow-lg;
+  z-index: 5;
+
+  &:hover {
+    background: $primary-dark;
+  }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s, transform 0.2s;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
 
 .detail-header {
@@ -573,7 +643,7 @@ async function confirmAiAdvice() {
     flex-shrink: 0;
   }
 
-  .detail {
+  .detail-scroll {
     padding: 18px;
   }
 }

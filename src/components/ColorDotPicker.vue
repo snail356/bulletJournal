@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 
 export interface ColorDotOption {
   value: string
@@ -21,13 +21,37 @@ const emit = defineEmits<{
 
 const open = ref(false)
 const rootRef = ref<HTMLElement | null>(null)
+const menuRef = ref<HTMLElement | null>(null)
+const menuStyle = ref<Record<string, string>>({})
 
 const currentColor = computed(
   () => props.options.find((o) => o.value === props.modelValue)?.color ?? props.modelValue,
 )
 
-function toggle() {
+async function toggle() {
   open.value = !open.value
+  if (open.value) {
+    await nextTick()
+    updateMenuPosition()
+  }
+}
+
+function updateMenuPosition() {
+  const trigger = rootRef.value?.getBoundingClientRect()
+  const menu = menuRef.value?.getBoundingClientRect()
+  if (!trigger || !menu) return
+
+  let left =
+    props.menuAlign === 'end' ? trigger.right - menu.width : trigger.left
+  // 不讓選單超出視窗左右邊界
+  left = Math.max(8, Math.min(left, window.innerWidth - menu.width - 8))
+
+  let top = trigger.bottom + 6
+  if (top + menu.height > window.innerHeight - 8) {
+    top = trigger.top - menu.height - 6
+  }
+
+  menuStyle.value = { left: `${left}px`, top: `${top}px` }
 }
 
 function select(value: string) {
@@ -36,13 +60,25 @@ function select(value: string) {
 }
 
 function onClickOutside(e: MouseEvent) {
-  if (rootRef.value && !rootRef.value.contains(e.target as Node)) {
-    open.value = false
-  }
+  const target = e.target as Node
+  if (rootRef.value?.contains(target) || menuRef.value?.contains(target)) return
+  open.value = false
 }
 
-onMounted(() => document.addEventListener('mousedown', onClickOutside))
-onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
+function closeOnScroll() {
+  if (open.value) open.value = false
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', onClickOutside)
+  window.addEventListener('scroll', closeOnScroll, true)
+  window.addEventListener('resize', closeOnScroll)
+})
+onUnmounted(() => {
+  document.removeEventListener('mousedown', onClickOutside)
+  window.removeEventListener('scroll', closeOnScroll, true)
+  window.removeEventListener('resize', closeOnScroll)
+})
 </script>
 
 <template>
@@ -55,17 +91,19 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
       @click.stop="toggle"
     />
 
-    <div v-if="open" class="menu" :class="menuAlign">
-      <button
-        v-for="opt in options"
-        :key="opt.value"
-        type="button"
-        class="color-dot"
-        :class="{ active: modelValue === opt.value }"
-        :style="{ background: opt.color }"
-        @click.stop="select(opt.value)"
-      />
-    </div>
+    <Teleport to="body">
+      <div v-if="open" ref="menuRef" class="color-dot-menu" :style="menuStyle">
+        <button
+          v-for="opt in options"
+          :key="opt.value"
+          type="button"
+          class="color-dot"
+          :class="{ active: modelValue === opt.value }"
+          :style="{ background: opt.color }"
+          @click.stop="select(opt.value)"
+        />
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -93,10 +131,9 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
   }
 }
 
-.menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  z-index: 100;
+.color-dot-menu {
+  position: fixed;
+  z-index: 1400;
   display: flex;
   gap: 6px;
   background: white;
@@ -104,14 +141,6 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
   border-radius: 6px;
   box-shadow: $shadow;
   border: 1px solid $border;
-
-  &.start {
-    left: 0;
-  }
-
-  &.end {
-    right: 0;
-  }
 }
 
 .color-dot {

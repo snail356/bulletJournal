@@ -787,7 +787,9 @@ async function onContextPaste() {
   padding-left: 32px;
   min-width: 0;
   max-width: 100%;
-  overflow: hidden;
+  // 用 clip 而非 hidden：clip 不會建立捲動容器，
+  // 備註操作列的 position: sticky 才能相對於視窗捲動生效
+  overflow: clip;
 }
 
 .section {

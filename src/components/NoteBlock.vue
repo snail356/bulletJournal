@@ -18,7 +18,6 @@ const emit = defineEmits<{
 }>()
 
 const store = useTaskStore()
-const hovered = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const contentRef = ref<InstanceType<typeof InlineEditable> | null>(null)
 
@@ -66,11 +65,29 @@ async function onFileChange(e: Event) {
       background: NOTE_COLOR_BG[note.color],
       borderColor: NOTE_COLOR_DOT[note.color],
     }"
-    @mouseenter="hovered = true"
-    @mouseleave="hovered = false"
     @paste="onPaste"
     @contextmenu.prevent
   >
+    <div class="actions-anchor">
+      <div class="actions">
+        <button type="button" title="編輯" @click="contentRef?.startEditing()">
+          <AppIcon name="pen" size="xs" />
+        </button>
+        <button type="button" title="貼上圖片" @click="triggerUpload">
+          <AppIcon name="image" size="xs" />
+        </button>
+        <ColorDotPicker
+          :model-value="note.color"
+          :options="NOTE_COLOR_OPTIONS"
+          menu-align="end"
+          @update:model-value="setColor"
+        />
+        <button type="button" title="刪除" @click="remove">
+          <AppIcon name="trash" size="xs" />
+        </button>
+      </div>
+    </div>
+
     <InlineEditable
       ref="contentRef"
       :model-value="note.content"
@@ -85,24 +102,6 @@ async function onFileChange(e: Event) {
       @preview="emit('preview', $event)"
     />
 
-    <div v-show="hovered" class="actions">
-      <button type="button" title="編輯" @click="contentRef?.startEditing()">
-        <AppIcon name="pen" size="xs" />
-      </button>
-      <button type="button" title="貼上圖片" @click="triggerUpload">
-        <AppIcon name="image" size="xs" />
-      </button>
-      <ColorDotPicker
-        :model-value="note.color"
-        :options="NOTE_COLOR_OPTIONS"
-        menu-align="end"
-        @update:model-value="setColor"
-      />
-      <button type="button" title="刪除" @click="remove">
-        <AppIcon name="trash" size="xs" />
-      </button>
-    </div>
-
     <input ref="fileInput" type="file" accept="image/*" hidden @change="onFileChange" />
   </div>
 </template>
@@ -113,9 +112,17 @@ async function onFileChange(e: Event) {
 .note {
   position: relative;
   padding: 12px;
+  // 右側預留 hover 操作列空間，避免 icon 蓋住備註文字
+  padding-right: 120px;
   border-radius: $radius-sm;
   border-left: 3px solid;
   margin-top: 8px;
+
+  &:hover .actions,
+  .actions:focus-within {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .content {
@@ -124,26 +131,56 @@ async function onFileChange(e: Event) {
   line-height: 1.6;
 }
 
+// 高度為 0 的 sticky 錨點：備註很長時操作列會跟著捲動、停留在可視範圍內
+.actions-anchor {
+  position: sticky;
+  top: 8px;
+  height: 0;
+  z-index: 2;
+}
+
 .actions {
   position: absolute;
-  top: 8px;
-  right: 8px;
+  top: -4px;
+  right: -112px; // 對齊 .note 預留的右側 padding 區
   display: flex;
   gap: 2px;
   align-items: center;
   background: rgba(255, 255, 255, 0.85);
   border-radius: 6px;
   padding: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
 
   button {
     width: 26px;
     height: 26px;
     border-radius: 4px;
     font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 
     &:hover {
       background: white;
     }
+  }
+}
+
+@media (max-width: $breakpoint-sm) {
+  .note {
+    padding-right: 12px;
+    padding-top: 44px;
+  }
+
+  .actions {
+    top: -36px;
+    right: 0;
+    opacity: 1;
+    pointer-events: auto;
+    background: transparent;
   }
 }
 </style>
