@@ -52,7 +52,7 @@ onUnmounted(() => {
       :existing="store.getReflectionByDate(store.reflectionModalDate)"
       @submit="onReflectionSubmit"
       @save="store.saveDailyReflectionDraft"
-      @cancel="store.snoozeReflectionPrompt"
+      @cancel="store.dismissReflectionModal"
     />
   </div>
 </template>

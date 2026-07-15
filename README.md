@@ -1,4 +1,4 @@
-# Bullet Journal 工作狀態紀錄
+﻿# Bullet Journal 工作狀態紀錄
 
 Vue 3 + Vite + TypeScript 前端專案，用於每日工作任務追蹤。
 
@@ -40,3 +40,7 @@ npm run dev
 - 完成任務自動排序至清單底部
 - 左側小日曆與今日進度圓環
 - 刪除任務支援復原 Toast
+
+## 文件
+
+- [AI 主管建議（Gemini）](docs/ai-manager-advice.md)：設定 API Key、用量確認與疑難排解

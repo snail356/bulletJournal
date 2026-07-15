@@ -82,6 +82,12 @@ export interface DailyReflection {
   morningContent: string
   afternoon1to3Content: string
   afternoonAfter3Content: string
+  /** 當日總結 */
+  summaryContent: string
+  /** AI 主管建議 */
+  aiManagerAdvice: string
+  /** AI 建議產生時間 */
+  aiGeneratedAt: string | null
   /** draft＝暫存；submitted＝完成提交後進入回顧日誌 */
   status: 'draft' | 'submitted'
   createdAt: string
@@ -94,11 +100,19 @@ export interface DailyReflectionInput {
   morningContent: string
   afternoon1to3Content: string
   afternoonAfter3Content: string
+  summaryContent: string
 }
 
 export interface ReflectionPromptState {
   snoozedUntil: string | null
   lastReflectedDate: string | null
+}
+
+/** Gemini API 本機呼叫用量（非 Google 帳單） */
+export interface GeminiUsageState {
+  totalSuccessCalls: number
+  lastCalledAt: string | null
+  lastError: string | null
 }
 
 export interface Task {

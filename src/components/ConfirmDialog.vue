@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 withDefaults(
   defineProps<{
     visible: boolean
@@ -91,6 +91,7 @@ function onConfirm() {
   font-size: 13px;
   color: $text-muted;
   line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .actions {

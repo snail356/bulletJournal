@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import DOMPurify from 'dompurify'
+import { marked } from 'marked'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { formatDisplayDate } from '@/utils/date'
+import { getGeminiModel, hasGeminiApiKey } from '@/utils/gemini'
 import type { DailyReflection } from '@/types'
 
 const store = useTaskStore()
@@ -11,11 +14,36 @@ const selectedDate = ref<string | null>(null)
 const confirmVisible = ref(false)
 const pendingDelete = ref<DailyReflection | null>(null)
 
+const aiConfirmVisible = ref(false)
+const aiError = ref('')
+
 const reflections = computed(() => store.dailyReflectionsSorted)
 
 const selected = computed(() => {
   if (!selectedDate.value) return null
   return store.getReflectionByDate(selectedDate.value) ?? null
+})
+
+const renderedAiAdvice = computed(() => {
+  const markdown = selected.value?.aiManagerAdvice?.trim()
+  if (!markdown) return ''
+  return DOMPurify.sanitize(marked.parse(markdown, { async: false }))
+})
+
+const aiConfirmMessage = computed(() => {
+  const usage = store.geminiUsage
+  const last = usage.lastCalledAt
+    ? formatDateTime(usage.lastCalledAt)
+    : '尚無'
+  return [
+    `本次將消耗 1 次 Gemini API 成功呼叫。`,
+    ``,
+    `目前本機累計成功呼叫：${usage.totalSuccessCalls} 次`,
+    `最後呼叫時間：${last}`,
+    `模型：${getGeminiModel()}`,
+    ``,
+    `用量為本機計數，非 Google 帳單全貌。確認後才會真正發送請求。`,
+  ].join('\n')
 })
 
 watch(
@@ -34,6 +62,7 @@ watch(
 
 function selectDate(date: string) {
   selectedDate.value = date
+  aiError.value = ''
 }
 
 function previewText(reflection: DailyReflection): string {
@@ -41,6 +70,7 @@ function previewText(reflection: DailyReflection): string {
     reflection.morningContent,
     reflection.afternoon1to3Content,
     reflection.afternoonAfter3Content,
+    reflection.summaryContent,
   ]
     .map((text) => text.trim())
     .filter(Boolean)
@@ -54,6 +84,17 @@ function displayContent(text: string): string {
   return trimmed || '（未填寫）'
 }
 
+function formatDateTime(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '-'
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  const hh = String(date.getHours()).padStart(2, '0')
+  const mm = String(date.getMinutes()).padStart(2, '0')
+  return `${y}-${m}-${d} ${hh}:${mm}`
+}
+
 function requestDelete(reflection: DailyReflection) {
   pendingDelete.value = reflection
   confirmVisible.value = true
@@ -64,13 +105,34 @@ function confirmDelete() {
   store.deleteDailyReflection(pendingDelete.value.id)
   pendingDelete.value = null
 }
+
+function requestAiAdvice() {
+  aiError.value = ''
+  if (!hasGeminiApiKey()) {
+    aiError.value =
+      '尚未設定 VITE_GEMINI_API_KEY。請參考 docs/ai-manager-advice.md，於 .env 設定後重啟 npm run dev。'
+    return
+  }
+  aiConfirmVisible.value = true
+}
+
+async function confirmAiAdvice() {
+  if (!selectedDate.value) return
+  aiError.value = ''
+  try {
+    await store.generateAiManagerAdvice(selectedDate.value)
+  } catch (error) {
+    aiError.value =
+      error instanceof Error ? error.message : '產生 AI 主管建議失敗'
+  }
+}
 </script>
 
 <template>
   <div class="reflection-view">
     <header class="page-header">
       <h1>回顧日誌</h1>
-      <p class="subtitle">依日期瀏覽每日回顧；三個時段會整合顯示為一份完整紀錄</p>
+      <p class="subtitle">依日期瀏覽每日回顧；各時段與當日總結整合顯示為一份完整紀錄</p>
     </header>
 
     <div v-if="reflections.length" class="layout">
@@ -117,6 +179,48 @@ function confirmDelete() {
             <h3 class="hint">下午3點後</h3>
             <p class="body">{{ displayContent(selected.afternoonAfter3Content) }}</p>
           </section>
+          <section class="block">
+            <h3 class="hint">當日總結</h3>
+            <p class="body">{{ displayContent(selected.summaryContent) }}</p>
+          </section>
+
+          <section class="block ai-block">
+            <div class="ai-header">
+              <h3 class="hint">AI 主管建議</h3>
+              <button
+                type="button"
+                class="btn-ai"
+                :disabled="store.aiAdviceLoading"
+                @click="requestAiAdvice"
+              >
+                <template v-if="store.aiAdviceLoading">
+                  產生中<span class="loading-dots" aria-hidden="true"
+                    ><i></i><i></i><i></i
+                  ></span>
+                </template>
+                <template v-else>
+                  {{ selected.aiManagerAdvice ? '重新產生' : '產生 AI 主管建議' }}
+                </template>
+              </button>
+            </div>
+            <p v-if="selected.aiGeneratedAt" class="ai-meta">
+              產生於 {{ formatDateTime(selected.aiGeneratedAt) }}
+            </p>
+            <p v-if="aiError" class="ai-error">{{ aiError }}</p>
+            <p v-if="store.aiAdviceLoading" class="ai-loading">
+              AI 主管正在整理建議<span class="loading-dots" aria-hidden="true"
+                ><i></i><i></i><i></i
+              ></span>
+            </p>
+            <div
+              v-else-if="selected.aiManagerAdvice"
+              class="body ai-body markdown-body"
+              v-html="renderedAiAdvice"
+            />
+            <p v-else class="ai-empty">
+              尚未產生建議。點擊上方按鈕前會先確認 API 呼叫用量。
+            </p>
+          </section>
         </article>
       </section>
     </div>
@@ -134,6 +238,16 @@ function confirmDelete() {
       danger
       @confirm="confirmDelete"
       @close="confirmVisible = false"
+    />
+
+    <ConfirmDialog
+      :visible="aiConfirmVisible"
+      title="確認呼叫 Gemini API"
+      :message="aiConfirmMessage"
+      confirm-label="確認呼叫"
+      cancel-label="取消"
+      @confirm="confirmAiAdvice"
+      @close="aiConfirmVisible = false"
     />
   </div>
 </template>
@@ -273,6 +387,165 @@ function confirmDelete() {
   color: $text;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.ai-block {
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px dashed $border;
+}
+
+.ai-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.btn-ai {
+  padding: 6px 12px;
+  background: $primary;
+  color: white;
+  border-radius: $radius-sm;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background: $primary-dark;
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: default;
+  }
+}
+
+.ai-meta {
+  font-size: 12px;
+  color: $text-muted;
+}
+
+.ai-error {
+  font-size: 13px;
+  color: #ef4444;
+  line-height: 1.5;
+}
+
+.ai-empty {
+  font-size: 13px;
+  color: $text-muted;
+}
+
+.ai-loading {
+  font-size: 13px;
+  color: $text-muted;
+}
+
+.loading-dots {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 3px;
+  margin-left: 4px;
+
+  i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: dot-bounce 1.2s ease-in-out infinite;
+
+    &:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+
+    &:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+  }
+}
+
+@keyframes dot-bounce {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+
+.ai-body {
+  padding: 12px;
+  background: $bg;
+  border-radius: $radius-sm;
+  border: 1px solid $border;
+}
+
+.markdown-body {
+  // 覆蓋 .body 的 pre-wrap，避免渲染後的 HTML 之間出現多餘空白
+  white-space: normal;
+
+  :deep(h1),
+  :deep(h2),
+  :deep(h3) {
+    margin: 16px 0 8px;
+    color: $text;
+    line-height: 1.4;
+
+    &:first-child {
+      margin-top: 0;
+    }
+  }
+
+  :deep(h1) {
+    font-size: 20px;
+  }
+
+  :deep(h2) {
+    font-size: 17px;
+  }
+
+  :deep(h3) {
+    font-size: 15px;
+  }
+
+  :deep(p) {
+    margin: 8px 0;
+  }
+
+  :deep(ul),
+  :deep(ol) {
+    margin: 8px 0;
+    padding-left: 24px;
+  }
+
+  :deep(li) {
+    margin: 5px 0;
+  }
+
+  :deep(strong) {
+    font-weight: 700;
+  }
+
+  :deep(blockquote) {
+    margin: 10px 0;
+    padding-left: 12px;
+    border-left: 3px solid $primary;
+    color: $text-muted;
+  }
+
+  :deep(code) {
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: rgba($primary, 0.1);
+    font-family: monospace;
+  }
 }
 
 .empty {

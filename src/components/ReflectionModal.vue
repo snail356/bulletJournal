@@ -13,12 +13,13 @@ const props = defineProps<{
 const emit = defineEmits<{
   submit: [input: DailyReflectionInput]
   save: [input: DailyReflectionInput]
-  cancel: []
+  cancel: [input: DailyReflectionInput]
 }>()
 
 const morningContent = ref('')
 const afternoon1to3Content = ref('')
 const afternoonAfter3Content = ref('')
+const summaryContent = ref('')
 
 const title = computed(() =>
   props.mode === 'prompt' ? '每日回顧' : '今日日誌',
@@ -27,14 +28,16 @@ const title = computed(() =>
 const subtitle = computed(() => {
   const dateLabel = formatDisplayDate(props.date)
   if (props.mode === 'prompt') {
-    return `${dateLabel} · 記錄前一天三個時段的想法`
+    return props.existing?.status === 'draft'
+      ? `${dateLabel} · 接續昨日未完成提交的草稿`
+      : `${dateLabel} · 記錄前一天各時段與當日總結`
   }
   if (props.existing?.status === 'draft') {
     return `${dateLabel} · 編輯暫存日誌`
   }
   return props.existing
     ? `${dateLabel} · 編輯今日日誌`
-    : `${dateLabel} · 填寫今日三個時段的想法`
+    : `${dateLabel} · 填寫各時段與當日總結`
 })
 
 const showDraftSave = computed(() => props.mode === 'manual')
@@ -46,6 +49,7 @@ watch(
     morningContent.value = props.existing?.morningContent ?? ''
     afternoon1to3Content.value = props.existing?.afternoon1to3Content ?? ''
     afternoonAfter3Content.value = props.existing?.afternoonAfter3Content ?? ''
+    summaryContent.value = props.existing?.summaryContent ?? ''
   },
 )
 
@@ -54,6 +58,7 @@ function payload(): DailyReflectionInput {
     morningContent: morningContent.value,
     afternoon1to3Content: afternoon1to3Content.value,
     afternoonAfter3Content: afternoonAfter3Content.value,
+    summaryContent: summaryContent.value,
   }
 }
 
@@ -64,11 +69,15 @@ function saveDraft() {
 function submit() {
   emit('submit', payload())
 }
+
+function cancel() {
+  emit('cancel', payload())
+}
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="overlay" @click.self="emit('cancel')">
+    <div v-if="visible" class="overlay" @click.self="cancel">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="reflection-title">
         <header class="header">
           <h2 id="reflection-title">{{ title }}</h2>
@@ -105,10 +114,20 @@ function submit() {
               placeholder="傍晚之後的收尾與反思…"
             />
           </label>
+
+          <label class="field">
+            <span class="hint">當日總結</span>
+            <textarea
+              v-model="summaryContent"
+              class="textarea"
+              rows="3"
+              placeholder="今天整體收穫、改善點或明日提醒…"
+            />
+          </label>
         </div>
 
         <div class="actions">
-          <button type="button" class="btn-text" @click="emit('cancel')">取消</button>
+          <button type="button" class="btn-text" @click="cancel">取消</button>
           <button type="button" class="btn-primary" @click="submit">完成提交</button>
           <button
             v-if="showDraftSave"

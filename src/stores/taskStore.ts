@@ -7,6 +7,7 @@ import type {
   DailyReflection,
   DailyReflectionInput,
   DifficultyNoteRecord,
+  GeminiUsageState,
   Label,
   MigrationCandidate,
   MigrationRecord,
@@ -24,18 +25,24 @@ import type {
 } from "@/types";
 import { createAttachmentFromFile } from "@/utils/attachment";
 import { addDays, daysBetween, todayString } from "@/utils/date";
+import {
+  generateAiManagerAdvice as requestAiManagerAdvice,
+} from "@/utils/gemini";
 import { generateId } from "@/utils/id";
 import {
+  AI_MANAGER_PROMPT_KEY,
   DAILY_REFLECTIONS_KEY,
   DIFFICULTY_NOTES_KEY,
   EXPAND_IMAGES_KEY,
   EXPAND_TASKS_KEY,
+  GEMINI_USAGE_KEY,
   LABELS_KEY,
   MIGRATION_REVIEW_KEY,
   REFLECTION_PROMPT_KEY,
   SELECTED_DATE_KEY,
   STATUS_ITEMS_KEY,
   TASKS_KEY,
+  defaultGeminiUsageState,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
   hasStorageKey,
@@ -82,10 +89,18 @@ function isMigratedAwayFromDate(task: Task, date: string): boolean {
 }
 
 function normalizeDailyReflection(
-  reflection: DailyReflection & { status?: DailyReflection["status"] },
+  reflection: DailyReflection & {
+    status?: DailyReflection["status"];
+    summaryContent?: string;
+    aiManagerAdvice?: string;
+    aiGeneratedAt?: string | null;
+  },
 ): DailyReflection {
   return {
     ...reflection,
+    summaryContent: reflection.summaryContent ?? "",
+    aiManagerAdvice: reflection.aiManagerAdvice ?? "",
+    aiGeneratedAt: reflection.aiGeneratedAt ?? null,
     status: reflection.status ?? "submitted",
   };
 }
@@ -191,6 +206,13 @@ export const useTaskStore = defineStore("task", () => {
   const reflectionPromptState = ref<ReflectionPromptState>(
     loadFromStorage(REFLECTION_PROMPT_KEY, defaultReflectionPromptState),
   );
+  const geminiUsage = ref<GeminiUsageState>(
+    loadFromStorage(GEMINI_USAGE_KEY, defaultGeminiUsageState),
+  );
+  const aiManagerPrompt = ref(
+    loadFromStorage(AI_MANAGER_PROMPT_KEY, ""),
+  );
+  const aiAdviceLoading = ref(false);
   const reflectionModalVisible = ref(false);
   /** 彈窗正在編輯的日誌日期（prompt 為昨日；手動新增為當日） */
   const reflectionModalDate = ref(addDays(todayString(), -1));
@@ -219,6 +241,15 @@ export const useTaskStore = defineStore("task", () => {
 
   function persistReflectionPromptState() {
     saveToStorage(REFLECTION_PROMPT_KEY, reflectionPromptState.value);
+  }
+
+  function persistGeminiUsage() {
+    saveToStorage(GEMINI_USAGE_KEY, geminiUsage.value);
+  }
+
+  function setAiManagerPrompt(prompt: string) {
+    aiManagerPrompt.value = prompt.trim();
+    saveToStorage(AI_MANAGER_PROMPT_KEY, aiManagerPrompt.value);
   }
 
   function persist() {
@@ -416,8 +447,9 @@ export const useTaskStore = defineStore("task", () => {
 
   function shouldShowReflectionPrompt(today: string = todayString()): boolean {
     const yesterday = yesterdayString(today);
-    // 前一日已有日誌（含暫存），隔日不再彈窗
-    if (getReflectionByDate(yesterday)) return false;
+    const yesterdayReflection = getReflectionByDate(yesterday);
+    // 僅在前一日「已完成提交」時才不再彈窗；草稿要帶到隔日彈窗繼續填
+    if (yesterdayReflection?.status === "submitted") return false;
     if (reflectionPromptState.value.lastReflectedDate === today) return false;
     if (reflectionPromptState.value.snoozedUntil === today) return false;
     // 仍有未處理的延期任務時，先等遷移完成再回顧
@@ -445,7 +477,30 @@ export const useTaskStore = defineStore("task", () => {
     openReflectionModal(yesterdayString(), "prompt");
   }
 
+  function hasReflectionContent(input: DailyReflectionInput): boolean {
+    return [
+      input.morningContent,
+      input.afternoon1to3Content,
+      input.afternoonAfter3Content,
+      input.summaryContent,
+    ].some((text) => text.trim().length > 0);
+  }
+
   function snoozeReflectionPrompt() {
+    reflectionModalVisible.value = false;
+  }
+
+  /**
+   * 取消／關閉：若尚未完成提交且有內容，自動存成草稿，隔日彈窗可接續顯示
+   */
+  function dismissReflectionModal(input: DailyReflectionInput) {
+    const date = reflectionModalDate.value;
+    const existing = getReflectionByDate(date);
+
+    if (existing?.status !== "submitted" && hasReflectionContent(input)) {
+      upsertDailyReflection(date, input, "draft");
+    }
+
     if (reflectionModalMode.value === "prompt") {
       reflectionPromptState.value.snoozedUntil = todayString();
       persistReflectionPromptState();
@@ -465,6 +520,7 @@ export const useTaskStore = defineStore("task", () => {
       existing.morningContent = input.morningContent;
       existing.afternoon1to3Content = input.afternoon1to3Content;
       existing.afternoonAfter3Content = input.afternoonAfter3Content;
+      existing.summaryContent = input.summaryContent;
       existing.status = status;
       existing.updatedAt = now;
     } else {
@@ -474,6 +530,9 @@ export const useTaskStore = defineStore("task", () => {
         morningContent: input.morningContent,
         afternoon1to3Content: input.afternoon1to3Content,
         afternoonAfter3Content: input.afternoonAfter3Content,
+        summaryContent: input.summaryContent,
+        aiManagerAdvice: "",
+        aiGeneratedAt: null,
         status,
         createdAt: now,
         updatedAt: now,
@@ -507,6 +566,42 @@ export const useTaskStore = defineStore("task", () => {
       (item) => item.id !== id,
     );
     persistDailyReflections();
+  }
+
+  async function generateAiManagerAdvice(date: string): Promise<void> {
+    const reflection = getReflectionByDate(date);
+    if (!reflection || reflection.status !== "submitted") {
+      throw new Error("僅能對已完成提交的回顧產生 AI 主管建議");
+    }
+    if (aiAdviceLoading.value) return;
+
+    aiAdviceLoading.value = true;
+    geminiUsage.value.lastError = null;
+    persistGeminiUsage();
+
+    try {
+      const advice = await requestAiManagerAdvice(
+        reflection,
+        aiManagerPrompt.value,
+      );
+      reflection.aiManagerAdvice = advice;
+      reflection.aiGeneratedAt = new Date().toISOString();
+      reflection.updatedAt = reflection.aiGeneratedAt;
+      persistDailyReflections();
+
+      geminiUsage.value.totalSuccessCalls += 1;
+      geminiUsage.value.lastCalledAt = reflection.aiGeneratedAt;
+      geminiUsage.value.lastError = null;
+      persistGeminiUsage();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "產生 AI 主管建議失敗";
+      geminiUsage.value.lastError = message;
+      persistGeminiUsage();
+      throw error;
+    } finally {
+      aiAdviceLoading.value = false;
+    }
   }
 
   function rescheduleTask(task: Task, newDate: string) {
@@ -1175,6 +1270,7 @@ export const useTaskStore = defineStore("task", () => {
     difficultyNoteRecords.value = [];
     dailyReflections.value = [];
     reflectionPromptState.value = { ...defaultReflectionPromptState };
+    aiManagerPrompt.value = "";
     reflectionModalVisible.value = false;
     statusItems.value = createDefaultStatusItems();
     persist();
@@ -1182,6 +1278,7 @@ export const useTaskStore = defineStore("task", () => {
     persistDifficultyNotes();
     persistDailyReflections();
     persistReflectionPromptState();
+    saveToStorage(AI_MANAGER_PROMPT_KEY, aiManagerPrompt.value);
     persistStatusItems();
   }
 
@@ -1204,6 +1301,9 @@ export const useTaskStore = defineStore("task", () => {
     reflectionModalVisible,
     reflectionModalDate,
     reflectionModalMode,
+    geminiUsage,
+    aiManagerPrompt,
+    aiAdviceLoading,
     init,
     getTasksByDate,
     getTaskDatesWithActivity,
@@ -1223,9 +1323,12 @@ export const useTaskStore = defineStore("task", () => {
     checkReflectionPrompt,
     openTodayReflectionEditor,
     snoozeReflectionPrompt,
+    dismissReflectionModal,
     saveDailyReflectionDraft,
     submitDailyReflection,
     deleteDailyReflection,
+    generateAiManagerAdvice,
+    setAiManagerPrompt,
     tasksForSelectedDate,
     todayProgress,
     createTask,

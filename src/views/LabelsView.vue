@@ -14,6 +14,25 @@ const newName = ref('')
 const newColor = ref(DEFAULT_LABEL_COLOR)
 const confirmVisible = ref(false)
 const pendingDeleteId = ref<string | null>(null)
+const editingLabelId = ref<string | null>(null)
+const editingStatusId = ref<TaskStatus | null>(null)
+
+function focusOnMount(el: unknown) {
+  if (el instanceof HTMLInputElement) {
+    el.focus()
+    el.select()
+  }
+}
+
+function blurOnEnter(e: KeyboardEvent) {
+  ;(e.target as HTMLInputElement).blur()
+}
+
+function saveLabelName(id: string, name: string) {
+  editingLabelId.value = null
+  const trimmed = name.trim()
+  if (trimmed) store.updateLabel(id, { name: trimmed })
+}
 
 const { draggingId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd } =
   useSimpleReorderDrag(
@@ -51,10 +70,10 @@ function confirmRemoveLabel() {
   }
 }
 
-function updateStatusName(id: TaskStatus, name: string) {
+function saveStatusName(id: TaskStatus, name: string) {
+  editingStatusId.value = null
   const trimmed = name.trim()
-  if (!trimmed) return
-  store.updateStatusItem(id, { name: trimmed })
+  if (trimmed) store.updateStatusItem(id, { name: trimmed })
 }
 
 function updateStatusColor(id: TaskStatus, color: string) {
@@ -104,7 +123,26 @@ function updateStatusColor(id: TaskStatus, color: string) {
             :options="LABEL_COLOR_OPTIONS"
             @update:model-value="(color) => store.updateLabel(label.id, { color })"
           />
-          <span class="name">{{ label.name }}</span>
+          <input
+            v-if="editingLabelId === label.id"
+            :ref="focusOnMount"
+            class="name-input"
+            type="text"
+            :value="label.name"
+            @blur="saveLabelName(label.id, ($event.target as HTMLInputElement).value)"
+            @keyup.enter="blurOnEnter"
+          />
+          <template v-else>
+            <span class="name">{{ label.name }}</span>
+            <button
+              type="button"
+              class="edit"
+              aria-label="編輯名稱"
+              @click="editingLabelId = label.id"
+            >
+              <AppIcon name="pen" size="xs" />
+            </button>
+          </template>
           <span class="count">
             {{ store.tasks.filter((t) => t.labels.includes(label.id)).length }} 項任務
           </span>
@@ -144,17 +182,25 @@ function updateStatusColor(id: TaskStatus, color: string) {
             @update:model-value="(color) => updateStatusColor(item.id, color)"
           />
           <input
+            v-if="editingStatusId === item.id"
+            :ref="focusOnMount"
             class="name-input"
             type="text"
             :value="item.name"
-            @change="updateStatusName(item.id, ($event.target as HTMLInputElement).value)"
+            @blur="saveStatusName(item.id, ($event.target as HTMLInputElement).value)"
+            @keyup.enter="blurOnEnter"
           />
-          <span
-            class="status-preview"
-            :style="{ color: item.color, background: item.bgColor }"
-          >
-            {{ item.name }}
-          </span>
+          <template v-else>
+            <span class="name">{{ item.name }}</span>
+            <button
+              type="button"
+              class="edit"
+              aria-label="編輯名稱"
+              @click="editingStatusId = item.id"
+            >
+              <AppIcon name="pen" size="xs" />
+            </button>
+          </template>
           <span class="count">
             {{ store.getStatusTaskCount(item.id) }} 項任務
           </span>
@@ -291,22 +337,23 @@ function updateStatusColor(id: TaskStatus, color: string) {
   font-size: 14px;
 }
 
-.status-preview {
-  width: 100%;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 3px 10px;
-  border-radius: 20px;
-  display: inline-block;
-  width: fit-content;
-  margin-left: 22px;
-}
-
 .count {
   width: 100%;
   font-size: 12px;
   color: $text-muted;
   padding-left: 22px;
+}
+
+.edit {
+  color: $text-muted;
+  padding: 4px;
+  border-radius: 4px;
+  line-height: 1;
+
+  &:hover {
+    color: $primary;
+    background: rgba(0, 0, 0, 0.05);
+  }
 }
 
 .delete {

@@ -1,4 +1,8 @@
-import type { MigrationReviewState, ReflectionPromptState } from '@/types'
+import type {
+  GeminiUsageState,
+  MigrationReviewState,
+  ReflectionPromptState,
+} from '@/types'
 
 const TASKS_KEY = 'bullet-journal-tasks'
 const LABELS_KEY = 'bullet-journal-labels'
@@ -10,6 +14,8 @@ const DIFFICULTY_NOTES_KEY = 'bullet-journal-difficulty-notes'
 const STATUS_ITEMS_KEY = 'bullet-journal-status-items'
 const DAILY_REFLECTIONS_KEY = 'bullet-journal-daily-reflections'
 const REFLECTION_PROMPT_KEY = 'bullet-journal-reflection-prompt'
+const GEMINI_USAGE_KEY = 'bullet-journal-gemini-usage'
+const AI_MANAGER_PROMPT_KEY = 'bullet-journal-ai-manager-prompt'
 
 const defaultMigrationReviewState: MigrationReviewState = {
   snoozedUntil: null,
@@ -20,6 +26,12 @@ const defaultMigrationReviewState: MigrationReviewState = {
 const defaultReflectionPromptState: ReflectionPromptState = {
   snoozedUntil: null,
   lastReflectedDate: null,
+}
+
+const defaultGeminiUsageState: GeminiUsageState = {
+  totalSuccessCalls: 0,
+  lastCalledAt: null,
+  lastError: null,
 }
 
 export function loadFromStorage<T>(key: string, fallback: T): T {
@@ -55,6 +67,9 @@ export {
   STATUS_ITEMS_KEY,
   DAILY_REFLECTIONS_KEY,
   REFLECTION_PROMPT_KEY,
+  GEMINI_USAGE_KEY,
+  AI_MANAGER_PROMPT_KEY,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
+  defaultGeminiUsageState,
 }

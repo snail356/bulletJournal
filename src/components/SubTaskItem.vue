@@ -182,6 +182,7 @@ async function onFileChange(e: Event) {
           class="note"
           multiline
           hint
+          save-when-empty
           placeholder="新增備註…"
           @save="saveNote"
           @editing-change="noteEditing = $event"
