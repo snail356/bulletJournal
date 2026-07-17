@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import type { Task } from '@/types'
+import type { Attachment, Task } from '@/types'
+import AttachmentList from './AttachmentList.vue'
 import CodeSnippet from './CodeSnippet.vue'
 import AppIcon from './AppIcon.vue'
 import { useTaskStore } from '@/stores/taskStore'
@@ -10,13 +11,19 @@ const props = defineProps<{
   taskId: string
   content: string
   contentType: Task['bodyContentType']
+  attachments: Attachment[]
+}>()
+
+const emit = defineEmits<{
+  preview: [attachment: Attachment]
 }>()
 
 const store = useTaskStore()
-const expanded = ref(props.content.trim().length > 0)
+const expanded = ref(props.content.trim().length > 0 || props.attachments.length > 0)
 const editingCode = ref(false)
 const draft = ref(props.content)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
+const fileInput = ref<HTMLInputElement | null>(null)
 
 const isCode = computed(() => props.contentType === 'code')
 const hasContent = computed(() => props.content.trim().length > 0)
@@ -24,7 +31,10 @@ const showEditor = computed(() => !isCode.value || editingCode.value)
 
 const preview = computed(() => {
   const text = props.content.trim().replace(/\s+/g, ' ')
-  if (!text) return '尚無內容'
+  if (!text) {
+    if (props.attachments.length) return `${props.attachments.length} 張圖片`
+    return '尚無內容'
+  }
   return text.length > 48 ? `${text.slice(0, 48)}…` : text
 })
 
@@ -96,7 +106,23 @@ function onInput(e: Event) {
   autoResize(el)
 }
 
-function onPaste(e: ClipboardEvent) {
+async function onPaste(e: ClipboardEvent) {
+  const items = e.clipboardData?.items
+  if (items) {
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault()
+        e.stopPropagation()
+        const file = item.getAsFile()
+        if (file) {
+          expanded.value = true
+          await store.addAttachment('task', props.taskId, file)
+        }
+        return
+      }
+    }
+  }
+
   const text = e.clipboardData?.getData('text/plain') ?? ''
   if (!text.trim() || !looksLikeCode(text)) return
 
@@ -116,6 +142,18 @@ function onPaste(e: ClipboardEvent) {
   })
 }
 
+function triggerUpload() {
+  expanded.value = true
+  fileInput.value?.click()
+}
+
+async function onFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (file) await store.addAttachment('task', props.taskId, file)
+  input.value = ''
+}
+
 /** 阻止冒泡至主任務右鍵選單，保留瀏覽器原生複製／貼上選單 */
 function onContextMenu(e: MouseEvent) {
   e.stopPropagation()
@@ -123,7 +161,11 @@ function onContextMenu(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="section body-section" @contextmenu="onContextMenu">
+  <div
+    class="section body-section"
+    @paste="onPaste"
+    @contextmenu="onContextMenu"
+  >
     <div class="section-header">
       <button
         type="button"
@@ -135,7 +177,20 @@ function onContextMenu(e: MouseEvent) {
           :name="expanded ? 'chevron-down' : 'chevron-right'"
           size="xs"
         />
-        <p class="section-title">內容</p>
+        <p class="section-title">
+          內容
+          <span v-if="attachments.length" class="section-count">
+            {{ attachments.length }}
+          </span>
+        </p>
+      </button>
+      <button
+        type="button"
+        class="upload-btn"
+        title="貼上／上傳圖片"
+        @click="triggerUpload"
+      >
+        <AppIcon name="image" size="xs" />
       </button>
     </div>
 
@@ -173,7 +228,20 @@ function onContextMenu(e: MouseEvent) {
         @paste="onPaste"
         @contextmenu="onContextMenu"
       />
+
+      <AttachmentList
+        :attachments="attachments"
+        @preview="emit('preview', $event)"
+      />
     </div>
+
+    <input
+      ref="fileInput"
+      type="file"
+      accept="image/*"
+      hidden
+      @change="onFileChange"
+    />
   </div>
 </template>
 
@@ -211,6 +279,27 @@ function onContextMenu(e: MouseEvent) {
   color: inherit;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.section-count {
+  margin-left: 6px;
+  color: $primary;
+  font-weight: 700;
+}
+
+.upload-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: $text-muted;
+
+  &:hover {
+    color: $primary;
+    background: $bg;
+  }
 }
 
 .collapsed-preview {

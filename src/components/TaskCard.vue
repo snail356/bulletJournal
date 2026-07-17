@@ -5,7 +5,6 @@ import { formatDisplayDate } from '@/utils/date'
 import SubTaskItem from './SubTaskItem.vue'
 import TaskBodySection from './TaskBodySection.vue'
 import NoteBlock from './NoteBlock.vue'
-import AttachmentList from './AttachmentList.vue'
 import TaskContextMenu from './TaskContextMenu.vue'
 import type { ContextMenuItem } from './TaskContextMenu.vue'
 import TaskFormModal from './TaskFormModal.vue'
@@ -424,15 +423,12 @@ async function onContextPaste() {
     </header>
 
     <div v-show="expanded && !isMigrated" class="body">
-      <AttachmentList
-        :attachments="task.attachments"
-        @preview="emit('preview', $event)"
-      />
-
       <TaskBodySection
         :task-id="task.id"
         :content="task.bodyContent"
         :content-type="task.bodyContentType"
+        :attachments="task.attachments"
+        @preview="emit('preview', $event)"
       />
 
       <div class="section">
