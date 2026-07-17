@@ -129,6 +129,10 @@ export interface Task {
   statusHours: number | null
   /** 困難點備註（可從歷史紀錄選取） */
   difficultyNote: string
+  /** 主任務內容區（唯一，不可新增刪除） */
+  bodyContent: string
+  /** text＝一般內容；code＝程式碼區塊顯示 */
+  bodyContentType: 'text' | 'code'
   completed: boolean
   subtasks: SubTask[]
   notes: Note[]

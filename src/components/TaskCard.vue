@@ -3,6 +3,7 @@ import { computed, inject, nextTick, provide, ref, watch } from 'vue'
 import type { Attachment, SubTask, Task, TaskStatus } from '@/types'
 import { formatDisplayDate } from '@/utils/date'
 import SubTaskItem from './SubTaskItem.vue'
+import TaskBodySection from './TaskBodySection.vue'
 import NoteBlock from './NoteBlock.vue'
 import AttachmentList from './AttachmentList.vue'
 import TaskContextMenu from './TaskContextMenu.vue'
@@ -164,6 +165,15 @@ function openMenu(e: MouseEvent) {
 
 function onContextMenu(e: MouseEvent) {
   if (isMigrated.value) return
+  const target = e.target as HTMLElement | null
+  // 輸入區保留瀏覽器原生選單（複製／貼上），不開主任務選單
+  if (
+    target?.closest(
+      'textarea, input, [contenteditable="true"], .inline-editable.editing, .body-section, .note, .subtask',
+    )
+  ) {
+    return
+  }
   e.preventDefault()
   openMenu(e)
 }
@@ -273,7 +283,7 @@ function confirmMove() {
 
 async function onPaste(e: ClipboardEvent) {
   const target = e.target as HTMLElement
-  if (target.closest('.subtask') || target.closest('.note')) return
+  if (target.closest('.subtask') || target.closest('.note') || target.closest('.body-section')) return
 
   const items = e.clipboardData?.items
   if (!items) return
@@ -417,6 +427,12 @@ async function onContextPaste() {
       <AttachmentList
         :attachments="task.attachments"
         @preview="emit('preview', $event)"
+      />
+
+      <TaskBodySection
+        :task-id="task.id"
+        :content="task.bodyContent"
+        :content-type="task.bodyContentType"
       />
 
       <div class="section">

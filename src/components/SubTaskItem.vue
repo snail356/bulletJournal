@@ -175,7 +175,7 @@ async function onFileChange(e: Event) {
     @mouseleave="hovered = false"
     @mousedown="onSubtaskMouseDown"
     @paste.capture="onPaste"
-    @contextmenu.prevent
+    @contextmenu.stop
     @dragover="subtaskDrag?.onDragOver($event, subtask.id)"
     @drop="subtaskDrag?.onDrop($event, subtask.id)"
   >

@@ -90,6 +90,8 @@ function normalizeTask(task: Task & { carriedFromDate?: string }): Task {
     migrationHistory,
     statusHours: task.statusHours ?? null,
     difficultyNote: task.difficultyNote ?? "",
+    bodyContent: task.bodyContent ?? "",
+    bodyContentType: task.bodyContentType ?? "text",
     subtasks: task.subtasks.map(normalizeSubTask),
     notes: (task.notes ?? []).map(normalizeNote),
   };
@@ -780,6 +782,8 @@ export const useTaskStore = defineStore("task", () => {
       status: payload.status ?? "in_progress",
       statusHours: null,
       difficultyNote: "",
+      bodyContent: "",
+      bodyContentType: "text",
       completed: false,
       subtasks: [],
       notes: [],

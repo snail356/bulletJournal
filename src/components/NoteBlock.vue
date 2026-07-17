@@ -137,7 +137,7 @@ async function onFileChange(e: Event) {
       borderColor: NOTE_COLOR_DOT[note.color],
     }"
     @paste="onPaste"
-    @contextmenu.prevent
+    @contextmenu.stop
   >
     <div class="actions-anchor">
       <div class="actions">
