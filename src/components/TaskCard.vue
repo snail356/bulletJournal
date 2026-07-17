@@ -132,6 +132,11 @@ function onHoursKeydown(e: KeyboardEvent) {
   }
 }
 
+function onHoursFocus(e: FocusEvent) {
+  const input = e.target as HTMLInputElement
+  nextTick(() => input.select())
+}
+
 function onDifficultyNoteCommit(value: string) {
   store.setTaskDifficultyNote(props.task.id, value)
 }
@@ -387,7 +392,8 @@ async function onContextPaste() {
                 :model-value="task.labels"
                 @update:model-value="onLabelsChange"
               />
-              <div class="status-hours">
+              <div class="status-hours" @click.stop>
+                <span class="hours-label">時數</span>
                 <input
                   v-model="hoursDraft"
                   type="text"
@@ -395,25 +401,13 @@ async function onContextPaste() {
                   class="hours-input"
                   placeholder="0"
                   aria-label="狀態時數"
-                  @click.stop
+                  @focus="onHoursFocus"
                   @blur="commitHours"
                   @keydown="onHoursKeydown"
                 />
                 <span class="hours-unit">h</span>
               </div>
             </div>
-          </div>
-          <div v-show="expanded" class="difficulty-row" @click.stop>
-            <span class="difficulty-label">困難點</span>
-            <SearchableCombobox
-              class="difficulty-note"
-              :model-value="task.difficultyNote"
-              :options="difficultyOptions"
-              placeholder="輸入或選擇歷史紀錄…"
-              empty-text="尚無歷史紀錄"
-              @commit="onDifficultyNoteCommit"
-              @select="onDifficultyNoteCommit"
-            />
           </div>
         </template>
       </div>
@@ -495,6 +489,21 @@ async function onContextPaste() {
             @save="saveEmptyNote"
           />
         </template>
+      </div>
+
+      <div class="section difficulty-section" @click.stop>
+        <div class="section-header">
+          <p class="section-title">困難點</p>
+        </div>
+        <SearchableCombobox
+          class="difficulty-note"
+          :model-value="task.difficultyNote"
+          :options="difficultyOptions"
+          placeholder="輸入或選擇歷史紀錄…"
+          empty-text="尚無歷史紀錄"
+          @commit="onDifficultyNoteCommit"
+          @select="onDifficultyNoteCommit"
+        />
       </div>
     </div>
 
@@ -714,27 +723,44 @@ async function onContextPaste() {
 .status-hours {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  padding: 2px 8px 2px 6px;
-  border-radius: 20px;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 10px 4px 10px;
+  border-radius: $radius-sm;
   background: $bg;
   border: 1px solid $border;
+  cursor: text;
+
+  &:hover {
+    border-color: #d1d5db;
+  }
 
   &:focus-within {
     border-color: $primary;
     box-shadow: 0 0 0 2px $primary-light;
+    background: $surface;
   }
 }
 
+.hours-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: $text-muted;
+  white-space: nowrap;
+  user-select: none;
+}
+
 .hours-input {
-  width: 48px;
-  padding: 0;
+  width: 64px;
+  min-width: 64px;
+  padding: 2px 0;
   border: none;
   background: transparent;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   color: $text;
   text-align: right;
+  line-height: 1.3;
 
   &:focus {
     outline: none;
@@ -751,24 +777,15 @@ async function onContextPaste() {
 }
 
 .hours-unit {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: $text-muted;
 }
 
-.difficulty-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.difficulty-label {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 600;
-  color: $text-muted;
-  white-space: nowrap;
+.difficulty-section {
+  .difficulty-note {
+    width: 100%;
+  }
 }
 
 .difficulty-note {
@@ -983,14 +1000,15 @@ async function onContextPaste() {
     width: 100%;
   }
 
-  .difficulty-row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 4px;
+  .status-hours {
+    flex: 1 1 auto;
+    min-width: 120px;
   }
 
-  .difficulty-label {
-    font-size: 10px;
+  .hours-input {
+    flex: 1;
+    width: auto;
+    text-align: left;
   }
 
   .header-actions {

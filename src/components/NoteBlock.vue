@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import type { Attachment, Note } from '@/types'
 import AttachmentList from './AttachmentList.vue'
 import ColorDotPicker from './ColorDotPicker.vue'
@@ -26,6 +26,27 @@ const editingCode = ref(false)
 
 const isCode = computed(() => props.note.contentType === 'code')
 
+function shouldStartCollapsed(content: string): boolean {
+  const trimmed = content.trim()
+  if (!trimmed) return false
+  return trimmed.includes('\n') || trimmed.length > 80
+}
+
+const collapsed = ref(shouldStartCollapsed(props.note.content))
+
+watch(
+  () => props.note.id,
+  () => {
+    collapsed.value = shouldStartCollapsed(props.note.content)
+  },
+)
+
+const oneLinePreview = computed(() => {
+  const text = props.note.content.trim().replace(/\s+/g, ' ')
+  if (!text) return '（空白備註）'
+  return text.length > 72 ? `${text.slice(0, 72)}…` : text
+})
+
 function resolveContentType(content: string): Note['contentType'] {
   return looksLikeCode(content) ? 'code' : 'text'
 }
@@ -36,6 +57,7 @@ function saveContent(content: string) {
     contentType: resolveContentType(content),
   })
   editingCode.value = false
+  collapsed.value = shouldStartCollapsed(content)
 }
 
 function remove() {
@@ -51,7 +73,12 @@ function convertToText() {
   editingCode.value = false
 }
 
+function toggleCollapsed() {
+  collapsed.value = !collapsed.value
+}
+
 async function startEditing() {
+  collapsed.value = false
   if (isCode.value) {
     editingCode.value = true
     await nextTick()
@@ -83,6 +110,7 @@ async function onPaste(e: ClipboardEvent) {
     contentType: 'code',
   })
   editingCode.value = false
+  collapsed.value = shouldStartCollapsed(text)
 }
 
 function triggerUpload() {
@@ -100,7 +128,10 @@ async function onFileChange(e: Event) {
 <template>
   <div
     class="note"
-    :class="{ 'is-code': isCode && !editingCode }"
+    :class="{
+      'is-code': isCode && !editingCode && !collapsed,
+      collapsed,
+    }"
     :style="{
       background: NOTE_COLOR_BG[note.color],
       borderColor: NOTE_COLOR_DOT[note.color],
@@ -110,6 +141,17 @@ async function onFileChange(e: Event) {
   >
     <div class="actions-anchor">
       <div class="actions">
+        <button
+          type="button"
+          :title="collapsed ? '展開備註' : '收合為一行'"
+          :aria-expanded="!collapsed"
+          @click="toggleCollapsed"
+        >
+          <AppIcon
+            :name="collapsed ? 'chevron-right' : 'chevron-down'"
+            size="xs"
+          />
+        </button>
         <button type="button" title="編輯" @click="startEditing">
           <AppIcon name="pen" size="xs" />
         </button>
@@ -136,23 +178,35 @@ async function onFileChange(e: Event) {
       </div>
     </div>
 
-    <CodeSnippet v-if="isCode && !editingCode" :code="note.content" />
-    <InlineEditable
-      v-else
-      ref="contentRef"
-      :model-value="note.content"
-      tag="p"
-      class="content"
-      :class="{ 'content-code': isCode }"
-      multiline
-      @save="saveContent"
-      @editing-change="(v) => { if (!v) editingCode = false }"
-    />
+    <button
+      v-if="collapsed"
+      type="button"
+      class="one-line-preview"
+      :title="oneLinePreview"
+      @click="collapsed = false"
+    >
+      <span v-if="isCode" class="code-tag">code</span>
+      <span class="preview-text">{{ oneLinePreview }}</span>
+    </button>
+    <template v-else>
+      <CodeSnippet v-if="isCode && !editingCode" :code="note.content" />
+      <InlineEditable
+        v-else
+        ref="contentRef"
+        :model-value="note.content"
+        tag="p"
+        class="content"
+        :class="{ 'content-code': isCode }"
+        multiline
+        @save="saveContent"
+        @editing-change="(v) => { if (!v) editingCode = false }"
+      />
 
-    <AttachmentList
-      :attachments="note.attachments"
-      @preview="emit('preview', $event)"
-    />
+      <AttachmentList
+        :attachments="note.attachments"
+        @preview="emit('preview', $event)"
+      />
+    </template>
 
     <input ref="fileInput" type="file" accept="image/*" hidden @change="onFileChange" />
   </div>
@@ -164,7 +218,7 @@ async function onFileChange(e: Event) {
 .note {
   position: relative;
   padding: 12px;
-  padding-right: 140px;
+  padding-right: 160px;
   border-radius: $radius-sm;
   border-left: 3px solid;
   margin-top: 8px;
@@ -174,6 +228,46 @@ async function onFileChange(e: Event) {
     opacity: 1;
     pointer-events: auto;
   }
+
+  &.collapsed {
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
+
+.one-line-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  font-size: 13px;
+  line-height: 1.5;
+  color: $text;
+  cursor: pointer;
+
+  &:hover .preview-text {
+    color: $primary;
+  }
+}
+
+.preview-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.code-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #e5e7eb;
+  background: #1f2937;
 }
 
 .content {
@@ -197,7 +291,7 @@ async function onFileChange(e: Event) {
 .actions {
   position: absolute;
   top: -4px;
-  right: -132px;
+  right: -152px;
   display: flex;
   gap: 2px;
   align-items: center;
@@ -228,6 +322,10 @@ async function onFileChange(e: Event) {
   .note {
     padding-right: 12px;
     padding-top: 44px;
+
+    &.collapsed {
+      padding-top: 44px;
+    }
   }
 
   .actions {
