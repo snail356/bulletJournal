@@ -3,9 +3,11 @@ import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
 import type { Attachment, SubTask } from "@/types";
 import AttachmentList from "./AttachmentList.vue";
 import AppIcon from "./AppIcon.vue";
+import CodeSnippet from "./CodeSnippet.vue";
 import InlineEditable from "./InlineEditable.vue";
 import { SUBTASK_DRAG_KEY } from "@/composables/taskDrag";
 import { useTaskStore } from "@/stores/taskStore";
+import { looksLikeCode } from "@/utils/detectCode";
 
 const props = defineProps<{
   subtask: SubTask;
@@ -26,8 +28,10 @@ const isDragOver = computed(
   () => subtaskDrag?.dragOverId.value === props.subtask.id,
 );
 const hasNote = computed(() => props.subtask.note.trim().length > 0);
+const isCodeNote = computed(() => props.subtask.noteContentType === "code");
 const editing = ref(false);
 const noteEditing = ref(false);
+const editingCodeNote = ref(false);
 const hovered = ref(false);
 const noteExpanded = ref(hasNote.value);
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -62,8 +66,30 @@ function saveTitle(title: string) {
   store.updateSubTask(props.taskId, props.subtask.id, { title });
 }
 
+function resolveNoteContentType(note: string): SubTask["noteContentType"] {
+  return looksLikeCode(note) ? "code" : "text";
+}
+
 function saveNote(note: string) {
-  store.updateSubTask(props.taskId, props.subtask.id, { note });
+  store.updateSubTask(props.taskId, props.subtask.id, {
+    note,
+    noteContentType: resolveNoteContentType(note),
+  });
+  editingCodeNote.value = false;
+}
+
+function convertNoteToText() {
+  store.updateSubTask(props.taskId, props.subtask.id, {
+    noteContentType: "text",
+  });
+  editingCodeNote.value = false;
+}
+
+async function startEditCodeNote() {
+  noteExpanded.value = true;
+  editingCodeNote.value = true;
+  await nextTick();
+  noteRef.value?.startEditing();
 }
 
 function toggleNote() {
@@ -93,6 +119,18 @@ async function onPaste(e: ClipboardEvent) {
       return;
     }
   }
+
+  const text = e.clipboardData?.getData("text/plain") ?? "";
+  if (!text.trim() || !looksLikeCode(text)) return;
+
+  e.preventDefault();
+  e.stopPropagation();
+  noteExpanded.value = true;
+  editingCodeNote.value = false;
+  store.updateSubTask(props.taskId, props.subtask.id, {
+    note: text.replace(/\n$/, ""),
+    noteContentType: "code",
+  });
 }
 
 function focusSubtask() {
@@ -103,7 +141,7 @@ function onSubtaskMouseDown(e: MouseEvent) {
   const target = e.target as HTMLElement | null;
   if (
     target?.closest(
-      ".inline-editable, [contenteditable], input, button, label, .drag-handle, a",
+      ".inline-editable, [contenteditable], input, button, label, .drag-handle, a, .code-snippet",
     )
   ) {
     return;
@@ -175,17 +213,35 @@ async function onFileChange(e: Event) {
       />
 
       <div v-if="noteExpanded" class="note-area">
+        <div v-if="isCodeNote && !editingCodeNote" class="code-note">
+          <div class="code-note-actions">
+            <button type="button" title="編輯" @click="startEditCodeNote">
+              <AppIcon name="pen" size="xs" />
+            </button>
+            <button type="button" title="轉為一般文字" @click="convertNoteToText">
+              <AppIcon name="file-lines" size="xs" />
+            </button>
+          </div>
+          <CodeSnippet :code="subtask.note" />
+        </div>
         <InlineEditable
+          v-else
           ref="noteRef"
           :model-value="subtask.note"
           tag="p"
           class="note"
+          :class="{ 'note-code': isCodeNote }"
           multiline
           hint
           save-when-empty
           placeholder="新增備註…"
           @save="saveNote"
-          @editing-change="noteEditing = $event"
+          @editing-change="
+            (v) => {
+              noteEditing = v;
+              if (!v) editingCodeNote = false;
+            }
+          "
         />
       </div>
 
@@ -342,6 +398,38 @@ async function onFileChange(e: Event) {
   line-height: 1.5;
   white-space: pre-wrap;
   color: $text-muted;
+
+  &.note-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: $text;
+  }
+}
+
+.code-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.code-note-actions {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+
+  button {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    color: $text-muted;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      color: $primary;
+      background: rgba(255, 255, 255, 0.8);
+    }
+  }
 }
 
 .actions {

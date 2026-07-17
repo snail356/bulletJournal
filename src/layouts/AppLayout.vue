@@ -18,7 +18,9 @@ function onVisibilityChange() {
 
 function onReflectionSubmit(input: DailyReflectionInput) {
   store.submitDailyReflection(input)
-  router.push('/reflections')
+  if (router.currentRoute.value.path !== '/reflections') {
+    router.push('/reflections')
+  }
 }
 
 onMounted(() => {

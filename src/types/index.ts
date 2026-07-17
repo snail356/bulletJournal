@@ -24,6 +24,8 @@ export interface Note {
   id: string
   taskId: string
   content: string
+  /** text＝一般備註；code＝程式碼區塊顯示 */
+  contentType: 'text' | 'code'
   color: 'purple' | 'orange' | 'green' | 'blue' | 'gray'
   attachments: Attachment[]
   createdAt: string
@@ -35,6 +37,8 @@ export interface SubTask {
   taskId: string
   title: string
   note: string
+  /** text＝一般備註；code＝程式碼區塊顯示 */
+  noteContentType: 'text' | 'code'
   completed: boolean
   attachments: Attachment[]
   createdAt: string
@@ -88,7 +92,7 @@ export interface DailyReflection {
   aiManagerAdvice: string
   /** AI 建議產生時間 */
   aiGeneratedAt: string | null
-  /** draft＝暫存；submitted＝完成提交後進入回顧日誌 */
+  /** draft＝暫存（仍可在回顧日誌查看並呼叫 AI）；submitted＝完成提交 */
   status: 'draft' | 'submitted'
   createdAt: string
   updatedAt: string

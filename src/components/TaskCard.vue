@@ -53,6 +53,7 @@ const pendingFocusSubtaskId = ref<string | null>(null)
 const moveDateValue = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
 const expanded = ref(store.expandAllTasks)
+const notesExpanded = ref(true)
 
 watch(
   () => store.expandAllTasks,
@@ -64,6 +65,19 @@ watch(
 function toggleExpanded() {
   expanded.value = !expanded.value
 }
+
+function toggleNotesExpanded() {
+  notesExpanded.value = !notesExpanded.value
+}
+
+const notesPreview = computed(() => {
+  const notes = props.task.notes
+  if (!notes.length) return '尚無備註'
+  const latest = notes[notes.length - 1]
+  const text = latest.content.trim().replace(/\s+/g, ' ')
+  const snippet = text.length > 48 ? `${text.slice(0, 48)}…` : text || '（空白備註）'
+  return notes.length === 1 ? snippet : `${notes.length} 則 · ${snippet}`
+})
 
 const subtaskProgress = computed(() => {
   const total = props.task.subtasks.length
@@ -166,6 +180,7 @@ function addSubtaskInline() {
 
 function saveEmptyNote(content: string) {
   store.createNote(props.task.id, content)
+  notesExpanded.value = true
 }
 
 function onCompleteChange(e: Event) {
@@ -204,6 +219,7 @@ function onMenuSelect(key: string) {
       addSubtaskInline()
       break
     case 'add-note':
+      notesExpanded.value = true
       showNoteModal.value = true
       break
     case 'paste-image':
@@ -240,6 +256,7 @@ function onLabelsChange(labels: string[]) {
 
 function addNote(content: string) {
   store.createNote(props.task.id, content)
+  notesExpanded.value = true
 }
 
 function confirmMove() {
@@ -432,27 +449,52 @@ async function onContextPaste() {
 
       <div class="section">
         <div class="section-header">
-          <p class="section-title">備註 / 進度</p>
+          <button
+            type="button"
+            class="section-toggle"
+            :aria-expanded="notesExpanded"
+            @click="toggleNotesExpanded"
+          >
+            <AppIcon
+              :name="notesExpanded ? 'chevron-down' : 'chevron-right'"
+              size="xs"
+            />
+            <p class="section-title">
+              備註 / 進度
+              <span v-if="task.notes.length" class="section-count">
+                {{ task.notes.length }}
+              </span>
+            </p>
+          </button>
           <button type="button" class="add-btn" @click="showNoteModal = true">
             + 新增
           </button>
         </div>
-        <NoteBlock
-          v-for="note in task.notes"
-          :key="note.id"
-          :note="note"
-          :task-id="task.id"
-          @preview="emit('preview', $event)"
-        />
-        <InlineEditable
-          v-if="!task.notes.length"
-          model-value=""
-          tag="p"
-          class="empty-hint"
-          hint
-          placeholder="尚無備註"
-          @save="saveEmptyNote"
-        />
+        <p
+          v-if="!notesExpanded && task.notes.length"
+          class="notes-collapsed-preview"
+          @click="notesExpanded = true"
+        >
+          {{ notesPreview }}
+        </p>
+        <template v-else>
+          <NoteBlock
+            v-for="note in task.notes"
+            :key="note.id"
+            :note="note"
+            :task-id="task.id"
+            @preview="emit('preview', $event)"
+          />
+          <InlineEditable
+            v-if="!task.notes.length"
+            model-value=""
+            tag="p"
+            class="empty-hint"
+            hint
+            placeholder="尚無備註"
+            @save="saveEmptyNote"
+          />
+        </template>
       </div>
     </div>
 
@@ -803,10 +845,24 @@ async function onContextPaste() {
   margin-bottom: 4px;
 }
 
+.section-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: $text-muted;
+  border-radius: 4px;
+  padding: 2px 4px 2px 0;
+
+  &:hover {
+    color: $primary;
+  }
+}
+
 .section-title {
   font-size: 11px;
   font-weight: 600;
-  color: $text-muted;
+  color: inherit;
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -815,6 +871,26 @@ async function onContextPaste() {
   margin-left: 6px;
   color: $primary;
   font-weight: 700;
+}
+
+.notes-collapsed-preview {
+  margin-top: 4px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: $text-muted;
+  background: $bg;
+  border-radius: $radius-sm;
+  border-left: 3px solid $border;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover {
+    color: $text;
+    border-left-color: $primary;
+  }
 }
 
 .add-btn {

@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import type { Attachment, Note } from '@/types'
 import AttachmentList from './AttachmentList.vue'
 import ColorDotPicker from './ColorDotPicker.vue'
+import CodeSnippet from './CodeSnippet.vue'
 import AppIcon from './AppIcon.vue'
 import InlineEditable from './InlineEditable.vue'
 import { useTaskStore } from '@/stores/taskStore'
+import { looksLikeCode } from '@/utils/detectCode'
 import { NOTE_COLOR_BG, NOTE_COLOR_DOT, NOTE_COLOR_OPTIONS } from '@/utils/noteColors'
 
 const props = defineProps<{
@@ -20,9 +22,20 @@ const emit = defineEmits<{
 const store = useTaskStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const contentRef = ref<InstanceType<typeof InlineEditable> | null>(null)
+const editingCode = ref(false)
+
+const isCode = computed(() => props.note.contentType === 'code')
+
+function resolveContentType(content: string): Note['contentType'] {
+  return looksLikeCode(content) ? 'code' : 'text'
+}
 
 function saveContent(content: string) {
-  store.updateNote(props.taskId, props.note.id, { content })
+  store.updateNote(props.taskId, props.note.id, {
+    content,
+    contentType: resolveContentType(content),
+  })
+  editingCode.value = false
 }
 
 function remove() {
@@ -33,17 +46,43 @@ function setColor(color: string) {
   store.updateNote(props.taskId, props.note.id, { color: color as Note['color'] })
 }
 
+function convertToText() {
+  store.updateNote(props.taskId, props.note.id, { contentType: 'text' })
+  editingCode.value = false
+}
+
+async function startEditing() {
+  if (isCode.value) {
+    editingCode.value = true
+    await nextTick()
+  }
+  contentRef.value?.startEditing()
+}
+
 async function onPaste(e: ClipboardEvent) {
   const items = e.clipboardData?.items
   if (!items) return
+
   for (const item of items) {
     if (item.type.startsWith('image/')) {
       e.preventDefault()
       e.stopPropagation()
       const file = item.getAsFile()
       if (file) await store.addAttachment('note', props.note.id, file)
+      return
     }
   }
+
+  const text = e.clipboardData?.getData('text/plain') ?? ''
+  if (!text.trim() || !looksLikeCode(text)) return
+
+  e.preventDefault()
+  e.stopPropagation()
+  store.updateNote(props.taskId, props.note.id, {
+    content: text.replace(/\n$/, ''),
+    contentType: 'code',
+  })
+  editingCode.value = false
 }
 
 function triggerUpload() {
@@ -61,6 +100,7 @@ async function onFileChange(e: Event) {
 <template>
   <div
     class="note"
+    :class="{ 'is-code': isCode && !editingCode }"
     :style="{
       background: NOTE_COLOR_BG[note.color],
       borderColor: NOTE_COLOR_DOT[note.color],
@@ -70,8 +110,16 @@ async function onFileChange(e: Event) {
   >
     <div class="actions-anchor">
       <div class="actions">
-        <button type="button" title="編輯" @click="contentRef?.startEditing()">
+        <button type="button" title="編輯" @click="startEditing">
           <AppIcon name="pen" size="xs" />
+        </button>
+        <button
+          v-if="isCode"
+          type="button"
+          title="轉為一般文字"
+          @click="convertToText"
+        >
+          <AppIcon name="file-lines" size="xs" />
         </button>
         <button type="button" title="貼上圖片" @click="triggerUpload">
           <AppIcon name="image" size="xs" />
@@ -88,13 +136,17 @@ async function onFileChange(e: Event) {
       </div>
     </div>
 
+    <CodeSnippet v-if="isCode && !editingCode" :code="note.content" />
     <InlineEditable
+      v-else
       ref="contentRef"
       :model-value="note.content"
       tag="p"
       class="content"
+      :class="{ 'content-code': isCode }"
       multiline
       @save="saveContent"
+      @editing-change="(v) => { if (!v) editingCode = false }"
     />
 
     <AttachmentList
@@ -112,8 +164,7 @@ async function onFileChange(e: Event) {
 .note {
   position: relative;
   padding: 12px;
-  // 右側預留 hover 操作列空間，避免 icon 蓋住備註文字
-  padding-right: 120px;
+  padding-right: 140px;
   border-radius: $radius-sm;
   border-left: 3px solid;
   margin-top: 8px;
@@ -129,9 +180,13 @@ async function onFileChange(e: Event) {
   font-size: 13px;
   white-space: pre-wrap;
   line-height: 1.6;
+
+  &.content-code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+  }
 }
 
-// 高度為 0 的 sticky 錨點：備註很長時操作列會跟著捲動、停留在可視範圍內
 .actions-anchor {
   position: sticky;
   top: 8px;
@@ -142,7 +197,7 @@ async function onFileChange(e: Event) {
 .actions {
   position: absolute;
   top: -4px;
-  right: -112px; // 對齊 .note 預留的右側 padding 區
+  right: -132px;
   display: flex;
   gap: 2px;
   align-items: center;

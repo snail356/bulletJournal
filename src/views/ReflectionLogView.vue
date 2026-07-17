@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { useTaskStore } from '@/stores/taskStore'
-import { formatDisplayDate } from '@/utils/date'
+import { formatDisplayDate, todayString } from '@/utils/date'
 import { getGeminiModel, hasGeminiApiKey } from '@/utils/gemini'
 import type { DailyReflection } from '@/types'
 
@@ -33,6 +33,14 @@ const selected = computed(() => {
   if (!selectedDate.value) return null
   return store.getReflectionByDate(selectedDate.value) ?? null
 })
+
+const isSelectedToday = computed(
+  () => selected.value?.date === todayString(),
+)
+
+const canEditSelected = computed(
+  () => selected.value?.status === 'draft',
+)
 
 const renderedAiAdvice = computed(() => {
   const markdown = selected.value?.aiManagerAdvice?.trim()
@@ -63,11 +71,32 @@ watch(
       selectedDate.value = null
       return
     }
-    if (!selectedDate.value || !list.some((item) => item.date === selectedDate.value)) {
-      selectedDate.value = list[0].date
+    const today = todayString()
+    const hasToday = list.some((item) => item.date === today)
+    const selectedValid =
+      !!selectedDate.value &&
+      list.some((item) => item.date === selectedDate.value)
+
+    if (!selectedValid) {
+      selectedDate.value = hasToday ? today : list[0].date
     }
   },
   { immediate: true },
+)
+
+// 當日日誌內容更新（儲存草稿／完成提交）後，自動選取今日並捲到頂部
+watch(
+  () => store.getReflectionByDate(todayString())?.updatedAt,
+  async (updatedAt, prev) => {
+    if (!updatedAt || updatedAt === prev) return
+    const today = todayString()
+    if (!reflections.value.some((item) => item.date === today)) return
+    selectedDate.value = today
+    aiError.value = ''
+    showBackToTop.value = false
+    await nextTick()
+    detailScrollRef.value?.scrollTo({ top: 0 })
+  },
 )
 
 function selectDate(date: string) {
@@ -118,6 +147,11 @@ function confirmDelete() {
   pendingDelete.value = null
 }
 
+function editSelectedJournal() {
+  if (!selected.value || selected.value.status !== 'draft') return
+  store.openDraftReflectionEditor(selected.value.date)
+}
+
 function requestAiAdvice() {
   aiError.value = ''
   if (!hasGeminiApiKey()) {
@@ -144,7 +178,9 @@ async function confirmAiAdvice() {
   <div class="reflection-view">
     <header class="page-header">
       <h1>回顧日誌</h1>
-      <p class="subtitle">依日期瀏覽每日回顧；各時段與當日總結整合顯示為一份完整紀錄</p>
+      <p class="subtitle">
+        依日期瀏覽每日回顧；未完成草稿與已提交紀錄同樣呈現，皆可呼叫 AI 主管建議
+      </p>
     </header>
 
     <div v-if="reflections.length" class="layout">
@@ -157,84 +193,116 @@ async function confirmAiAdvice() {
           :class="{ active: item.date === selectedDate }"
           @click="selectDate(item.date)"
         >
-          <span class="date-label">{{ formatDisplayDate(item.date) }}</span>
+          <span class="date-row">
+            <span class="date-label">{{ formatDisplayDate(item.date) }}</span>
+            <span v-if="item.status === 'draft'" class="badge draft">草稿</span>
+            <span
+              v-else-if="item.date === todayString()"
+              class="badge today"
+            >今日</span>
+          </span>
           <span class="date-preview">{{ previewText(item) }}</span>
         </button>
       </aside>
 
       <section v-if="selected" class="detail">
-        <div ref="detailScrollRef" class="detail-scroll" @scroll.passive="onDetailScroll">
-        <div class="detail-header">
-          <div>
-            <h2>{{ formatDisplayDate(selected.date) }}</h2>
-            <p class="detail-meta">完整回顧報告</p>
-          </div>
-          <button
-            type="button"
-            class="delete"
-            aria-label="刪除此日回顧"
-            @click="requestDelete(selected)"
-          >
-            <AppIcon name="trash" size="sm" />
-          </button>
-        </div>
-
-        <article class="report">
-          <section class="block">
-            <h3 class="hint">早上</h3>
-            <p class="body">{{ displayContent(selected.morningContent) }}</p>
-          </section>
-          <section class="block">
-            <h3 class="hint">下午1點-3點</h3>
-            <p class="body">{{ displayContent(selected.afternoon1to3Content) }}</p>
-          </section>
-          <section class="block">
-            <h3 class="hint">下午3點後</h3>
-            <p class="body">{{ displayContent(selected.afternoonAfter3Content) }}</p>
-          </section>
-          <section class="block">
-            <h3 class="hint">當日總結</h3>
-            <p class="body">{{ displayContent(selected.summaryContent) }}</p>
-          </section>
-
-          <section class="block ai-block">
-            <div class="ai-header">
-              <h3 class="hint">AI 主管建議</h3>
+        <div
+          ref="detailScrollRef"
+          class="detail-scroll"
+          @scroll.passive="onDetailScroll"
+        >
+          <div class="detail-header">
+            <div>
+              <h2>{{ formatDisplayDate(selected.date) }}</h2>
+              <p class="detail-meta">
+                <template v-if="selected.status === 'draft'">
+                  草稿 · 尚未完成提交，仍可呼叫 AI 主管
+                </template>
+                <template v-else-if="isSelectedToday">今日回顧報告</template>
+                <template v-else>完整回顧報告</template>
+              </p>
+            </div>
+            <div class="detail-actions">
+              <button
+                v-if="canEditSelected"
+                type="button"
+                class="edit"
+                aria-label="編輯當日日誌"
+                @click="editSelectedJournal"
+              >
+                <AppIcon name="pen" size="sm" />
+              </button>
               <button
                 type="button"
-                class="btn-ai"
-                :disabled="store.aiAdviceLoading"
-                @click="requestAiAdvice"
+                class="delete"
+                aria-label="刪除此日回顧"
+                @click="requestDelete(selected)"
               >
-                <template v-if="store.aiAdviceLoading">
-                  產生中<span class="loading-dots" aria-hidden="true"
-                    ><i></i><i></i><i></i
-                  ></span>
-                </template>
-                <template v-else>
-                  {{ selected.aiManagerAdvice ? '重新產生' : '產生 AI 主管建議' }}
-                </template>
+                <AppIcon name="trash" size="sm" />
               </button>
             </div>
-            <p v-if="selected.aiGeneratedAt" class="ai-meta">
-              產生於 {{ formatDateTime(selected.aiGeneratedAt) }}
-            </p>
-            <p v-if="aiError" class="ai-error">{{ aiError }}</p>
-            <p v-if="store.aiAdviceLoading" class="ai-loading">
-              AI 主管正在整理建議<span class="loading-dots" aria-hidden="true"
-                ><i></i><i></i><i></i
-              ></span>
-            </p>
-            <div
-              v-else-if="selected.aiManagerAdvice"
-              class="body ai-body markdown-body"
-              v-html="renderedAiAdvice"
-            />
-            <p v-else class="ai-empty">
-              尚未產生建議。點擊上方按鈕前會先確認 API 呼叫用量。
-            </p>
-          </section>
-        </article>
+          </div>
+
+          <article class="report">
+            <section class="block">
+              <h3 class="hint">早上</h3>
+              <p class="body">{{ displayContent(selected.morningContent) }}</p>
+            </section>
+            <section class="block">
+              <h3 class="hint">下午1點-3點</h3>
+              <p class="body">{{ displayContent(selected.afternoon1to3Content) }}</p>
+            </section>
+            <section class="block">
+              <h3 class="hint">下午3點後</h3>
+              <p class="body">{{ displayContent(selected.afternoonAfter3Content) }}</p>
+            </section>
+            <section class="block">
+              <h3 class="hint">當日總結</h3>
+              <p class="body">{{ displayContent(selected.summaryContent) }}</p>
+            </section>
+
+            <section class="block ai-block">
+              <div class="ai-header">
+                <h3 class="hint">AI 主管建議</h3>
+                <button
+                  type="button"
+                  class="btn-ai"
+                  :disabled="store.aiAdviceLoading"
+                  @click="requestAiAdvice"
+                >
+                  <template v-if="store.aiAdviceLoading">
+                    產生中<span class="loading-dots" aria-hidden="true"
+                      ><i></i><i></i><i></i
+                    ></span>
+                  </template>
+                  <template v-else>
+                    {{
+                      selected.aiManagerAdvice
+                        ? '重新產生'
+                        : '產生 AI 主管建議'
+                    }}
+                  </template>
+                </button>
+              </div>
+              <p v-if="selected.aiGeneratedAt" class="ai-meta">
+                產生於 {{ formatDateTime(selected.aiGeneratedAt) }}
+              </p>
+              <p v-if="aiError" class="ai-error">{{ aiError }}</p>
+              <p v-if="store.aiAdviceLoading" class="ai-loading">
+                AI 主管正在整理建議<span class="loading-dots" aria-hidden="true"
+                  ><i></i><i></i><i></i
+                ></span>
+              </p>
+              <div
+                v-else-if="selected.aiManagerAdvice"
+                class="body ai-body markdown-body"
+                v-html="renderedAiAdvice"
+              />
+              <p v-else class="ai-empty">
+                尚未產生建議。點擊上方按鈕前會先確認 API 呼叫用量。
+              </p>
+            </section>
+          </article>
         </div>
 
         <Transition name="fade">
@@ -252,7 +320,9 @@ async function confirmAiAdvice() {
     </div>
 
     <div v-else class="empty">
-      <p>尚無回顧紀錄。於今日任務頁新增日誌並完成提交後，會顯示在此。</p>
+      <p>
+        尚無回顧紀錄。於今日任務頁新增並儲存日誌後，當日內容會顯示於此，可直接呼叫 AI 主管。
+      </p>
     </div>
 
     <ConfirmDialog
@@ -333,11 +403,34 @@ async function confirmAiAdvice() {
   }
 }
 
+.date-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .date-label {
-  display: block;
   font-size: 14px;
   font-weight: 600;
   color: $text;
+}
+
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  line-height: 1.4;
+
+  &.draft {
+    color: #b45309;
+    background: rgba(#f59e0b, 0.15);
+  }
+
+  &.today {
+    color: $primary;
+    background: $primary-light;
+  }
 }
 
 .date-preview {
@@ -354,7 +447,6 @@ async function confirmAiAdvice() {
   border-radius: $radius;
   box-shadow: $shadow;
   min-height: 360px;
-  // 高度與左側日期列表一致，內容改在卡片內滾動
   max-height: calc(100vh - 180px);
   display: flex;
   flex-direction: column;
@@ -421,16 +513,30 @@ async function confirmAiAdvice() {
   color: $text-muted;
 }
 
-.delete {
+.detail-actions {
+  display: flex;
+  gap: 4px;
   flex-shrink: 0;
+}
+
+.edit,
+.delete {
   color: $text-muted;
   padding: 6px;
   border-radius: $radius-sm;
 
   &:hover {
-    color: #ef4444;
-    background: rgba(#ef4444, 0.1);
+    background: rgba(0, 0, 0, 0.05);
   }
+}
+
+.edit:hover {
+  color: $primary;
+}
+
+.delete:hover {
+  color: #ef4444;
+  background: rgba(#ef4444, 0.1);
 }
 
 .report {
@@ -558,7 +664,6 @@ async function confirmAiAdvice() {
 }
 
 .markdown-body {
-  // 覆蓋 .body 的 pre-wrap，避免渲染後的 HTML 之間出現多餘空白
   white-space: normal;
 
   :deep(h1),

@@ -24,6 +24,7 @@ import type {
   TodayProgress,
 } from "@/types";
 import { createAttachmentFromFile } from "@/utils/attachment";
+import { looksLikeCode } from "@/utils/detectCode";
 import { addDays, daysBetween, todayString } from "@/utils/date";
 import {
   generateAiManagerAdvice as requestAiManagerAdvice,
@@ -60,7 +61,18 @@ function cloneTask(task: Task): Task {
 }
 
 function normalizeSubTask(sub: SubTask): SubTask {
-  return { ...sub, note: sub.note ?? "" };
+  return {
+    ...sub,
+    note: sub.note ?? "",
+    noteContentType: sub.noteContentType ?? "text",
+  };
+}
+
+function normalizeNote(note: Note): Note {
+  return {
+    ...note,
+    contentType: note.contentType ?? "text",
+  };
 }
 
 function normalizeTask(task: Task & { carriedFromDate?: string }): Task {
@@ -79,6 +91,7 @@ function normalizeTask(task: Task & { carriedFromDate?: string }): Task {
     statusHours: task.statusHours ?? null,
     difficultyNote: task.difficultyNote ?? "",
     subtasks: task.subtasks.map(normalizeSubTask),
+    notes: (task.notes ?? []).map(normalizeNote),
   };
 }
 
@@ -189,6 +202,13 @@ export const useTaskStore = defineStore("task", () => {
   const tasks = ref<Task[]>([]);
   const labels = ref<Label[]>([]);
   const selectedDate = ref(todayString());
+  /** 響應式的「今天」：頁面跨日仍開著時，喚醒檢查會更新它，讓相關 computed 重新計算 */
+  const currentDate = ref(todayString());
+
+  function refreshCurrentDate() {
+    const today = todayString();
+    if (currentDate.value !== today) currentDate.value = today;
+  }
   const expandImages = ref(loadFromStorage(EXPAND_IMAGES_KEY, false));
   const expandAllTasks = ref(loadFromStorage(EXPAND_TASKS_KEY, true));
   const migrationReviewState = ref<MigrationReviewState>(
@@ -348,7 +368,9 @@ export const useTaskStore = defineStore("task", () => {
       .sort((a, b) => a.overdueFrom.localeCompare(b.overdueFrom));
   }
 
-  const migrationCandidates = computed(() => getMigrationCandidates());
+  const migrationCandidates = computed(() =>
+    getMigrationCandidates(currentDate.value),
+  );
 
   const overdueTaskCount = computed(() => migrationCandidates.value.length);
 
@@ -358,6 +380,7 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function checkMigrationReview() {
+    refreshCurrentDate();
     if (shouldShowMigrationReview()) {
       migrationReviewVisible.value = true;
     }
@@ -365,6 +388,7 @@ export const useTaskStore = defineStore("task", () => {
 
   /** 優先處理延期任務；完成後再觸發每日回顧 */
   function checkDailyPrompts() {
+    refreshCurrentDate();
     if (shouldShowMigrationReview()) {
       reflectionModalVisible.value = false;
       migrationReviewVisible.value = true;
@@ -374,6 +398,7 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function openMigrationReview() {
+    refreshCurrentDate();
     if (getMigrationCandidates().length > 0) {
       reflectionModalVisible.value = false;
       migrationReviewVisible.value = true;
@@ -429,13 +454,12 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   const dailyReflectionsSorted = computed(() =>
-    [...dailyReflections.value]
-      .filter((item) => item.status === "submitted")
-      .sort((a, b) => b.date.localeCompare(a.date)),
+    // 已提交與未完成草稿皆顯示，未完成也可檢視並呼叫 AI 主管
+    [...dailyReflections.value].sort((a, b) => b.date.localeCompare(a.date)),
   );
 
   const todayJournalState = computed<TodayJournalState>(() => {
-    const reflection = getReflectionByDate(todayString());
+    const reflection = getReflectionByDate(currentDate.value);
     if (!reflection) return "new";
     if (reflection.status === "submitted") return "done";
     return "edit";
@@ -469,6 +493,13 @@ export const useTaskStore = defineStore("task", () => {
   function openTodayReflectionEditor() {
     if (todayJournalState.value === "done") return;
     openReflectionModal(todayString(), "manual");
+  }
+
+  /** 開啟未完成（草稿）回顧的編輯彈窗 */
+  function openDraftReflectionEditor(date: string) {
+    const reflection = getReflectionByDate(date);
+    if (!reflection || reflection.status === "submitted") return;
+    openReflectionModal(date, "manual");
   }
 
   function checkReflectionPrompt() {
@@ -570,8 +601,8 @@ export const useTaskStore = defineStore("task", () => {
 
   async function generateAiManagerAdvice(date: string): Promise<void> {
     const reflection = getReflectionByDate(date);
-    if (!reflection || reflection.status !== "submitted") {
-      throw new Error("僅能對已完成提交的回顧產生 AI 主管建議");
+    if (!reflection) {
+      throw new Error("找不到該日回顧，請先新增或編輯日誌後再試");
     }
     if (aiAdviceLoading.value) return;
 
@@ -891,6 +922,7 @@ export const useTaskStore = defineStore("task", () => {
       taskId,
       title,
       note: "",
+      noteContentType: "text",
       completed: false,
       attachments: [],
       createdAt: now,
@@ -908,7 +940,9 @@ export const useTaskStore = defineStore("task", () => {
   function updateSubTask(
     taskId: string,
     subTaskId: string,
-    payload: Partial<Pick<SubTask, "title" | "note" | "completed">>,
+    payload: Partial<
+      Pick<SubTask, "title" | "note" | "noteContentType" | "completed">
+    >,
   ) {
     const task = findTask(taskId);
     if (!task) return;
@@ -952,6 +986,7 @@ export const useTaskStore = defineStore("task", () => {
     taskId: string,
     content: string,
     color: Note["color"] = "purple",
+    contentType?: Note["contentType"],
   ): Note | null {
     const task = findTask(taskId);
     if (!task) return null;
@@ -960,6 +995,8 @@ export const useTaskStore = defineStore("task", () => {
       id: generateId(),
       taskId,
       content,
+      contentType:
+        contentType ?? (looksLikeCode(content) ? "code" : "text"),
       color,
       attachments: [],
       createdAt: now,
@@ -973,7 +1010,7 @@ export const useTaskStore = defineStore("task", () => {
   function updateNote(
     taskId: string,
     noteId: string,
-    payload: Partial<Pick<Note, "content" | "color">>,
+    payload: Partial<Pick<Note, "content" | "contentType" | "color">>,
   ) {
     const task = findTask(taskId);
     if (!task) return;
@@ -1322,6 +1359,7 @@ export const useTaskStore = defineStore("task", () => {
     getReflectionByDate,
     checkReflectionPrompt,
     openTodayReflectionEditor,
+    openDraftReflectionEditor,
     snoozeReflectionPrompt,
     dismissReflectionModal,
     saveDailyReflectionDraft,
