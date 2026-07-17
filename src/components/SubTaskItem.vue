@@ -387,6 +387,8 @@ async function onFileChange(e: Event) {
 
 .note-area {
   margin-top: 4px;
+  // 回收 subtask 右側為操作列保留的 100px，讓備註框可用寬度更完整
+  margin-right: -92px;
   padding: 6px 8px;
   border-left: 2px solid $border;
   background: rgba(0, 0, 0, 0.03);
@@ -483,6 +485,10 @@ async function onFileChange(e: Event) {
   .subtask {
     flex-wrap: wrap;
     padding: 8px 4px 40px;
+  }
+
+  .note-area {
+    margin-right: 0;
   }
 
   .actions {

@@ -13,7 +13,7 @@ const props = defineProps<{
 }>()
 
 const store = useTaskStore()
-const expanded = ref(true)
+const expanded = ref(props.content.trim().length > 0)
 const editingCode = ref(false)
 const draft = ref(props.content)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
