@@ -24,7 +24,7 @@ import type {
   TodayProgress,
 } from "@/types";
 import { createAttachmentFromFile } from "@/utils/attachment";
-import { looksLikeCode } from "@/utils/detectCode";
+import { resolveContentType } from "@/utils/detectContentType";
 import { addDays, daysBetween, todayString } from "@/utils/date";
 import {
   generateAiManagerAdvice as requestAiManagerAdvice,
@@ -1000,7 +1000,7 @@ export const useTaskStore = defineStore("task", () => {
       taskId,
       content,
       contentType:
-        contentType ?? (looksLikeCode(content) ? "code" : "text"),
+        contentType ?? resolveContentType(content),
       color,
       attachments: [],
       createdAt: now,

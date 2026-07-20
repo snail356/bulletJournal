@@ -663,66 +663,6 @@ async function confirmAiAdvice() {
   border: 1px solid $border;
 }
 
-.markdown-body {
-  white-space: normal;
-
-  :deep(h1),
-  :deep(h2),
-  :deep(h3) {
-    margin: 16px 0 8px;
-    color: $text;
-    line-height: 1.4;
-
-    &:first-child {
-      margin-top: 0;
-    }
-  }
-
-  :deep(h1) {
-    font-size: 20px;
-  }
-
-  :deep(h2) {
-    font-size: 17px;
-  }
-
-  :deep(h3) {
-    font-size: 15px;
-  }
-
-  :deep(p) {
-    margin: 8px 0;
-  }
-
-  :deep(ul),
-  :deep(ol) {
-    margin: 8px 0;
-    padding-left: 24px;
-  }
-
-  :deep(li) {
-    margin: 5px 0;
-  }
-
-  :deep(strong) {
-    font-weight: 700;
-  }
-
-  :deep(blockquote) {
-    margin: 10px 0;
-    padding-left: 12px;
-    border-left: 3px solid $primary;
-    color: $text-muted;
-  }
-
-  :deep(code) {
-    padding: 2px 5px;
-    border-radius: 4px;
-    background: rgba($primary, 0.1);
-    font-family: monospace;
-  }
-}
-
 .empty {
   text-align: center;
   padding: 60px 20px;
@@ -752,4 +692,8 @@ async function confirmAiAdvice() {
     padding: 18px;
   }
 }
+</style>
+
+<style lang="scss">
+@use '@/styles/markdown';
 </style>

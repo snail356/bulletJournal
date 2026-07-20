@@ -9,6 +9,9 @@ export type TaskStatus =
 
 export type AttachmentOwnerType = 'task' | 'subtask' | 'note'
 
+/** 輸入區內容格式：text＝純文字；code＝程式碼區塊；markdown＝Markdown 渲染 */
+export type ContentFormat = 'text' | 'code' | 'markdown'
+
 export interface Attachment {
   id: string
   ownerType: AttachmentOwnerType
@@ -24,8 +27,7 @@ export interface Note {
   id: string
   taskId: string
   content: string
-  /** text＝一般備註；code＝程式碼區塊顯示 */
-  contentType: 'text' | 'code'
+  contentType: ContentFormat
   color: 'purple' | 'orange' | 'green' | 'blue' | 'gray'
   attachments: Attachment[]
   createdAt: string
@@ -37,8 +39,7 @@ export interface SubTask {
   taskId: string
   title: string
   note: string
-  /** text＝一般備註；code＝程式碼區塊顯示 */
-  noteContentType: 'text' | 'code'
+  noteContentType: ContentFormat
   completed: boolean
   attachments: Attachment[]
   createdAt: string
@@ -131,8 +132,7 @@ export interface Task {
   difficultyNote: string
   /** 主任務內容區（唯一，不可新增刪除） */
   bodyContent: string
-  /** text＝一般內容；code＝程式碼區塊顯示 */
-  bodyContentType: 'text' | 'code'
+  bodyContentType: ContentFormat
   completed: boolean
   subtasks: SubTask[]
   notes: Note[]

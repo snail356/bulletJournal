@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import type { Attachment, Note } from '@/types'
+import type { Attachment, ContentFormat, Note } from '@/types'
 import AttachmentList from './AttachmentList.vue'
 import ColorDotPicker from './ColorDotPicker.vue'
 import CodeSnippet from './CodeSnippet.vue'
+import MarkdownContent from './MarkdownContent.vue'
 import AppIcon from './AppIcon.vue'
 import InlineEditable from './InlineEditable.vue'
 import { useTaskStore } from '@/stores/taskStore'
-import { looksLikeCode } from '@/utils/detectCode'
+import { resolveContentType } from '@/utils/detectContentType'
 import { NOTE_COLOR_BG, NOTE_COLOR_DOT, NOTE_COLOR_OPTIONS } from '@/utils/noteColors'
 
 const props = defineProps<{
@@ -22,9 +23,11 @@ const emit = defineEmits<{
 const store = useTaskStore()
 const fileInput = ref<HTMLInputElement | null>(null)
 const contentRef = ref<InstanceType<typeof InlineEditable> | null>(null)
-const editingCode = ref(false)
+const editingFormatted = ref(false)
 
 const isCode = computed(() => props.note.contentType === 'code')
+const isMarkdown = computed(() => props.note.contentType === 'markdown')
+const isFormatted = computed(() => isCode.value || isMarkdown.value)
 
 function shouldStartCollapsed(content: string): boolean {
   const trimmed = content.trim()
@@ -47,16 +50,12 @@ const oneLinePreview = computed(() => {
   return text.length > 72 ? `${text.slice(0, 72)}…` : text
 })
 
-function resolveContentType(content: string): Note['contentType'] {
-  return looksLikeCode(content) ? 'code' : 'text'
-}
-
 function saveContent(content: string) {
   store.updateNote(props.taskId, props.note.id, {
     content,
     contentType: resolveContentType(content),
   })
-  editingCode.value = false
+  editingFormatted.value = false
   collapsed.value = shouldStartCollapsed(content)
 }
 
@@ -70,7 +69,7 @@ function setColor(color: string) {
 
 function convertToText() {
   store.updateNote(props.taskId, props.note.id, { contentType: 'text' })
-  editingCode.value = false
+  editingFormatted.value = false
 }
 
 function toggleCollapsed() {
@@ -79,11 +78,23 @@ function toggleCollapsed() {
 
 async function startEditing() {
   collapsed.value = false
-  if (isCode.value) {
-    editingCode.value = true
+  if (isFormatted.value) {
+    editingFormatted.value = true
     await nextTick()
   }
   contentRef.value?.startEditing()
+}
+
+function applyPastedContent(text: string) {
+  const contentType = resolveContentType(text)
+  if (contentType === 'text') return
+
+  store.updateNote(props.taskId, props.note.id, {
+    content: text.replace(/\n$/, ''),
+    contentType,
+  })
+  editingFormatted.value = false
+  collapsed.value = shouldStartCollapsed(text)
 }
 
 async function onPaste(e: ClipboardEvent) {
@@ -101,16 +112,14 @@ async function onPaste(e: ClipboardEvent) {
   }
 
   const text = e.clipboardData?.getData('text/plain') ?? ''
-  if (!text.trim() || !looksLikeCode(text)) return
+  if (!text.trim()) return
+
+  const contentType = resolveContentType(text)
+  if (contentType === 'text') return
 
   e.preventDefault()
   e.stopPropagation()
-  store.updateNote(props.taskId, props.note.id, {
-    content: text.replace(/\n$/, ''),
-    contentType: 'code',
-  })
-  editingCode.value = false
-  collapsed.value = shouldStartCollapsed(text)
+  applyPastedContent(text)
 }
 
 function triggerUpload() {
@@ -123,13 +132,19 @@ async function onFileChange(e: Event) {
   if (file) await store.addAttachment('note', props.note.id, file)
   input.value = ''
 }
+
+function formatTag(type: ContentFormat): string | null {
+  if (type === 'code') return 'code'
+  if (type === 'markdown') return 'md'
+  return null
+}
 </script>
 
 <template>
   <div
     class="note"
     :class="{
-      'is-code': isCode && !editingCode && !collapsed,
+      'is-formatted': isFormatted && !editingFormatted && !collapsed,
       collapsed,
     }"
     :style="{
@@ -156,7 +171,7 @@ async function onFileChange(e: Event) {
           <AppIcon name="pen" size="xs" />
         </button>
         <button
-          v-if="isCode"
+          v-if="isFormatted"
           type="button"
           title="轉為一般文字"
           @click="convertToText"
@@ -185,11 +200,17 @@ async function onFileChange(e: Event) {
       :title="oneLinePreview"
       @click="collapsed = false"
     >
-      <span v-if="isCode" class="code-tag">code</span>
+      <span v-if="formatTag(note.contentType)" class="format-tag">
+        {{ formatTag(note.contentType) }}
+      </span>
       <span class="preview-text">{{ oneLinePreview }}</span>
     </button>
     <template v-else>
-      <CodeSnippet v-if="isCode && !editingCode" :code="note.content" />
+      <CodeSnippet v-if="isCode && !editingFormatted" :code="note.content" />
+      <MarkdownContent
+        v-else-if="isMarkdown && !editingFormatted"
+        :content="note.content"
+      />
       <InlineEditable
         v-else
         ref="contentRef"
@@ -199,7 +220,7 @@ async function onFileChange(e: Event) {
         :class="{ 'content-code': isCode }"
         multiline
         @save="saveContent"
-        @editing-change="(v) => { if (!v) editingCode = false }"
+        @editing-change="(v) => { if (!v) editingFormatted = false }"
       />
 
       <AttachmentList
@@ -259,7 +280,7 @@ async function onFileChange(e: Event) {
   white-space: nowrap;
 }
 
-.code-tag {
+.format-tag {
   flex-shrink: 0;
   font-size: 10px;
   font-weight: 700;

@@ -1,0 +1,38 @@
+---
+description: Commit 訊息使用繁體中文
+alwaysApply: true
+---
+
+# Commit 訊息規範
+
+產生或撰寫 git commit 訊息時，**一律使用繁體中文**。
+
+## 格式
+
+- 可保留 conventional commit 前綴（`feat` / `fix` / `refactor` / `docs` / `chore` 等）
+- 冒號後的說明必須為繁體中文
+- 聚焦「為什麼」而非「改了什麼檔案」
+- 簡潔 1–2 句，避免冗長清單
+
+## 範例
+
+```
+feat: 主任務新增可收合內容區，支援多行文字與程式碼
+
+fix: 修正輸入區右鍵誤開主任務選單導致無法複製
+
+refactor: 調整備註收合與困難點區塊位置
+```
+
+## 避免
+
+```
+feat: Update task management components and enhance context menu
+fix: Fix copy issue in input area
+```
+
+## 規則檔本身
+
+- `.cursor/rules/commit-messages.mdc` **不要**加入暫存區，也**不要**一併提交
+- 撰寫 commit 說明時也不要提及此檔案或其內容
+- commit 只納入其餘功能／修正變更

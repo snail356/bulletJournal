@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import type { Attachment, Task } from '@/types'
+import type { Attachment, ContentFormat, Task } from '@/types'
 import AttachmentList from './AttachmentList.vue'
 import CodeSnippet from './CodeSnippet.vue'
+import MarkdownContent from './MarkdownContent.vue'
 import AppIcon from './AppIcon.vue'
 import { useTaskStore } from '@/stores/taskStore'
-import { looksLikeCode } from '@/utils/detectCode'
+import { resolveContentType } from '@/utils/detectContentType'
 
 const props = defineProps<{
   taskId: string
@@ -20,14 +21,16 @@ const emit = defineEmits<{
 
 const store = useTaskStore()
 const expanded = ref(props.content.trim().length > 0 || props.attachments.length > 0)
-const editingCode = ref(false)
+const editingFormatted = ref(false)
 const draft = ref(props.content)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)
 const fileInput = ref<HTMLInputElement | null>(null)
 
 const isCode = computed(() => props.contentType === 'code')
+const isMarkdown = computed(() => props.contentType === 'markdown')
+const isFormatted = computed(() => isCode.value || isMarkdown.value)
 const hasContent = computed(() => props.content.trim().length > 0)
-const showEditor = computed(() => !isCode.value || editingCode.value)
+const showEditor = computed(() => !isFormatted.value || editingFormatted.value)
 
 const preview = computed(() => {
   const text = props.content.trim().replace(/\s+/g, ' ')
@@ -59,29 +62,24 @@ watch(expanded, async (value) => {
   if (textareaRef.value) autoResize(textareaRef.value)
 })
 
-function resolveContentType(content: string): Task['bodyContentType'] {
-  return looksLikeCode(content) ? 'code' : 'text'
-}
-
 function commitDraft() {
   const next = draft.value.replace(/\n$/, '')
-  const contentType = resolveContentType(next)
   store.updateTask(props.taskId, {
     bodyContent: next,
-    bodyContentType: contentType,
+    bodyContentType: resolveContentType(next),
   })
-  editingCode.value = false
+  editingFormatted.value = false
   draft.value = next
 }
 
 function convertToText() {
   store.updateTask(props.taskId, { bodyContentType: 'text' })
-  editingCode.value = false
+  editingFormatted.value = false
   draft.value = props.content
 }
 
-async function startEditCode() {
-  editingCode.value = true
+async function startEditFormatted() {
+  editingFormatted.value = true
   draft.value = props.content
   await nextTick()
   const el = textareaRef.value
@@ -106,6 +104,19 @@ function onInput(e: Event) {
   autoResize(el)
 }
 
+function applyPastedContent(text: string) {
+  const contentType = resolveContentType(text)
+  if (contentType === 'text') return false
+
+  store.updateTask(props.taskId, {
+    bodyContent: text.replace(/\n$/, ''),
+    bodyContentType: contentType,
+  })
+  editingFormatted.value = false
+  draft.value = text.replace(/\n$/, '')
+  return true
+}
+
 async function onPaste(e: ClipboardEvent) {
   const items = e.clipboardData?.items
   if (items) {
@@ -124,21 +135,24 @@ async function onPaste(e: ClipboardEvent) {
   }
 
   const text = e.clipboardData?.getData('text/plain') ?? ''
-  if (!text.trim() || !looksLikeCode(text)) return
+  if (!text.trim()) return
 
-  // 讓 paste 先進入 textarea，再於 nextTick 依內容判定 code
+  const contentType = resolveContentType(text)
+  if (contentType === 'text') return
+
+  if (!showEditor.value) {
+    e.preventDefault()
+    e.stopPropagation()
+    applyPastedContent(text)
+    return
+  }
+
   nextTick(() => {
     const el = textareaRef.value
     if (!el) return
     draft.value = el.value
     autoResize(el)
-    if (looksLikeCode(el.value)) {
-      store.updateTask(props.taskId, {
-        bodyContent: el.value.replace(/\n$/, ''),
-        bodyContentType: 'code',
-      })
-      editingCode.value = false
-    }
+    applyPastedContent(el.value)
   })
 }
 
@@ -154,9 +168,14 @@ async function onFileChange(e: Event) {
   input.value = ''
 }
 
-/** 阻止冒泡至主任務右鍵選單，保留瀏覽器原生複製／貼上選單 */
 function onContextMenu(e: MouseEvent) {
   e.stopPropagation()
+}
+
+function formatTag(type: ContentFormat): string | null {
+  if (type === 'code') return 'code'
+  if (type === 'markdown') return 'md'
+  return null
 }
 </script>
 
@@ -199,14 +218,16 @@ function onContextMenu(e: MouseEvent) {
       class="collapsed-preview"
       @click="expanded = true"
     >
-      <span v-if="isCode && hasContent" class="code-tag">code</span>
+      <span v-if="formatTag(contentType) && hasContent" class="format-tag">
+        {{ formatTag(contentType) }}
+      </span>
       {{ preview }}
     </p>
 
     <div v-else class="body-area">
-      <div v-if="isCode && !editingCode" class="code-body">
-        <div class="code-actions">
-          <button type="button" title="編輯" @click="startEditCode">
+      <div v-if="isCode && !editingFormatted" class="formatted-body">
+        <div class="formatted-actions">
+          <button type="button" title="編輯" @click="startEditFormatted">
             <AppIcon name="pen" size="xs" />
           </button>
           <button type="button" title="轉為一般文字" @click="convertToText">
@@ -214,6 +235,17 @@ function onContextMenu(e: MouseEvent) {
           </button>
         </div>
         <CodeSnippet :code="content" />
+      </div>
+      <div v-else-if="isMarkdown && !editingFormatted" class="formatted-body">
+        <div class="formatted-actions">
+          <button type="button" title="編輯" @click="startEditFormatted">
+            <AppIcon name="pen" size="xs" />
+          </button>
+          <button type="button" title="轉為一般文字" @click="convertToText">
+            <AppIcon name="file-lines" size="xs" />
+          </button>
+        </div>
+        <MarkdownContent :content="content" />
       </div>
       <textarea
         v-else
@@ -322,7 +354,7 @@ function onContextMenu(e: MouseEvent) {
   }
 }
 
-.code-tag {
+.format-tag {
   display: inline-block;
   margin-right: 6px;
   padding: 0 5px;
@@ -389,11 +421,11 @@ function onContextMenu(e: MouseEvent) {
   }
 }
 
-.code-body {
+.formatted-body {
   position: relative;
 }
 
-.code-actions {
+.formatted-actions {
   display: flex;
   justify-content: flex-end;
   gap: 4px;

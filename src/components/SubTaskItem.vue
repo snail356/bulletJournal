@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
-import type { Attachment, SubTask } from "@/types";
+import type { Attachment, ContentFormat, SubTask } from "@/types";
 import AttachmentList from "./AttachmentList.vue";
 import AppIcon from "./AppIcon.vue";
 import CodeSnippet from "./CodeSnippet.vue";
+import MarkdownContent from "./MarkdownContent.vue";
 import InlineEditable from "./InlineEditable.vue";
 import { SUBTASK_DRAG_KEY } from "@/composables/taskDrag";
 import { useTaskStore } from "@/stores/taskStore";
-import { looksLikeCode } from "@/utils/detectCode";
+import { resolveContentType } from "@/utils/detectContentType";
 
 const props = defineProps<{
   subtask: SubTask;
@@ -29,9 +30,12 @@ const isDragOver = computed(
 );
 const hasNote = computed(() => props.subtask.note.trim().length > 0);
 const isCodeNote = computed(() => props.subtask.noteContentType === "code");
+const isMarkdownNote = computed(
+  () => props.subtask.noteContentType === "markdown",
+);
 const editing = ref(false);
 const noteEditing = ref(false);
-const editingCodeNote = ref(false);
+const editingFormattedNote = ref(false);
 const hovered = ref(false);
 const noteExpanded = ref(hasNote.value);
 const fileInput = ref<HTMLInputElement | null>(null);
@@ -66,28 +70,24 @@ function saveTitle(title: string) {
   store.updateSubTask(props.taskId, props.subtask.id, { title });
 }
 
-function resolveNoteContentType(note: string): SubTask["noteContentType"] {
-  return looksLikeCode(note) ? "code" : "text";
-}
-
 function saveNote(note: string) {
   store.updateSubTask(props.taskId, props.subtask.id, {
     note,
-    noteContentType: resolveNoteContentType(note),
+    noteContentType: resolveContentType(note),
   });
-  editingCodeNote.value = false;
+  editingFormattedNote.value = false;
 }
 
 function convertNoteToText() {
   store.updateSubTask(props.taskId, props.subtask.id, {
     noteContentType: "text",
   });
-  editingCodeNote.value = false;
+  editingFormattedNote.value = false;
 }
 
-async function startEditCodeNote() {
+async function startEditFormattedNote() {
   noteExpanded.value = true;
-  editingCodeNote.value = true;
+  editingFormattedNote.value = true;
   await nextTick();
   noteRef.value?.startEditing();
 }
@@ -107,6 +107,18 @@ function remove() {
   store.deleteSubTask(props.taskId, props.subtask.id);
 }
 
+function applyPastedNote(text: string) {
+  const noteContentType = resolveContentType(text);
+  if (noteContentType === "text") return;
+
+  noteExpanded.value = true;
+  editingFormattedNote.value = false;
+  store.updateSubTask(props.taskId, props.subtask.id, {
+    note: text.replace(/\n$/, ""),
+    noteContentType,
+  });
+}
+
 async function onPaste(e: ClipboardEvent) {
   const items = e.clipboardData?.items;
   if (!items) return;
@@ -121,16 +133,14 @@ async function onPaste(e: ClipboardEvent) {
   }
 
   const text = e.clipboardData?.getData("text/plain") ?? "";
-  if (!text.trim() || !looksLikeCode(text)) return;
+  if (!text.trim()) return;
+
+  const noteContentType = resolveContentType(text);
+  if (noteContentType === "text") return;
 
   e.preventDefault();
   e.stopPropagation();
-  noteExpanded.value = true;
-  editingCodeNote.value = false;
-  store.updateSubTask(props.taskId, props.subtask.id, {
-    note: text.replace(/\n$/, ""),
-    noteContentType: "code",
-  });
+  applyPastedNote(text);
 }
 
 function focusSubtask() {
@@ -141,7 +151,7 @@ function onSubtaskMouseDown(e: MouseEvent) {
   const target = e.target as HTMLElement | null;
   if (
     target?.closest(
-      ".inline-editable, [contenteditable], input, button, label, .drag-handle, a, .code-snippet",
+      ".inline-editable, [contenteditable], input, button, label, .drag-handle, a, .code-snippet, .markdown-content",
     )
   ) {
     return;
@@ -158,6 +168,12 @@ async function onFileChange(e: Event) {
   const file = input.files?.[0];
   if (file) await store.addAttachment("subtask", props.subtask.id, file);
   input.value = "";
+}
+
+function formatTag(type: ContentFormat): string | null {
+  if (type === "code") return "code";
+  if (type === "markdown") return "md";
+  return null;
 }
 </script>
 
@@ -213,9 +229,12 @@ async function onFileChange(e: Event) {
       />
 
       <div v-if="noteExpanded" class="note-area">
-        <div v-if="isCodeNote && !editingCodeNote" class="code-note">
-          <div class="code-note-actions">
-            <button type="button" title="編輯" @click="startEditCodeNote">
+        <div
+          v-if="isCodeNote && !editingFormattedNote"
+          class="formatted-note"
+        >
+          <div class="formatted-note-actions">
+            <button type="button" title="編輯" @click="startEditFormattedNote">
               <AppIcon name="pen" size="xs" />
             </button>
             <button type="button" title="轉為一般文字" @click="convertNoteToText">
@@ -223,6 +242,20 @@ async function onFileChange(e: Event) {
             </button>
           </div>
           <CodeSnippet :code="subtask.note" />
+        </div>
+        <div
+          v-else-if="isMarkdownNote && !editingFormattedNote"
+          class="formatted-note"
+        >
+          <div class="formatted-note-actions">
+            <button type="button" title="編輯" @click="startEditFormattedNote">
+              <AppIcon name="pen" size="xs" />
+            </button>
+            <button type="button" title="轉為一般文字" @click="convertNoteToText">
+              <AppIcon name="file-lines" size="xs" />
+            </button>
+          </div>
+          <MarkdownContent :content="subtask.note" />
         </div>
         <InlineEditable
           v-else
@@ -239,7 +272,7 @@ async function onFileChange(e: Event) {
           @editing-change="
             (v) => {
               noteEditing = v;
-              if (!v) editingCodeNote = false;
+              if (!v) editingFormattedNote = false;
             }
           "
         />
@@ -265,7 +298,13 @@ async function onFileChange(e: Event) {
           :name="noteExpanded ? 'chevron-down' : 'chevron-right'"
           size="xs"
         />
-        <span v-if="hasNote && !noteExpanded" class="note-dot" />
+        <span
+          v-if="hasNote && !noteExpanded && formatTag(subtask.noteContentType)"
+          class="note-format-tag"
+        >
+          {{ formatTag(subtask.noteContentType) }}
+        </span>
+        <span v-else-if="hasNote && !noteExpanded" class="note-dot" />
       </button>
       <button type="button" title="貼上圖片" @click="triggerUpload">
         <AppIcon name="image" size="xs" />
@@ -387,7 +426,6 @@ async function onFileChange(e: Event) {
 
 .note-area {
   margin-top: 4px;
-  // 回收 subtask 右側為操作列保留的 100px，讓備註框可用寬度更完整
   margin-right: -92px;
   padding: 6px 8px;
   border-left: 2px solid $border;
@@ -407,13 +445,13 @@ async function onFileChange(e: Event) {
   }
 }
 
-.code-note {
+.formatted-note {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.code-note-actions {
+.formatted-note-actions {
   display: flex;
   gap: 2px;
   justify-content: flex-end;
@@ -479,6 +517,19 @@ async function onFileChange(e: Event) {
   height: 5px;
   border-radius: 50%;
   background: $primary;
+}
+
+.note-format-tag {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 2px 3px;
+  border-radius: 3px;
+  color: #e5e7eb;
+  background: #1f2937;
 }
 
 @media (max-width: $breakpoint-sm) {
