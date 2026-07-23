@@ -6,9 +6,11 @@ import { mockLabels, mockTasks } from '@/mock/data'
 import { TASKS_KEY, LABELS_KEY, SELECTED_DATE_KEY, saveToStorage } from '@/utils/storage'
 import { todayString } from '@/utils/date'
 import { getGeminiModel, hasGeminiApiKey } from '@/utils/gemini'
+import { buildBackupZip, downloadBlob } from '@/utils/backup'
 
 const store = useTaskStore()
 const message = ref('')
+const messageError = ref(false)
 const aiPromptDraft = ref(store.aiManagerPrompt)
 const aiPromptMessage = ref('')
 const confirmVisible = ref(false)
@@ -16,7 +18,17 @@ const confirmTitle = ref('')
 const confirmMessage = ref('')
 const confirmDanger = ref(false)
 const confirmLabel = ref('確定')
+const backupLoading = ref(false)
 let confirmAction: (() => void) | null = null
+
+function showFeedback(text: string, isError = false) {
+  message.value = text
+  messageError.value = isError
+  setTimeout(() => {
+    message.value = ''
+    messageError.value = false
+  }, 4000)
+}
 
 const geminiKeyConfigured = computed(() => hasGeminiApiKey())
 const geminiLastCalled = computed(() => {
@@ -56,8 +68,7 @@ function resetMockData() {
       saveToStorage(TASKS_KEY, store.tasks)
       saveToStorage(LABELS_KEY, store.labels)
       saveToStorage(SELECTED_DATE_KEY, store.selectedDate)
-      message.value = '已重置為 mock 資料'
-      setTimeout(() => (message.value = ''), 3000)
+      showFeedback('已重置為 mock 資料')
     },
   )
 }
@@ -68,11 +79,34 @@ function clearAllData() {
     '確定要清除所有任務、標籤與偏好設定？此操作無法復原，且不會還原為示範資料。',
     () => {
       store.clearAllData()
-      message.value = '已清除所有資料'
-      setTimeout(() => (message.value = ''), 3000)
+      showFeedback('已清除所有資料')
     },
     { danger: true, confirmLabel: '全部清除' },
   )
+}
+
+async function backupData() {
+  if (backupLoading.value) return
+  backupLoading.value = true
+  try {
+    const result = await buildBackupZip({
+      tasks: store.tasks,
+      labels: store.labels,
+      statusItems: store.statusItems,
+      reflections: store.dailyReflections,
+    })
+    downloadBlob(result.blob, result.fileName)
+    showFeedback(
+      `已下載備份：${result.taskCount} 任務、${result.reflectionCount} 日誌、${result.imageCount} 張 WebP`,
+    )
+  } catch (error) {
+    showFeedback(
+      error instanceof Error ? error.message : '備份失敗，請稍後再試',
+      true,
+    )
+  } finally {
+    backupLoading.value = false
+  }
 }
 
 function saveAiManagerPrompt() {
@@ -94,8 +128,18 @@ function saveAiManagerPrompt() {
 
     <div class="settings-card">
       <h2>資料管理</h2>
-      <p class="desc">所有資料儲存於瀏覽器 localStorage，無需後端。</p>
+      <p class="desc">
+        所有資料儲存於瀏覽器 localStorage，無需後端。可將任務與回顧匯出為 Markdown，圖片轉成外置 WebP 並打包成 ZIP。
+      </p>
       <div class="actions">
+        <button
+          type="button"
+          class="btn-primary"
+          :disabled="backupLoading"
+          @click="backupData"
+        >
+          {{ backupLoading ? '備份中…' : '備份' }}
+        </button>
         <button type="button" class="btn-secondary" @click="resetMockData">
           重置為 Mock 資料
         </button>
@@ -103,7 +147,9 @@ function saveAiManagerPrompt() {
           清除所有資料
         </button>
       </div>
-      <p v-if="message" class="feedback">{{ message }}</p>
+      <p v-if="message" class="feedback" :class="{ error: messageError }">
+        {{ message }}
+      </p>
     </div>
 
     <div class="settings-card">
@@ -269,8 +315,13 @@ function saveAiManagerPrompt() {
   color: white;
   font-weight: 500;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: $primary-dark;
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: default;
   }
 }
 
@@ -302,6 +353,10 @@ function saveAiManagerPrompt() {
   margin-top: 12px;
   color: #22c55e;
   font-size: 13px;
+
+  &.error {
+    color: #ef4444;
+  }
 }
 
 .info {

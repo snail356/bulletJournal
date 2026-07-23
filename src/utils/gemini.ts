@@ -1,4 +1,4 @@
-import type { DailyReflection } from '@/types'
+import type { DailyReflection, StatusItem, Task } from '@/types'
 
 const DEFAULT_MODEL = 'gemini-3.5-flash'
 
@@ -27,7 +27,55 @@ export function normalizeAiAdviceText(text: string): string {
     .trim()
 }
 
-function buildPrompt(reflection: DailyReflection, customPrompt: string): string {
+function truncate(text: string, max = 280): string {
+  const trimmed = text.trim().replace(/\s+/g, ' ')
+  if (!trimmed) return ''
+  return trimmed.length > max ? `${trimmed.slice(0, max)}…` : trimmed
+}
+
+function formatDayTasks(tasks: Task[], statusItems: StatusItem[]): string {
+  if (!tasks.length) return '（當日無任務）'
+
+  return tasks
+    .map((task, index) => {
+      const statusName =
+        statusItems.find((item) => item.id === task.status)?.name ?? task.status
+      const doneSub = task.subtasks.filter((s) => s.completed).length
+      const totalSub = task.subtasks.length
+      const lines = [
+        `${index + 1}. [${task.completed ? '已完成' : '未完成'}] ${task.title || '（無標題）'}`,
+        `   狀態：${statusName}` +
+          (task.statusHours != null ? `｜時數：${task.statusHours}h` : ''),
+      ]
+      if (task.difficultyNote.trim()) {
+        lines.push(`   困難點：${truncate(task.difficultyNote, 120)}`)
+      }
+      if (task.bodyContent.trim()) {
+        lines.push(`   內容：${truncate(task.bodyContent)}`)
+      }
+      if (totalSub > 0) {
+        lines.push(`   子任務：${doneSub}/${totalSub} 完成`)
+        for (const sub of task.subtasks.slice(0, 8)) {
+          lines.push(
+            `   - [${sub.completed ? 'x' : ' '}] ${sub.title || '（無標題）'}` +
+              (sub.note.trim() ? `（${truncate(sub.note, 80)}）` : ''),
+          )
+        }
+        if (task.subtasks.length > 8) {
+          lines.push(`   - …另有 ${task.subtasks.length - 8} 項子任務`)
+        }
+      }
+      return lines.join('\n')
+    })
+    .join('\n\n')
+}
+
+function buildPrompt(
+  reflection: DailyReflection,
+  customPrompt: string,
+  dayTasks: Task[],
+  statusItems: StatusItem[],
+): string {
   const section = (label: string, text: string) =>
     `【${label}】\n${text.trim() || '（未填寫）'}`
 
@@ -35,8 +83,9 @@ function buildPrompt(reflection: DailyReflection, customPrompt: string): string 
     ...(customPrompt.trim()
       ? ['【使用者自訂 Prompt】', customPrompt.trim(), '']
       : []),
-    '你是一位務實、具體、可執行的 AI 主管，正在檢視同仁的「每日回顧」。',
+    '你是一位務實、具體、可執行的 AI 主管，正在檢視同仁的「每日回顧」與「當日任務」。',
     '請用繁體中文回覆，語氣專業但不指責，著重可落地的下一步。',
+    '請同時參考當日任務進度／阻塞與回顧內容，避免只重述日誌文字。',
     '',
     '請使用 Markdown 格式，依下列結構輸出；不要使用程式碼區塊：',
     '## 一、總評',
@@ -46,6 +95,9 @@ function buildPrompt(reflection: DailyReflection, customPrompt: string): string 
     '1. …',
     '2. …',
     '3. …（可到 4 條）',
+    '',
+    '以下是該日任務清單：',
+    formatDayTasks(dayTasks, statusItems),
     '',
     '以下是該日回顧內容：',
     section('早上', reflection.morningContent),
@@ -73,6 +125,8 @@ interface GeminiGenerateResponse {
 export async function generateAiManagerAdvice(
   reflection: DailyReflection,
   customPrompt = '',
+  dayTasks: Task[] = [],
+  statusItems: StatusItem[] = [],
 ): Promise<string> {
   const apiKey = getGeminiApiKey()
   if (!apiKey) {
@@ -94,14 +148,23 @@ export async function generateAiManagerAdvice(
       systemInstruction: {
         parts: [
           {
-            text: '你是務實、具體、可執行的 AI 主管，回覆一律使用繁體中文。',
+            text: '你是務實、具體、可執行的 AI 主管，回覆一律使用繁體中文。請同時參考當日任務與回顧內容提出建議。',
           },
         ],
       },
       contents: [
         {
           role: 'user',
-          parts: [{ text: buildPrompt(reflection, customPrompt) }],
+          parts: [
+            {
+              text: buildPrompt(
+                reflection,
+                customPrompt,
+                dayTasks,
+                statusItems,
+              ),
+            },
+          ],
         },
       ],
       generationConfig: {

@@ -627,9 +627,17 @@ export const useTaskStore = defineStore("task", () => {
     persistGeminiUsage();
 
     try {
+      const dayTasks = tasks.value
+        .filter((task) => task.date === date)
+        .sort((a, b) => {
+          if (a.completed !== b.completed) return a.completed ? 1 : -1;
+          return a.title.localeCompare(b.title, "zh-Hant");
+        });
       const advice = await requestAiManagerAdvice(
         reflection,
         aiManagerPrompt.value,
+        dayTasks,
+        statusItems.value,
       );
       reflection.aiManagerAdvice = advice;
       reflection.aiGeneratedAt = new Date().toISOString();
