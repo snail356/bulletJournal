@@ -17,6 +17,16 @@ export function hasGeminiApiKey(): boolean {
   return getGeminiApiKey().length > 0
 }
 
+/** 清掉 API 回傳或舊資料中多餘空白，避免 Markdown 渲染後版面鬆散 */
+export function normalizeAiAdviceText(text: string): string {
+  return text
+    .replace(/\u00a0/g, ' ')
+    .replace(/[ \t]+$/gm, '')
+    .replace(/^[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function buildPrompt(reflection: DailyReflection, customPrompt: string): string {
   const section = (label: string, text: string) =>
     `【${label}】\n${text.trim() || '（未填寫）'}`
@@ -134,6 +144,5 @@ export async function generateAiManagerAdvice(
     throw new Error('Gemini 未回傳可用的建議內容，請稍後再試')
   }
 
-  // 移除多餘空白：連續 3 個以上換行壓成 2 個、行尾空白清掉
-  return text.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n')
+  return normalizeAiAdviceText(text)
 }

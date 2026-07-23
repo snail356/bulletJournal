@@ -6,7 +6,7 @@ import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { formatDisplayDate, todayString } from '@/utils/date'
-import { getGeminiModel, hasGeminiApiKey } from '@/utils/gemini'
+import { getGeminiModel, hasGeminiApiKey, normalizeAiAdviceText } from '@/utils/gemini'
 import type { DailyReflection } from '@/types'
 
 const store = useTaskStore()
@@ -38,13 +38,17 @@ const isSelectedToday = computed(
   () => selected.value?.date === todayString(),
 )
 
-const canEditSelected = computed(
-  () => selected.value?.status === 'draft',
-)
+const canEditSelected = computed(() => !!selected.value)
+
+function editSelectedJournal() {
+  if (!selected.value) return
+  store.openReflectionEditor(selected.value.date)
+}
 
 const renderedAiAdvice = computed(() => {
-  const markdown = selected.value?.aiManagerAdvice?.trim()
-  if (!markdown) return ''
+  const raw = selected.value?.aiManagerAdvice
+  if (!raw?.trim()) return ''
+  const markdown = normalizeAiAdviceText(raw)
   return DOMPurify.sanitize(marked.parse(markdown, { async: false }))
 })
 
@@ -147,11 +151,6 @@ function confirmDelete() {
   pendingDelete.value = null
 }
 
-function editSelectedJournal() {
-  if (!selected.value || selected.value.status !== 'draft') return
-  store.openDraftReflectionEditor(selected.value.date)
-}
-
 function requestAiAdvice() {
   aiError.value = ''
   if (!hasGeminiApiKey()) {
@@ -218,8 +217,8 @@ async function confirmAiAdvice() {
                 <template v-if="selected.status === 'draft'">
                   草稿 · 尚未完成提交，仍可呼叫 AI 主管
                 </template>
-                <template v-else-if="isSelectedToday">今日回顧報告</template>
-                <template v-else>完整回顧報告</template>
+                <template v-else-if="isSelectedToday">今日回顧報告 · 可退回編輯</template>
+                <template v-else>完整回顧報告 · 可退回編輯</template>
               </p>
             </div>
             <div class="detail-actions">
@@ -227,10 +226,17 @@ async function confirmAiAdvice() {
                 v-if="canEditSelected"
                 type="button"
                 class="edit"
-                aria-label="編輯當日日誌"
+                :class="{ 'edit-revert': selected.status === 'submitted' }"
+                :aria-label="
+                  selected.status === 'draft' ? '編輯日誌' : '退回編輯'
+                "
                 @click="editSelectedJournal"
               >
                 <AppIcon name="pen" size="sm" />
+                <span
+                  v-if="selected.status === 'submitted'"
+                  class="edit-label"
+                >退回編輯</span>
               </button>
               <button
                 type="button"
@@ -295,7 +301,7 @@ async function confirmAiAdvice() {
               </p>
               <div
                 v-else-if="selected.aiManagerAdvice"
-                class="body ai-body markdown-body"
+                class="ai-body markdown-body"
                 v-html="renderedAiAdvice"
               />
               <p v-else class="ai-empty">
@@ -530,6 +536,18 @@ async function confirmAiAdvice() {
   }
 }
 
+.edit-revert {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+}
+
+.edit-label {
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .edit:hover {
   color: $primary;
 }
@@ -661,6 +679,7 @@ async function confirmAiAdvice() {
   background: $bg;
   border-radius: $radius-sm;
   border: 1px solid $border;
+  white-space: normal;
 }
 
 .empty {

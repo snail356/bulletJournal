@@ -116,6 +116,11 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
   cursor: pointer;
   transition: border-color 0.15s;
   max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: left;
+  line-height: 1.35;
 
   &:hover {
     border-color: currentColor;
@@ -123,6 +128,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 }
 
 .chevron {
+  flex-shrink: 0;
   transition: transform 0.15s;
 
   &.open {
@@ -135,7 +141,8 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
   top: calc(100% + 6px);
   left: 0;
   z-index: 100;
-  min-width: 160px;
+  min-width: max(160px, 100%);
+  max-width: min(280px, calc(100vw - 32px));
   max-height: 240px;
   overflow-y: auto;
   background: $surface;
@@ -150,13 +157,17 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 
 .option {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   padding: 8px 10px;
   border-radius: 6px;
   font-size: 12px;
   color: var(--c);
   text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  line-height: 1.4;
 
   &:hover {
     background: var(--bg);

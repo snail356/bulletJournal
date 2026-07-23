@@ -52,6 +52,7 @@ const showDeleteConfirm = ref(false)
 const pendingFocusSubtaskId = ref<string | null>(null)
 const moveDateValue = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
+const hoursInput = ref<HTMLInputElement | null>(null)
 const expanded = ref(store.expandAllTasks)
 const notesExpanded = ref(true)
 
@@ -132,9 +133,26 @@ function onHoursKeydown(e: KeyboardEvent) {
   }
 }
 
+function selectHoursInput() {
+  const input = hoursInput.value
+  if (!input) return
+  input.focus()
+  nextTick(() => input.select())
+}
+
 function onHoursFocus(e: FocusEvent) {
   const input = e.target as HTMLInputElement
   nextTick(() => input.select())
+}
+
+function onHoursClick(e: MouseEvent) {
+  const input = e.target as HTMLInputElement
+  nextTick(() => input.select())
+}
+
+function onStatusHoursClick(e: MouseEvent) {
+  if ((e.target as HTMLElement).closest('.hours-input')) return
+  selectHoursInput()
 }
 
 function onDifficultyNoteCommit(value: string) {
@@ -401,9 +419,10 @@ async function onContextPaste() {
                 :model-value="task.labels"
                 @update:model-value="onLabelsChange"
               />
-              <div class="status-hours" @click.stop>
+              <div class="status-hours" @click.stop="onStatusHoursClick">
                 <span class="hours-label">時數</span>
                 <input
+                  ref="hoursInput"
                   v-model="hoursDraft"
                   type="text"
                   inputmode="decimal"
@@ -411,6 +430,7 @@ async function onContextPaste() {
                   placeholder="0"
                   aria-label="狀態時數"
                   @focus="onHoursFocus"
+                  @click="onHoursClick"
                   @blur="commitHours"
                   @keydown="onHoursKeydown"
                 />
@@ -763,8 +783,10 @@ async function onContextPaste() {
 }
 
 .hours-input {
-  width: 64px;
-  min-width: 64px;
+  width: 4.5ch;
+  min-width: 4.5ch;
+  max-width: 8ch;
+  field-sizing: content;
   padding: 2px 0;
   border: none;
   background: transparent;
@@ -1020,6 +1042,8 @@ async function onContextPaste() {
   .hours-input {
     flex: 1;
     width: auto;
+    min-width: 4.5ch;
+    max-width: none;
     text-align: left;
   }
 

@@ -493,15 +493,29 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function openTodayReflectionEditor() {
-    if (todayJournalState.value === "done") return;
-    openReflectionModal(todayString(), "manual");
+    const date = todayString();
+    if (!getReflectionByDate(date)) {
+      openReflectionModal(date, "manual");
+      return;
+    }
+    openReflectionEditor(date);
   }
 
-  /** 開啟未完成（草稿）回顧的編輯彈窗 */
-  function openDraftReflectionEditor(date: string) {
+  /** 開啟回顧編輯；已提交者會先退回草稿 */
+  function openReflectionEditor(date: string) {
     const reflection = getReflectionByDate(date);
-    if (!reflection || reflection.status === "submitted") return;
+    if (!reflection) return;
+    if (reflection.status === "submitted") {
+      reflection.status = "draft";
+      reflection.updatedAt = new Date().toISOString();
+      persistDailyReflections();
+    }
     openReflectionModal(date, "manual");
+  }
+
+  /** @deprecated 請改用 openReflectionEditor */
+  function openDraftReflectionEditor(date: string) {
+    openReflectionEditor(date);
   }
 
   function checkReflectionPrompt() {
@@ -1363,6 +1377,7 @@ export const useTaskStore = defineStore("task", () => {
     getReflectionByDate,
     checkReflectionPrompt,
     openTodayReflectionEditor,
+    openReflectionEditor,
     openDraftReflectionEditor,
     snoozeReflectionPrompt,
     dismissReflectionModal,

@@ -31,14 +31,13 @@ const journalButtonLabel = computed(() => {
     case 'edit':
       return '編輯日誌'
     case 'done':
-      return '已完成日誌'
+      return '退回編輯'
     default:
       return '新增日誌'
   }
 })
 
 function onJournalClick() {
-  if (store.todayJournalState === 'done') return
   store.openTodayReflectionEditor()
 }
 
@@ -87,7 +86,6 @@ function undoDelete() {
           type="button"
           class="btn-secondary"
           :class="{ done: store.todayJournalState === 'done' }"
-          :disabled="store.todayJournalState === 'done'"
           @click="onJournalClick"
         >
           {{ journalButtonLabel }}

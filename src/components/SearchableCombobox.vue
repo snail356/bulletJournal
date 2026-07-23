@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -23,11 +23,14 @@ const emit = defineEmits<{
 }>()
 
 const rootRef = ref<HTMLElement | null>(null)
+const menuRef = ref<HTMLElement | null>(null)
 const open = ref(false)
 const inputValue = ref(props.modelValue)
 const activeIndex = ref(-1)
 /** 透過右側箭頭展開時，忽略輸入內容顯示全部選項 */
 const browseAll = ref(false)
+const suppressBlurCommit = ref(false)
+const menuStyle = ref<Record<string, string>>({})
 
 watch(
   () => props.modelValue,
@@ -50,9 +53,46 @@ const hasExactMatch = computed(() => {
   return props.options.some((option) => option.toLowerCase() === query)
 })
 
-function openDropdown() {
+watch(open, async (isOpen) => {
+  if (!isOpen) return
+  await nextTick()
+  updateMenuPosition()
+})
+
+watch(filteredOptions, async () => {
+  if (!open.value) return
+  await nextTick()
+  updateMenuPosition()
+})
+
+function updateMenuPosition() {
+  const trigger = rootRef.value?.getBoundingClientRect()
+  const menu = menuRef.value?.getBoundingClientRect()
+  if (!trigger) return
+
+  const width = Math.max(trigger.width, 240)
+  let left = trigger.left
+  left = Math.max(8, Math.min(left, window.innerWidth - width - 8))
+
+  let top = trigger.bottom + 4
+  const menuHeight = menu?.height ?? 180
+  if (top + menuHeight > window.innerHeight - 8) {
+    top = Math.max(8, trigger.top - menuHeight - 4)
+  }
+
+  menuStyle.value = {
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    maxWidth: `calc(100vw - 16px)`,
+  }
+}
+
+async function openDropdown() {
   open.value = true
   activeIndex.value = -1
+  await nextTick()
+  updateMenuPosition()
 }
 
 function closeDropdown() {
@@ -63,11 +103,27 @@ function closeDropdown() {
 
 function toggleBrowseAll() {
   if (open.value) {
-    closeDropdown()
+    if (browseAll.value) {
+      closeDropdown()
+    } else {
+      browseAll.value = true
+      activeIndex.value = -1
+      nextTick(updateMenuPosition)
+    }
     return
   }
   browseAll.value = true
   openDropdown()
+}
+
+function onTogglePointerDown(e: MouseEvent) {
+  e.preventDefault()
+  e.stopPropagation()
+  suppressBlurCommit.value = true
+  toggleBrowseAll()
+  window.setTimeout(() => {
+    suppressBlurCommit.value = false
+  }, 150)
 }
 
 function emitInput(value: string) {
@@ -106,9 +162,15 @@ function onFocus() {
 
 function onBlur() {
   window.setTimeout(() => {
-    if (!rootRef.value?.contains(document.activeElement)) {
-      commitCurrent()
+    if (suppressBlurCommit.value) return
+    const active = document.activeElement
+    if (
+      rootRef.value?.contains(active) ||
+      menuRef.value?.contains(active)
+    ) {
+      return
     }
+    commitCurrent()
   }, 120)
 }
 
@@ -152,14 +214,25 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 function onClickOutside(e: MouseEvent) {
-  if (rootRef.value && !rootRef.value.contains(e.target as Node)) {
-    // 由 blur 統一 commit，這裡只關選單避免雙重送出
-    if (open.value) closeDropdown()
-  }
+  const target = e.target as Node
+  if (rootRef.value?.contains(target) || menuRef.value?.contains(target)) return
+  if (open.value) closeDropdown()
 }
 
-onMounted(() => document.addEventListener('mousedown', onClickOutside))
-onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
+function closeOnScrollOrResize() {
+  if (open.value) closeDropdown()
+}
+
+onMounted(() => {
+  document.addEventListener('mousedown', onClickOutside)
+  window.addEventListener('scroll', closeOnScrollOrResize, true)
+  window.addEventListener('resize', closeOnScrollOrResize)
+})
+onUnmounted(() => {
+  document.removeEventListener('mousedown', onClickOutside)
+  window.removeEventListener('scroll', closeOnScrollOrResize, true)
+  window.removeEventListener('resize', closeOnScrollOrResize)
+})
 </script>
 
 <template>
@@ -185,38 +258,51 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
         class="toggle-btn"
         tabindex="-1"
         aria-label="展開選項"
-        @mousedown.prevent
-        @click="toggleBrowseAll"
+        @mousedown="onTogglePointerDown"
       >
         ▾
       </button>
     </div>
 
-    <ul v-if="open" class="options" role="listbox">
-      <li v-if="!browseAll && inputValue.trim() && !hasExactMatch" class="option hint">
-        使用新內容：「{{ inputValue.trim() }}」
-      </li>
-      <li
-        v-for="(option, index) in filteredOptions"
-        :key="option"
-        role="option"
-        class="option"
-        :class="{ active: index === activeIndex }"
-        @mousedown.prevent
-        @click="selectOption(option)"
+    <Teleport to="body">
+      <ul
+        v-if="open"
+        ref="menuRef"
+        class="options searchable-combobox-options"
+        role="listbox"
+        :style="menuStyle"
       >
-        {{ option }}
-      </li>
-      <li v-if="!filteredOptions.length && !inputValue.trim()" class="option empty">
-        {{ emptyText }}
-      </li>
-      <li
-        v-else-if="!filteredOptions.length && inputValue.trim()"
-        class="option empty"
-      >
-        無相符紀錄，Enter 建立新內容
-      </li>
-    </ul>
+        <li
+          v-if="!browseAll && inputValue.trim() && !hasExactMatch"
+          class="option hint"
+        >
+          使用新內容：「{{ inputValue.trim() }}」
+        </li>
+        <li
+          v-for="(option, index) in filteredOptions"
+          :key="option"
+          role="option"
+          class="option"
+          :class="{ active: index === activeIndex }"
+          @mousedown.prevent
+          @click="selectOption(option)"
+        >
+          {{ option }}
+        </li>
+        <li
+          v-if="!filteredOptions.length && !inputValue.trim()"
+          class="option empty"
+        >
+          {{ emptyText }}
+        </li>
+        <li
+          v-else-if="!filteredOptions.length && inputValue.trim()"
+          class="option empty"
+        >
+          無相符紀錄，Enter 建立新內容
+        </li>
+      </ul>
+    </Teleport>
   </div>
 </template>
 
@@ -226,6 +312,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 .searchable-combobox {
   position: relative;
   width: 100%;
+  min-width: 0;
 }
 
 .field-label {
@@ -242,7 +329,6 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
   border: 1px solid $border;
   border-radius: $radius-sm;
   background: $surface;
-  overflow: hidden;
 
   &:focus-within {
     border-color: $primary;
@@ -282,68 +368,69 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
   }
 }
 
-.options {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  z-index: 120;
-  max-height: 180px;
-  overflow-y: auto;
-  background: $surface;
-  border: 1px solid $border;
-  border-radius: $radius-sm;
-  box-shadow: $shadow-lg;
-  padding: 4px;
-}
-
-.option {
-  padding: 8px 10px;
-  font-size: 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  color: $text;
-  line-height: 1.4;
-  word-break: break-word;
-
-  &:hover,
-  &.active {
-    background: $primary-light;
-    color: $primary;
-  }
-
-  &.hint {
-    cursor: default;
-    color: $text-muted;
-    font-style: italic;
-    background: $bg;
-
-    &:hover {
-      background: $bg;
-      color: $text-muted;
-    }
-  }
-
-  &.empty {
-    cursor: default;
-    color: $text-muted;
-    text-align: center;
-
-    &:hover {
-      background: transparent;
-      color: $text-muted;
-    }
-  }
-}
-
 @media (max-width: $breakpoint-xs) {
   .input {
     font-size: 16px;
     padding: 8px 10px;
   }
+}
+</style>
 
-  .options {
-    max-height: min(180px, 40vh);
+<style lang="scss">
+@use '@/styles/variables' as *;
+
+.searchable-combobox-options {
+  position: fixed;
+  z-index: 1400;
+  max-height: min(240px, 45vh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: $surface;
+  border: 1px solid $border;
+  border-radius: $radius-sm;
+  box-shadow: $shadow-lg;
+  padding: 4px;
+  box-sizing: border-box;
+
+  .option {
+    padding: 8px 10px;
+    font-size: 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    color: $text;
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+
+    &:hover,
+    &.active {
+      background: $primary-light;
+      color: $primary;
+    }
+
+    &.hint {
+      cursor: default;
+      color: $text-muted;
+      font-style: italic;
+      background: $bg;
+
+      &:hover {
+        background: $bg;
+        color: $text-muted;
+      }
+    }
+
+    &.empty {
+      cursor: default;
+      color: $text-muted;
+      text-align: center;
+
+      &:hover {
+        background: transparent;
+        color: $text-muted;
+      }
+    }
   }
 }
 </style>
