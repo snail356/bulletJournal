@@ -27,6 +27,28 @@ export function daysBetween(fromDateStr: string, toDateStr: string): number {
   return Math.round((to.getTime() - from.getTime()) / msPerDay)
 }
 
+/** 最早的原排程日（無遷移紀錄則回傳目前 date） */
+export function getOriginalScheduledDate(
+  task: { date: string; migrationHistory: { fromDate: string }[] },
+): string {
+  const history = task.migrationHistory
+  if (!history.length) return task.date
+  return history.reduce(
+    (earliest, record) =>
+      record.fromDate < earliest ? record.fromDate : earliest,
+    history[0].fromDate,
+  )
+}
+
+/** 依遷移紀錄計算從最早原排程日到目前排程日的推延天數；無遷移則為 0 */
+export function getPostponedDays(
+  task: { date: string; migrationHistory: { fromDate: string }[] },
+): number {
+  const originalDate = getOriginalScheduledDate(task)
+  if (originalDate === task.date) return 0
+  return Math.max(0, daysBetween(originalDate, task.date))
+}
+
 export function isSameDate(a: string, b: string): boolean {
   return a === b
 }

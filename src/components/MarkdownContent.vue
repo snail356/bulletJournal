@@ -10,7 +10,10 @@ const props = defineProps<{
 const rendered = computed(() => {
   const markdown = props.content.trim()
   if (!markdown) return ''
-  return DOMPurify.sanitize(marked.parse(markdown, { async: false }))
+  // breaks: 單一 Enter 換行保留為 <br>（結束編輯後與 textarea 所見一致）
+  return DOMPurify.sanitize(
+    marked.parse(markdown, { async: false, breaks: true }),
+  )
 })
 </script>
 

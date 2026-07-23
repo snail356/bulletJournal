@@ -282,6 +282,15 @@ function formatTag(type: ContentFormat): string | null {
 
 .body-section {
   margin-top: 12px;
+
+  &:hover,
+  &:focus-within {
+    .upload-btn,
+    .formatted-actions {
+      opacity: 1;
+      pointer-events: auto;
+    }
+  }
 }
 
 .section-header {
@@ -289,6 +298,7 @@ function formatTag(type: ContentFormat): string | null {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 4px;
+  min-height: 28px;
 }
 
 .section-toggle {
@@ -327,6 +337,9 @@ function formatTag(type: ContentFormat): string | null {
   justify-content: center;
   border-radius: 6px;
   color: $text-muted;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
 
   &:hover {
     color: $primary;
@@ -423,13 +436,19 @@ function formatTag(type: ContentFormat): string | null {
 
 .formatted-body {
   position: relative;
+  min-width: 0;
 }
 
 .formatted-actions {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 1;
   display: flex;
-  justify-content: flex-end;
   gap: 4px;
-  margin-bottom: 4px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
 
   button {
     width: 28px;
@@ -440,7 +459,8 @@ function formatTag(type: ContentFormat): string | null {
     border-radius: 6px;
     color: $text-muted;
     border: 1px solid $border;
-    background: $surface;
+    background: rgba($surface, 0.95);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 
     &:hover {
       color: $primary;

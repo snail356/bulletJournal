@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, provide, ref, watch } from 'vue'
 import type { Attachment, SubTask, Task, TaskStatus } from '@/types'
-import { formatDisplayDate } from '@/utils/date'
+import { formatDisplayDate, getOriginalScheduledDate, getPostponedDays } from '@/utils/date'
 import SubTaskItem from './SubTaskItem.vue'
 import TaskBodySection from './TaskBodySection.vue'
 import NoteBlock from './NoteBlock.vue'
@@ -93,6 +93,13 @@ const incompleteSubtaskCount = computed(
 const isMigrated = computed(() => props.migratedAway === true)
 
 const migratedTargetLabel = computed(() => formatDisplayDate(props.task.date))
+
+const postponedDays = computed(() => getPostponedDays(props.task))
+
+const postponedLabel = computed(() => {
+  if (postponedDays.value <= 0) return ''
+  return `原排程 ${formatDisplayDate(getOriginalScheduledDate(props.task))}`
+})
 
 const difficultyOptions = computed(() => store.getDifficultyNoteOptions())
 
@@ -436,6 +443,13 @@ async function onContextPaste() {
                 />
                 <span class="hours-unit">h</span>
               </div>
+              <span
+                v-if="postponedDays > 0"
+                class="postponed-tag"
+                :title="postponedLabel"
+              >
+                推延 {{ postponedDays }} 天
+              </span>
             </div>
           </div>
         </template>
@@ -827,10 +841,19 @@ async function onContextPaste() {
   min-width: 0;
 }
 
-.carried {
-  font-size: 11px;
-  color: $text-muted;
-  font-style: italic;
+.postponed-tag {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: $radius-sm;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b45309;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  white-space: nowrap;
+  cursor: default;
 }
 
 .migrated-indicator {
