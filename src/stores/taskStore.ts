@@ -22,13 +22,13 @@ import type {
   TaskStatus,
   TodayJournalState,
   TodayProgress,
+  ToolboxItem,
+  ToolboxList,
 } from "@/types";
 import { createAttachmentFromFile } from "@/utils/attachment";
 import { resolveContentType } from "@/utils/detectContentType";
 import { addDays, daysBetween, todayString } from "@/utils/date";
-import {
-  generateAiManagerAdvice as requestAiManagerAdvice,
-} from "@/utils/gemini";
+import { generateAiManagerAdvice as requestAiManagerAdvice } from "@/utils/gemini";
 import { generateId } from "@/utils/id";
 import {
   AI_MANAGER_PROMPT_KEY,
@@ -43,6 +43,7 @@ import {
   SELECTED_DATE_KEY,
   STATUS_ITEMS_KEY,
   TASKS_KEY,
+  TOOLBOX_LISTS_KEY,
   defaultGeminiUsageState,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
@@ -117,6 +118,23 @@ function normalizeDailyReflection(
     aiManagerAdvice: reflection.aiManagerAdvice ?? "",
     aiGeneratedAt: reflection.aiGeneratedAt ?? null,
     status: reflection.status ?? "submitted",
+  };
+}
+
+function normalizeToolboxItem(item: ToolboxItem): ToolboxItem {
+  return {
+    ...item,
+    content: item.content ?? "",
+    contentType: item.contentType ?? "text",
+  };
+}
+
+function normalizeToolboxList(list: ToolboxList): ToolboxList {
+  return {
+    ...list,
+    title: list.title ?? "",
+    purpose: list.purpose ?? "",
+    items: (list.items ?? []).map(normalizeToolboxItem),
   };
 }
 
@@ -231,9 +249,7 @@ export const useTaskStore = defineStore("task", () => {
   const geminiUsage = ref<GeminiUsageState>(
     loadFromStorage(GEMINI_USAGE_KEY, defaultGeminiUsageState),
   );
-  const aiManagerPrompt = ref(
-    loadFromStorage(AI_MANAGER_PROMPT_KEY, ""),
-  );
+  const aiManagerPrompt = ref(loadFromStorage(AI_MANAGER_PROMPT_KEY, ""));
   const aiAdviceLoading = ref(false);
   const reflectionModalVisible = ref(false);
   /** 彈窗正在編輯的日誌日期（prompt 為昨日；手動新增為當日） */
@@ -244,6 +260,11 @@ export const useTaskStore = defineStore("task", () => {
       loadFromStorage<StatusItem[] | null>(STATUS_ITEMS_KEY, null),
     ),
   );
+  const toolboxLists = ref<ToolboxList[]>(
+    loadFromStorage(TOOLBOX_LISTS_KEY, [] as ToolboxList[]).map(
+      normalizeToolboxList,
+    ),
+  );
 
   function persistDifficultyNotes() {
     saveToStorage(DIFFICULTY_NOTES_KEY, difficultyNoteRecords.value);
@@ -251,6 +272,10 @@ export const useTaskStore = defineStore("task", () => {
 
   function persistStatusItems() {
     saveToStorage(STATUS_ITEMS_KEY, statusItems.value);
+  }
+
+  function persistToolboxLists() {
+    saveToStorage(TOOLBOX_LISTS_KEY, toolboxLists.value);
   }
 
   function persistMigrationReviewState() {
@@ -311,6 +336,7 @@ export const useTaskStore = defineStore("task", () => {
   });
 
   watch(statusItems, persistStatusItems, { deep: true });
+  watch(toolboxLists, persistToolboxLists, { deep: true });
 
   const tasksForSelectedDate = computed(() =>
     getTasksByDate(selectedDate.value),
@@ -671,7 +697,10 @@ export const useTaskStore = defineStore("task", () => {
     touchTask(task);
   }
 
-  function registerDifficultyNote(content: string, options?: { bumpUsage?: boolean }) {
+  function registerDifficultyNote(
+    content: string,
+    options?: { bumpUsage?: boolean },
+  ) {
     const trimmed = content.trim();
     if (!trimmed) return;
     const now = new Date().toISOString();
@@ -833,20 +862,23 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function deleteTask(id: string) {
-    const task = findTask(id)
-    if (!task) return
-    const attachmentIds: string[] = []
-    for (const attachment of task.attachments) attachmentIds.push(attachment.id)
+    const task = findTask(id);
+    if (!task) return;
+    const attachmentIds: string[] = [];
+    for (const attachment of task.attachments)
+      attachmentIds.push(attachment.id);
     for (const sub of task.subtasks) {
-      for (const attachment of sub.attachments) attachmentIds.push(attachment.id)
+      for (const attachment of sub.attachments)
+        attachmentIds.push(attachment.id);
     }
     for (const note of task.notes) {
-      for (const attachment of note.attachments) attachmentIds.push(attachment.id)
+      for (const attachment of note.attachments)
+        attachmentIds.push(attachment.id);
     }
     for (const attachmentId of attachmentIds) {
-      deleteAttachment(attachmentId)
+      deleteAttachment(attachmentId);
     }
-    tasks.value = tasks.value.filter((t) => t.id !== id)
+    tasks.value = tasks.value.filter((t) => t.id !== id);
   }
 
   function duplicateTask(taskId: string, targetDate?: string): Task | null {
@@ -1021,8 +1053,7 @@ export const useTaskStore = defineStore("task", () => {
       id: generateId(),
       taskId,
       content,
-      contentType:
-        contentType ?? resolveContentType(content),
+      contentType: contentType ?? resolveContentType(content),
       color,
       attachments: [],
       createdAt: now,
@@ -1322,6 +1353,110 @@ export const useTaskStore = defineStore("task", () => {
     };
   }
 
+  const toolboxListsSorted = computed(() =>
+    [...toolboxLists.value].sort((a, b) =>
+      b.updatedAt.localeCompare(a.updatedAt),
+    ),
+  );
+
+  function findToolboxList(listId: string): ToolboxList | undefined {
+    return toolboxLists.value.find((list) => list.id === listId);
+  }
+
+  function createToolboxList(title = "", purpose = ""): ToolboxList {
+    const now = new Date().toISOString();
+    const list: ToolboxList = {
+      id: generateId(),
+      title: title.trim() || "未命名清單",
+      purpose: purpose.trim(),
+      items: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+    toolboxLists.value.unshift(list);
+    return list;
+  }
+
+  function updateToolboxList(
+    listId: string,
+    payload: Partial<Pick<ToolboxList, "title" | "purpose">>,
+  ) {
+    const list = findToolboxList(listId);
+    if (!list) return;
+    if (payload.title !== undefined) {
+      list.title = payload.title.trim() || "未命名清單";
+    }
+    if (payload.purpose !== undefined) {
+      list.purpose = payload.purpose.trim();
+    }
+    list.updatedAt = new Date().toISOString();
+  }
+
+  function deleteToolboxList(listId: string) {
+    toolboxLists.value = toolboxLists.value.filter((list) => list.id !== listId);
+  }
+
+  function createToolboxItem(listId: string, content = ""): ToolboxItem | null {
+    const list = findToolboxList(listId);
+    if (!list) return null;
+    const now = new Date().toISOString();
+    const trimmed = content.trim();
+    const item: ToolboxItem = {
+      id: generateId(),
+      content: trimmed,
+      contentType: resolveContentType(trimmed),
+      createdAt: now,
+      updatedAt: now,
+    };
+    list.items.push(item);
+    list.updatedAt = now;
+    return item;
+  }
+
+  function updateToolboxItem(
+    listId: string,
+    itemId: string,
+    payload: Partial<Pick<ToolboxItem, "content" | "contentType">>,
+  ) {
+    const list = findToolboxList(listId);
+    if (!list) return;
+    const item = list.items.find((entry) => entry.id === itemId);
+    if (!item) return;
+    if (payload.content !== undefined) {
+      item.content = payload.content.trim();
+      item.contentType =
+        payload.contentType ?? resolveContentType(item.content);
+    } else if (payload.contentType !== undefined) {
+      item.contentType = payload.contentType;
+    }
+    item.updatedAt = new Date().toISOString();
+    list.updatedAt = item.updatedAt;
+  }
+
+  function deleteToolboxItem(listId: string, itemId: string) {
+    const list = findToolboxList(listId);
+    if (!list) return;
+    list.items = list.items.filter((item) => item.id !== itemId);
+    list.updatedAt = new Date().toISOString();
+  }
+
+  function reorderToolboxItems(
+    listId: string,
+    fromId: string,
+    toId: string,
+  ) {
+    const list = findToolboxList(listId);
+    if (!list || fromId === toId) return;
+    const fromIdx = list.items.findIndex((item) => item.id === fromId);
+    const toIdx = list.items.findIndex((item) => item.id === toId);
+    if (fromIdx < 0 || toIdx < 0) return;
+    const updated = [...list.items];
+    const [moved] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, moved);
+    list.items = updated;
+    list.updatedAt = new Date().toISOString();
+  }
+
   function clearAllData() {
     tasks.value = [];
     labels.value = [];
@@ -1336,6 +1471,7 @@ export const useTaskStore = defineStore("task", () => {
     aiManagerPrompt.value = "";
     reflectionModalVisible.value = false;
     statusItems.value = createDefaultStatusItems();
+    toolboxLists.value = [];
     persist();
     persistMigrationReviewState();
     persistDifficultyNotes();
@@ -1343,6 +1479,7 @@ export const useTaskStore = defineStore("task", () => {
     persistReflectionPromptState();
     saveToStorage(AI_MANAGER_PROMPT_KEY, aiManagerPrompt.value);
     persistStatusItems();
+    persistToolboxLists();
   }
 
   return {
@@ -1367,6 +1504,8 @@ export const useTaskStore = defineStore("task", () => {
     geminiUsage,
     aiManagerPrompt,
     aiAdviceLoading,
+    toolboxLists,
+    toolboxListsSorted,
     init,
     getTasksByDate,
     getTaskDatesWithActivity,
@@ -1431,6 +1570,13 @@ export const useTaskStore = defineStore("task", () => {
     getAllTasksFiltered,
     getTaskStats,
     findTask,
+    createToolboxList,
+    updateToolboxList,
+    deleteToolboxList,
+    createToolboxItem,
+    updateToolboxItem,
+    deleteToolboxItem,
+    reorderToolboxItems,
     clearAllData,
   };
 });

@@ -38,6 +38,12 @@ const router = createRouter({
       meta: { title: '困難點資料' },
     },
     {
+      path: '/toolbox',
+      name: 'toolbox',
+      component: () => import('@/views/ToolboxView.vue'),
+      meta: { title: '工具箱與思考清單' },
+    },
+    {
       path: '/reflections',
       name: 'reflections',
       component: () => import('@/views/ReflectionLogView.vue'),

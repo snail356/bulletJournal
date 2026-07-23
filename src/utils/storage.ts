@@ -16,6 +16,7 @@ const DAILY_REFLECTIONS_KEY = 'bullet-journal-daily-reflections'
 const REFLECTION_PROMPT_KEY = 'bullet-journal-reflection-prompt'
 const GEMINI_USAGE_KEY = 'bullet-journal-gemini-usage'
 const AI_MANAGER_PROMPT_KEY = 'bullet-journal-ai-manager-prompt'
+const TOOLBOX_LISTS_KEY = 'bullet-journal-toolbox-lists'
 
 const defaultMigrationReviewState: MigrationReviewState = {
   snoozedUntil: null,
@@ -69,6 +70,7 @@ export {
   REFLECTION_PROMPT_KEY,
   GEMINI_USAGE_KEY,
   AI_MANAGER_PROMPT_KEY,
+  TOOLBOX_LISTS_KEY,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
   defaultGeminiUsageState,

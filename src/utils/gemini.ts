@@ -169,7 +169,6 @@ export async function generateAiManagerAdvice(
       ],
       generationConfig: {
         temperature: 0.6,
-        // maxOutputTokens 包含模型的思考（thinking）tokens，需預留足夠空間
         maxOutputTokens: 4096,
         thinkingConfig: {
           thinkingLevel: 'low',

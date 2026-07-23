@@ -21,6 +21,7 @@ import {
   faPen,
   faSun,
   faTags,
+  faToolbox,
   faTrashCan,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons'
@@ -47,6 +48,7 @@ library.add(
   faPen,
   faSun,
   faTags,
+  faToolbox,
   faTrashCan,
   faXmark,
 )
@@ -73,6 +75,7 @@ export const appIcons = {
   pen: faPen,
   sun: faSun,
   tags: faTags,
+  toolbox: faToolbox,
   trash: faTrashCan,
   xmark: faXmark,
 } as const

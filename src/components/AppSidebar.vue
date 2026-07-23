@@ -15,6 +15,7 @@ const navItems: { path: string; label: string; icon: AppIconName }[] = [
   { path: '/tasks', label: '所有任務', icon: 'list-check' },
   { path: '/labels', label: '標籤管理', icon: 'tags' },
   { path: '/difficulty-notes', label: '困難點資料', icon: 'clipboard-list' },
+  { path: '/toolbox', label: '工具箱與思考清單', icon: 'toolbox' },
   { path: '/reflections', label: '回顧日誌', icon: 'file-lines' },
   { path: '/stats', label: '統計分析', icon: 'chart-column' },
   { path: '/settings', label: '設定', icon: 'gear' },

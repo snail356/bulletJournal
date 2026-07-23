@@ -168,3 +168,23 @@ export interface TodayProgress {
   completed: number
   percentage: number
 }
+
+/** 工具箱／思考清單中的單條項目 */
+export interface ToolboxItem {
+  id: string
+  content: string
+  contentType: ContentFormat
+  createdAt: string
+  updatedAt: string
+}
+
+/** 工具箱與思考清單（遇到方向決策時可快速對照） */
+export interface ToolboxList {
+  id: string
+  title: string
+  /** 何時使用／適用方向說明 */
+  purpose: string
+  items: ToolboxItem[]
+  createdAt: string
+  updatedAt: string
+}
