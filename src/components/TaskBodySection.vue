@@ -7,6 +7,7 @@ import MarkdownContent from './MarkdownContent.vue'
 import AppIcon from './AppIcon.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { resolveContentType } from '@/utils/detectContentType'
+import { getBodyExpanded, setBodyExpanded } from '@/utils/sectionCollapseState'
 
 const props = defineProps<{
   taskId: string
@@ -20,7 +21,23 @@ const emit = defineEmits<{
 }>()
 
 const store = useTaskStore()
-const expanded = ref(props.content.trim().length > 0 || props.attachments.length > 0)
+
+function defaultBodyExpanded(): boolean {
+  return props.content.trim().length > 0 || props.attachments.length > 0
+}
+
+const expanded = ref(getBodyExpanded(props.taskId, defaultBodyExpanded()))
+
+watch(expanded, (value) => {
+  setBodyExpanded(props.taskId, value)
+})
+
+watch(
+  () => props.taskId,
+  (taskId) => {
+    expanded.value = getBodyExpanded(taskId, defaultBodyExpanded())
+  },
+)
 const editingFormatted = ref(false)
 const draft = ref(props.content)
 const textareaRef = ref<HTMLTextAreaElement | null>(null)

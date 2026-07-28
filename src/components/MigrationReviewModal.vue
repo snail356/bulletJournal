@@ -16,13 +16,43 @@ const emit = defineEmits<{
 
 const rowActions = ref<Record<string, MigrationReviewActionType>>({})
 
+function initRowActions() {
+  const next: Record<string, MigrationReviewActionType> = {}
+  for (const candidate of props.candidates) {
+    next[candidate.task.id] = 'migrate'
+  }
+  rowActions.value = next
+}
+
+function getAction(taskId: string): MigrationReviewActionType {
+  return rowActions.value[taskId] ?? 'migrate'
+}
+
+function onActionChange(taskId: string, event: Event) {
+  const value = (event.target as HTMLSelectElement).value as MigrationReviewActionType
+  rowActions.value[taskId] = value
+}
+
 watch(
   () => props.visible,
   (visible) => {
-    if (!visible) return
+    if (!visible) {
+      rowActions.value = {}
+      return
+    }
+    initRowActions()
+  },
+  { immediate: true },
+)
+
+watch(
+  () => props.candidates.map((c) => c.task.id).join(','),
+  () => {
+    if (!props.visible) return
+    // 開啟中若候選清單變動，新列預設遷移到今天，已選過的保留
     const next: Record<string, MigrationReviewActionType> = {}
     for (const candidate of props.candidates) {
-      next[candidate.task.id] = 'migrate'
+      next[candidate.task.id] = rowActions.value[candidate.task.id] ?? 'migrate'
     }
     rowActions.value = next
   },
@@ -73,9 +103,10 @@ function confirm() {
               </p>
             </div>
             <select
-              v-model="rowActions[candidate.task.id]"
               class="action-select"
+              :value="getAction(candidate.task.id)"
               :aria-label="`處理 ${candidate.task.title}`"
+              @change="onActionChange(candidate.task.id, $event)"
             >
               <option value="migrate">遷移到今天</option>
               <option value="keep">保留在原日</option>

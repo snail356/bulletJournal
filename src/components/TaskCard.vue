@@ -18,6 +18,7 @@ import InlineEditable from './InlineEditable.vue'
 import { SUBTASK_DRAG_KEY, TASK_DRAG_KEY } from '@/composables/taskDrag'
 import { useReorderDrag } from '@/composables/useReorderDrag'
 import { useTaskStore } from '@/stores/taskStore'
+import { getNotesExpanded, setNotesExpanded } from '@/utils/sectionCollapseState'
 
 const props = defineProps<{
   task: Task
@@ -54,12 +55,23 @@ const moveDateValue = ref('')
 const fileInput = ref<HTMLInputElement | null>(null)
 const hoursInput = ref<HTMLInputElement | null>(null)
 const expanded = ref(store.expandAllTasks)
-const notesExpanded = ref(true)
+const notesExpanded = ref(getNotesExpanded(props.task.id, true))
 
 watch(
   () => store.expandAllTasks,
   (v) => {
     expanded.value = v
+  },
+)
+
+watch(notesExpanded, (value) => {
+  setNotesExpanded(props.task.id, value)
+})
+
+watch(
+  () => props.task.id,
+  (taskId) => {
+    notesExpanded.value = getNotesExpanded(taskId, true)
   },
 )
 

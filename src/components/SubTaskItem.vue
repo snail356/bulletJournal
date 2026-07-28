@@ -9,6 +9,10 @@ import InlineEditable from "./InlineEditable.vue";
 import { SUBTASK_DRAG_KEY } from "@/composables/taskDrag";
 import { useTaskStore } from "@/stores/taskStore";
 import { resolveContentType } from "@/utils/detectContentType";
+import {
+  getSubtaskNoteExpanded,
+  setSubtaskNoteExpanded,
+} from "@/utils/sectionCollapseState";
 
 const props = defineProps<{
   subtask: SubTask;
@@ -37,11 +41,24 @@ const editing = ref(false);
 const noteEditing = ref(false);
 const editingFormattedNote = ref(false);
 const hovered = ref(false);
-const noteExpanded = ref(hasNote.value);
+const noteExpanded = ref(
+  getSubtaskNoteExpanded(props.subtask.id, hasNote.value),
+);
 const fileInput = ref<HTMLInputElement | null>(null);
 const titleRef = ref<InstanceType<typeof InlineEditable> | null>(null);
 const noteRef = ref<InstanceType<typeof InlineEditable> | null>(null);
 const subtaskEl = ref<HTMLElement | null>(null);
+
+watch(noteExpanded, (value) => {
+  setSubtaskNoteExpanded(props.subtask.id, value);
+});
+
+watch(
+  () => props.subtask.id,
+  (subtaskId) => {
+    noteExpanded.value = getSubtaskNoteExpanded(subtaskId, hasNote.value);
+  },
+);
 
 watch(
   () => props.autofocus,

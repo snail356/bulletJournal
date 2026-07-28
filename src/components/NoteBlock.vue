@@ -10,6 +10,7 @@ import InlineEditable from './InlineEditable.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { resolveContentType } from '@/utils/detectContentType'
 import { NOTE_COLOR_BG, NOTE_COLOR_DOT, NOTE_COLOR_OPTIONS } from '@/utils/noteColors'
+import { getNoteCollapsed, setNoteCollapsed } from '@/utils/sectionCollapseState'
 
 const props = defineProps<{
   note: Note
@@ -35,12 +36,21 @@ function shouldStartCollapsed(content: string): boolean {
   return trimmed.includes('\n') || trimmed.length > 80
 }
 
-const collapsed = ref(shouldStartCollapsed(props.note.content))
+const collapsed = ref(
+  getNoteCollapsed(props.note.id, shouldStartCollapsed(props.note.content)),
+)
+
+watch(collapsed, (value) => {
+  setNoteCollapsed(props.note.id, value)
+})
 
 watch(
   () => props.note.id,
-  () => {
-    collapsed.value = shouldStartCollapsed(props.note.content)
+  (noteId) => {
+    collapsed.value = getNoteCollapsed(
+      noteId,
+      shouldStartCollapsed(props.note.content),
+    )
   },
 )
 
