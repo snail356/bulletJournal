@@ -6,6 +6,7 @@ import TodayProgress from './TodayProgress.vue'
 import AppIcon from './AppIcon.vue'
 import type { AppIconName } from '@/plugins/fontawesome'
 import { useTaskStore } from '@/stores/taskStore'
+import { todayString } from '@/utils/date'
 
 const route = useRoute()
 const store = useTaskStore()
@@ -25,6 +26,12 @@ const progress = computed(() => store.todayProgress)
 
 function isActive(path: string) {
   return route.path === path || route.path.startsWith(path + '/')
+}
+
+function onNavClick(path: string) {
+  if (path === '/today') {
+    store.setSelectedDate(todayString())
+  }
 }
 
 function openMigrationReview() {
@@ -51,6 +58,7 @@ function openMigrationReview() {
         :to="item.path"
         class="nav-item"
         :class="{ active: isActive(item.path) }"
+        @click="onNavClick(item.path)"
       >
         <span class="nav-icon">
           <AppIcon :name="item.icon" />

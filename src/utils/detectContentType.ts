@@ -26,6 +26,8 @@ export function looksLikeMarkdown(text: string): boolean {
     /^>\s+\S/m,
     /^---+$/m,
     /```[\s\S]*?```/,
+    // GFM 表格分隔列：| --- | :---: | ---: |
+    /^[\t ]*\|?[\t ]*:?-{3,}[\t ]*(\|[\t ]*:?-{3,}[\t ]*)+\|?[\t ]*$/m,
   ]
 
   return patterns.some((re) => re.test(trimmed))
