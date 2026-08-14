@@ -27,9 +27,8 @@ npm run dev
 | `/today` | 今日任務（完整互動） |
 | `/tasks` | 所有任務，可依狀態篩選 |
 | `/tasks/:id` | 任務詳情 |
-| `/labels` | 標籤管理 |
 | `/stats` | 統計分析 |
-| `/settings` | 設定 |
+| `/settings` | 設定（含標籤管理） |
 
 ## 資料儲存
 

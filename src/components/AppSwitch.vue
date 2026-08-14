@@ -1,16 +1,27 @@
 <script setup lang="ts">
-defineProps<{
+const props = defineProps<{
   modelValue: boolean
   label?: string
+  disabled?: boolean
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
+
+function onToggle() {
+  if (props.disabled) return
+  emit('update:modelValue', !props.modelValue)
+}
 </script>
 
 <template>
-  <label class="app-switch" @click.prevent="emit('update:modelValue', !modelValue)">
+  <label
+    class="app-switch"
+    :class="{ disabled }"
+    :aria-disabled="disabled ? 'true' : undefined"
+    @click.prevent="onToggle"
+  >
     <span class="track" :class="{ on: modelValue }">
       <span class="thumb" />
     </span>
@@ -27,6 +38,11 @@ const emit = defineEmits<{
   gap: 8px;
   cursor: pointer;
   user-select: none;
+
+  &.disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
+  }
 }
 
 .track {

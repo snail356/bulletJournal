@@ -102,7 +102,7 @@ function save() {
           {{ endDate ? `共 ${duration} 天` : '未設定結束日期時為單日任務' }}
         </p>
         <p v-if="mode === 'edit'" class="hint">狀態請點選任務卡片上的狀態標籤修改</p>
-        <div v-if="store.labels.length" class="field">
+        <div v-if="store.isNavFeatureEnabled('labels') && store.labels.length" class="field">
           <span class="field-label">標籤</span>
           <div class="labels">
             <button

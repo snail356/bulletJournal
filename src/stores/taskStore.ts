@@ -46,6 +46,7 @@ import {
   GEMINI_USAGE_KEY,
   LABELS_KEY,
   MIGRATION_REVIEW_KEY,
+  NAV_FEATURES_KEY,
   REFLECTION_PROMPT_KEY,
   SELECTED_DATE_KEY,
   STATUS_ITEMS_KEY,
@@ -63,6 +64,13 @@ import {
   getStatusBgForColor,
   normalizeStatusItems,
 } from "@/utils/status";
+import {
+  NAV_FEATURES,
+  defaultNavFeatureVisibility,
+  normalizeNavFeatureVisibility,
+  type NavFeatureId,
+  type NavFeatureVisibility,
+} from "@/utils/navFeatures";
 
 function cloneTask(task: Task): Task {
   return JSON.parse(JSON.stringify(task)) as Task;
@@ -273,6 +281,14 @@ export const useTaskStore = defineStore("task", () => {
       normalizeToolboxList,
     ),
   );
+  const navFeatureVisibility = ref<NavFeatureVisibility>(
+    normalizeNavFeatureVisibility(
+      loadFromStorage<Partial<NavFeatureVisibility> | null>(
+        NAV_FEATURES_KEY,
+        null,
+      ),
+    ),
+  );
 
   function persistDifficultyNotes() {
     saveToStorage(DIFFICULTY_NOTES_KEY, difficultyNoteRecords.value);
@@ -285,6 +301,36 @@ export const useTaskStore = defineStore("task", () => {
   function persistToolboxLists() {
     saveToStorage(TOOLBOX_LISTS_KEY, toolboxLists.value);
   }
+
+  function persistNavFeatures() {
+    saveToStorage(NAV_FEATURES_KEY, navFeatureVisibility.value);
+  }
+
+  function isNavFeatureEnabled(id: NavFeatureId): boolean {
+    const feature = NAV_FEATURES.find((item) => item.id === id);
+    if (feature?.alwaysEnabled) return true;
+    return navFeatureVisibility.value[id] !== false;
+  }
+
+  function setNavFeatureEnabled(id: NavFeatureId, enabled: boolean) {
+    const feature = NAV_FEATURES.find((item) => item.id === id);
+    if (!feature || feature.alwaysEnabled) return;
+    navFeatureVisibility.value = {
+      ...navFeatureVisibility.value,
+      [id]: enabled,
+    };
+    persistNavFeatures();
+    if (!enabled && id === "reflections") {
+      reflectionModalVisible.value = false;
+    }
+  }
+
+  const firstEnabledNavPath = computed(() => {
+    const feature = NAV_FEATURES.find(
+      (item) => item.showInSidebar !== false && isNavFeatureEnabled(item.id),
+    );
+    return feature?.path ?? "/settings";
+  });
 
   function persistMigrationReviewState() {
     saveToStorage(MIGRATION_REVIEW_KEY, migrationReviewState.value);
@@ -561,6 +607,7 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function checkReflectionPrompt() {
+    if (!isNavFeatureEnabled("reflections")) return;
     if (migrationReviewVisible.value) return;
     if (!shouldShowReflectionPrompt()) return;
     openReflectionModal(yesterdayString(), "prompt");
@@ -1429,7 +1476,9 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function deleteToolboxList(listId: string) {
-    toolboxLists.value = toolboxLists.value.filter((list) => list.id !== listId);
+    toolboxLists.value = toolboxLists.value.filter(
+      (list) => list.id !== listId,
+    );
   }
 
   function createToolboxItem(listId: string, content = ""): ToolboxItem | null {
@@ -1476,11 +1525,7 @@ export const useTaskStore = defineStore("task", () => {
     list.updatedAt = new Date().toISOString();
   }
 
-  function reorderToolboxItems(
-    listId: string,
-    fromId: string,
-    toId: string,
-  ) {
+  function reorderToolboxItems(listId: string, fromId: string, toId: string) {
     const list = findToolboxList(listId);
     if (!list || fromId === toId) return;
     const fromIdx = list.items.findIndex((item) => item.id === fromId);
@@ -1625,6 +1670,7 @@ export const useTaskStore = defineStore("task", () => {
     reflectionModalVisible.value = false;
     statusItems.value = createDefaultStatusItems();
     toolboxLists.value = [];
+    navFeatureVisibility.value = { ...defaultNavFeatureVisibility };
     persist();
     persistMigrationReviewState();
     persistDifficultyNotes();
@@ -1633,6 +1679,7 @@ export const useTaskStore = defineStore("task", () => {
     saveToStorage(AI_MANAGER_PROMPT_KEY, aiManagerPrompt.value);
     persistStatusItems();
     persistToolboxLists();
+    persistNavFeatures();
   }
 
   return {
@@ -1659,6 +1706,10 @@ export const useTaskStore = defineStore("task", () => {
     aiAdviceLoading,
     toolboxLists,
     toolboxListsSorted,
+    navFeatureVisibility,
+    firstEnabledNavPath,
+    isNavFeatureEnabled,
+    setNavFeatureEnabled,
     init,
     getTasksByDate,
     getTaskDatesWithActivity,

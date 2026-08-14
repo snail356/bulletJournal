@@ -83,6 +83,7 @@ function undoDelete() {
           @update:model-value="store.expandImages = $event"
         />
         <button
+          v-if="store.isNavFeatureEnabled('reflections')"
           type="button"
           class="btn-secondary"
           :class="{ done: store.todayJournalState === 'done' }"

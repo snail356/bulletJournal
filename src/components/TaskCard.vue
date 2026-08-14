@@ -435,6 +435,7 @@ async function onContextPaste() {
                 @update:model-value="onStatusChange"
               />
               <TaskLabelsDropdown
+                v-if="store.isNavFeatureEnabled('labels')"
                 :model-value="task.labels"
                 @update:model-value="onLabelsChange"
               />
@@ -549,7 +550,11 @@ async function onContextPaste() {
         </template>
       </div>
 
-      <div class="section difficulty-section" @click.stop>
+      <div
+        v-if="store.isNavFeatureEnabled('difficulty-notes')"
+        class="section difficulty-section"
+        @click.stop
+      >
         <div class="section-header">
           <p class="section-title">困難點</p>
         </div>

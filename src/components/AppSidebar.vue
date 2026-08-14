@@ -4,24 +4,18 @@ import { useRoute } from 'vue-router'
 import MiniCalendar from './MiniCalendar.vue'
 import TodayProgress from './TodayProgress.vue'
 import AppIcon from './AppIcon.vue'
-import type { AppIconName } from '@/plugins/fontawesome'
 import { useTaskStore } from '@/stores/taskStore'
 import { todayString } from '@/utils/date'
+import { NAV_FEATURES } from '@/utils/navFeatures'
 
 const route = useRoute()
 const store = useTaskStore()
 
-const navItems: { path: string; label: string; icon: AppIconName }[] = [
-  { path: '/today', label: '今日任務', icon: 'sun' },
-  { path: '/calendar', label: '日曆', icon: 'calendar' },
-  { path: '/tasks', label: '所有任務', icon: 'list-check' },
-  { path: '/labels', label: '標籤管理', icon: 'tags' },
-  { path: '/difficulty-notes', label: '困難點資料', icon: 'clipboard-list' },
-  { path: '/toolbox', label: '工具箱與思考清單', icon: 'toolbox' },
-  { path: '/reflections', label: '回顧日誌', icon: 'file-lines' },
-  { path: '/stats', label: '統計分析', icon: 'chart-column' },
-  { path: '/settings', label: '設定', icon: 'gear' },
-]
+const navItems = computed(() =>
+  NAV_FEATURES.filter(
+    (item) => item.showInSidebar !== false && store.isNavFeatureEnabled(item.id),
+  ),
+)
 
 const progress = computed(() => store.todayProgress)
 
@@ -83,6 +77,7 @@ function openMigrationReview() {
     <div class="sidebar-widgets">
       <MiniCalendar />
       <TodayProgress
+        v-if="store.isNavFeatureEnabled('today')"
         :completed="progress.completed"
         :total="progress.total"
         :percentage="progress.percentage"

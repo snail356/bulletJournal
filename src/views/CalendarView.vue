@@ -115,10 +115,12 @@ function displayedTask(taskId: string): Task | undefined {
 }
 
 function taskColors(task: Task) {
-  const labelId = task.labels[0]
-  const label = labelId ? store.labels.find((item) => item.id === labelId) : undefined
-  if (label) {
-    return { color: label.color, bgColor: getLabelBgForColor(label.color) }
+  if (store.isNavFeatureEnabled('labels')) {
+    const labelId = task.labels[0]
+    const label = labelId ? store.labels.find((item) => item.id === labelId) : undefined
+    if (label) {
+      return { color: label.color, bgColor: getLabelBgForColor(label.color) }
+    }
   }
   const status = store.getStatusItem(task.status)
   return { color: status.color, bgColor: status.bgColor }

@@ -18,7 +18,10 @@ function onVisibilityChange() {
 
 function onReflectionSubmit(input: DailyReflectionInput) {
   store.submitDailyReflection(input)
-  if (router.currentRoute.value.path !== '/reflections') {
+  if (
+    store.isNavFeatureEnabled('reflections') &&
+    router.currentRoute.value.path !== '/reflections'
+  ) {
     router.push('/reflections')
   }
 }
@@ -48,7 +51,7 @@ onUnmounted(() => {
     />
 
     <ReflectionModal
-      :visible="store.reflectionModalVisible"
+      :visible="store.isNavFeatureEnabled('reflections') && store.reflectionModalVisible"
       :date="store.reflectionModalDate"
       :mode="store.reflectionModalMode"
       :existing="store.getReflectionByDate(store.reflectionModalDate)"

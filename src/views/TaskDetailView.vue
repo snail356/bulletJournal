@@ -14,9 +14,13 @@ const previewAttachment = ref<Attachment | null>(null)
 
 const task = computed(() => store.findTask(route.params.id as string))
 
+function goToTaskList() {
+  router.push(store.isNavFeatureEnabled('all-tasks') ? '/tasks' : store.firstEnabledNavPath)
+}
+
 function onDeleted(task: Task) {
   store.deleteTask(task.id)
-  router.push('/tasks')
+  goToTaskList()
 }
 </script>
 
@@ -41,7 +45,7 @@ function onDeleted(task: Task) {
 
     <div v-else class="not-found">
       <p>找不到此任務</p>
-      <button type="button" @click="router.push('/tasks')">回到任務列表</button>
+      <button type="button" @click="goToTaskList">回到任務列表</button>
     </div>
 
     <AttachmentPreview

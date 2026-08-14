@@ -82,14 +82,10 @@ function updateStatusColor(id: TaskStatus, color: string) {
 </script>
 
 <template>
-  <div class="labels-view">
-    <header class="page-header">
-      <h1>標籤管理</h1>
-      <p class="subtitle">管理任務標籤分類，拖曳可調整順序</p>
-    </header>
-
+  <div class="labels-manager">
     <section class="section">
       <h2 class="section-title">任務標籤</h2>
+      <p class="section-desc">管理任務標籤分類，拖曳可調整順序</p>
 
       <div class="add-form">
         <input v-model="newName" type="text" placeholder="新標籤名稱" @keyup.enter="addLabel" />
@@ -224,41 +220,30 @@ function updateStatusColor(id: TaskStatus, color: string) {
 <style scoped lang="scss">
 @use '@/styles/variables' as *;
 
-.page-header {
-  margin-bottom: 24px;
+.section {
+  margin-bottom: 32px;
 
-  h1 {
-    font-size: 24px;
-    font-weight: 700;
+  &:last-of-type {
+    margin-bottom: 0;
   }
 }
 
-.subtitle {
-  color: $text-muted;
-  font-size: 13px;
-  margin-top: 4px;
-}
-
-.section {
-  margin-bottom: 40px;
-}
-
 .section-title {
-  font-size: 18px;
-  font-weight: 700;
-  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
 .section-desc {
   color: $text-muted;
   font-size: 13px;
-  margin: -4px 0 16px;
+  margin-bottom: 16px;
 }
 
 .add-form {
   display: flex;
   gap: 10px;
-  margin-bottom: 24px;
+  margin-bottom: 16px;
   flex-wrap: wrap;
   align-items: center;
 

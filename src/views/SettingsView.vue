@@ -1,6 +1,11 @@
 ﻿<script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
+import AppSwitch from '@/components/AppSwitch.vue'
+import AppIcon from '@/components/AppIcon.vue'
+import AppTabs, { type AppTabItem } from '@/components/AppTabs.vue'
+import LabelsManager from '@/components/LabelsManager.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { mockLabels, mockTasks } from '@/mock/data'
 import { downloadBackupZip } from '@/utils/backup'
@@ -8,6 +13,7 @@ import { importBackupZip } from '@/utils/backupImport'
 import { TASKS_KEY, LABELS_KEY, SELECTED_DATE_KEY, saveToStorage } from '@/utils/storage'
 import { todayString } from '@/utils/date'
 import { getGeminiModel, hasGeminiApiKey } from '@/utils/gemini'
+import { NAV_FEATURES, type NavFeatureId } from '@/utils/navFeatures'
 
 const store = useTaskStore()
 const message = ref('')
@@ -170,6 +176,45 @@ function saveAiManagerPrompt() {
     : '已清除自訂 Prompt，將使用系統預設設定'
   setTimeout(() => (aiPromptMessage.value = ''), 3000)
 }
+
+function toggleNavFeature(id: NavFeatureId, enabled: boolean) {
+  store.setNavFeatureEnabled(id, enabled)
+}
+
+const activeTab = ref('features')
+const settingsTabs: AppTabItem[] = [
+  { id: 'features', label: '功能頁面', icon: 'list-check' },
+  { id: 'labels', label: '標籤管理', icon: 'tags' },
+  { id: 'data', label: '資料管理', icon: 'copy' },
+  { id: 'ai', label: 'AI 設定', icon: 'file-lines' },
+  { id: 'about', label: '關於', icon: 'book' },
+]
+const settingsTabIds = new Set(settingsTabs.map((tab) => tab.id))
+const route = useRoute()
+const router = useRouter()
+
+function tabFromQuery(): string {
+  const tab = route.query.tab
+  return typeof tab === 'string' && settingsTabIds.has(tab) ? tab : 'features'
+}
+
+activeTab.value = tabFromQuery()
+
+watch(activeTab, (tab) => {
+  const current = typeof route.query.tab === 'string' ? route.query.tab : 'features'
+  if (current === tab) return
+  void router.replace({
+    query: tab === 'features' ? { ...route.query, tab: undefined } : { ...route.query, tab },
+  })
+})
+
+watch(
+  () => route.query.tab,
+  () => {
+    const next = tabFromQuery()
+    if (activeTab.value !== next) activeTab.value = next
+  },
+)
 </script>
 
 <template>
@@ -179,110 +224,149 @@ function saveAiManagerPrompt() {
       <p class="subtitle">應用程式偏好與資料管理</p>
     </header>
 
-    <div class="settings-card">
-      <h2>資料管理</h2>
-      <p class="desc">
-        所有資料儲存於瀏覽器 localStorage，無需後端。可備份或匯入任務、標籤、工具箱與思考清單。
-      </p>
-      <div class="actions">
-        <button
-          type="button"
-          class="btn-primary"
-          :disabled="busy"
-          @click="backupData"
-        >
-          {{ exporting ? '備份中…' : '備份資料' }}
-        </button>
-        <button
-          type="button"
-          class="btn-secondary"
-          :disabled="busy"
-          @click="chooseImportFile"
-        >
-          {{ importing ? '匯入中…' : '匯入備份' }}
-        </button>
-        <button type="button" class="btn-secondary" :disabled="busy" @click="resetMockData">
-          重置為 Mock 資料
-        </button>
-        <button type="button" class="btn-danger" :disabled="busy" @click="clearAllData">
-          清除所有資料
-        </button>
-      </div>
-      <input
-        ref="importInput"
-        class="file-input"
-        type="file"
-        accept=".zip,application/zip"
-        @change="onImportFileChange"
-      />
-      <p v-if="message" class="feedback" :class="{ error: messageError }">{{ message }}</p>
-      <div class="usage">
-        <h3>使用說明</h3>
-        <ul>
-          <li>
-            <strong>備份資料</strong>：下載 ZIP。內含可閱讀的 Markdown、外置 WebP 照片，以及供還原用的
-            <code>data.json</code>。
-          </li>
-          <li>
-            <strong>匯入備份</strong>：選擇先前下載的 ZIP。只會新增目前沒有的項目，已存在的不會覆蓋、也不會重複。
-          </li>
-          <li>
-            判斷已存在：任務比對「同一筆 id」或「同一天相同標題」；標籤比對名稱；思考清單比對標題，清單內思考點比對內容。
-          </li>
-          <li>回顧日誌、困難點紀錄與狀態標籤不會被這份備份匯入更動。</li>
-        </ul>
-      </div>
-    </div>
+    <AppTabs v-model="activeTab" :tabs="settingsTabs" aria-label="設定分類">
+      <template #features>
+        <div class="settings-card">
+          <h2>功能頁面</h2>
+          <p class="desc">
+            選擇左側選單要顯示的功能。關閉後該頁面不會出現在選單中，直接開啟連結也會改到仍開啟的頁面。設定無法關閉，以便隨時再調整。
+          </p>
+          <ul class="feature-list">
+            <li v-for="feature in NAV_FEATURES" :key="feature.id" class="feature-row">
+              <span class="feature-icon">
+                <AppIcon :name="feature.icon" />
+              </span>
+              <div class="feature-copy">
+                <span class="feature-name">{{ feature.label }}</span>
+                <span class="feature-desc">
+                  {{ feature.alwaysEnabled ? '無法關閉，以便隨時調整其他功能' : feature.description }}
+                </span>
+              </div>
+              <AppSwitch
+                :model-value="store.isNavFeatureEnabled(feature.id)"
+                :disabled="feature.alwaysEnabled"
+                @update:model-value="toggleNavFeature(feature.id, $event)"
+              />
+            </li>
+          </ul>
+        </div>
+      </template>
 
-    <div class="settings-card">
-      <h2>AI 主管 Prompt</h2>
-      <p class="desc">
-        可加入角色、語氣或分析重點等自訂指示。呼叫 Gemini API 時，此內容會加在系統預設 Prompt 之前；留空則只使用預設設定。
-      </p>
-      <label class="prompt-field">
-        <span>自訂 Prompt</span>
-        <textarea
-          v-model="aiPromptDraft"
-          rows="7"
-          maxlength="4000"
-          placeholder="例如：請特別分析時間分配，並以直接、精簡的語氣提出明日最重要的三項行動。"
-        />
-      </label>
-      <div class="prompt-footer">
-        <span class="character-count">{{ aiPromptDraft.length }} / 4000</span>
-        <button type="button" class="btn-primary" @click="saveAiManagerPrompt">
-          儲存 Prompt
-        </button>
-      </div>
-      <p v-if="aiPromptMessage" class="feedback">{{ aiPromptMessage }}</p>
-    </div>
+      <template #labels>
+        <LabelsManager />
+      </template>
 
-    <div class="settings-card">
-      <h2>Gemini 本機呼叫用量</h2>
-      <p class="desc">
-        AI 主管建議使用環境變數中的 API Key。此處顯示本機累計成功呼叫次數（非 Google 帳單）。
-        詳見 <code>docs/ai-manager-advice.md</code>。
-      </p>
-      <ul class="info">
-        <li>API Key：{{ geminiKeyConfigured ? '已設定（環境變數）' : '未設定' }}</li>
-        <li>模型：{{ getGeminiModel() }}</li>
-        <li>累計成功呼叫：{{ store.geminiUsage.totalSuccessCalls }} 次</li>
-        <li>最後呼叫：{{ geminiLastCalled }}</li>
-        <li v-if="store.geminiUsage.lastError">
-          最近錯誤：{{ store.geminiUsage.lastError }}
-        </li>
-      </ul>
-    </div>
+      <template #data>
+        <div class="settings-card">
+          <h2>資料管理</h2>
+          <p class="desc">
+            所有資料儲存於瀏覽器 localStorage，無需後端。可備份或匯入任務、標籤、工具箱與思考清單。
+          </p>
+          <div class="actions">
+            <button
+              type="button"
+              class="btn-primary"
+              :disabled="busy"
+              @click="backupData"
+            >
+              {{ exporting ? '備份中…' : '備份資料' }}
+            </button>
+            <button
+              type="button"
+              class="btn-secondary"
+              :disabled="busy"
+              @click="chooseImportFile"
+            >
+              {{ importing ? '匯入中…' : '匯入備份' }}
+            </button>
+            <button type="button" class="btn-secondary" :disabled="busy" @click="resetMockData">
+              重置為 Mock 資料
+            </button>
+            <button type="button" class="btn-danger" :disabled="busy" @click="clearAllData">
+              清除所有資料
+            </button>
+          </div>
+          <input
+            ref="importInput"
+            class="file-input"
+            type="file"
+            accept=".zip,application/zip"
+            @change="onImportFileChange"
+          />
+          <p v-if="message" class="feedback" :class="{ error: messageError }">{{ message }}</p>
+          <div class="usage">
+            <h3>使用說明</h3>
+            <ul>
+              <li>
+                <strong>備份資料</strong>：下載 ZIP。內含可閱讀的 Markdown、外置 WebP 照片，以及供還原用的
+                <code>data.json</code>。
+              </li>
+              <li>
+                <strong>匯入備份</strong>：選擇先前下載的 ZIP。只會新增目前沒有的項目，已存在的不會覆蓋、也不會重複。
+              </li>
+              <li>
+                判斷已存在：任務比對「同一筆 id」或「同一天相同標題」；標籤比對名稱；思考清單比對標題，清單內思考點比對內容。
+              </li>
+              <li>回顧日誌、困難點紀錄與狀態標籤不會被這份備份匯入更動。</li>
+            </ul>
+          </div>
+        </div>
+      </template>
 
-    <div class="settings-card">
-      <h2>關於</h2>
-      <p class="desc">Bullet Journal 工作狀態紀錄 Web App</p>
-      <ul class="info">
-        <li>Vue 3 + Vite + TypeScript</li>
-        <li>Pinia + Vue Router</li>
-        <li>版本 1.0.0</li>
-      </ul>
-    </div>
+      <template #ai>
+        <div class="settings-card">
+          <h2>AI 主管 Prompt</h2>
+          <p class="desc">
+            可加入角色、語氣或分析重點等自訂指示。呼叫 Gemini API 時，此內容會加在系統預設 Prompt 之前；留空則只使用預設設定。
+          </p>
+          <label class="prompt-field">
+            <span>自訂 Prompt</span>
+            <textarea
+              v-model="aiPromptDraft"
+              rows="7"
+              maxlength="4000"
+              placeholder="例如：請特別分析時間分配，並以直接、精簡的語氣提出明日最重要的三項行動。"
+            />
+          </label>
+          <div class="prompt-footer">
+            <span class="character-count">{{ aiPromptDraft.length }} / 4000</span>
+            <button type="button" class="btn-primary" @click="saveAiManagerPrompt">
+              儲存 Prompt
+            </button>
+          </div>
+          <p v-if="aiPromptMessage" class="feedback">{{ aiPromptMessage }}</p>
+        </div>
+
+        <div class="settings-card">
+          <h2>Gemini 本機呼叫用量</h2>
+          <p class="desc">
+            AI 主管建議使用環境變數中的 API Key。此處顯示本機累計成功呼叫次數（非 Google 帳單）。
+            詳見 <code>docs/ai-manager-advice.md</code>。
+          </p>
+          <ul class="info">
+            <li>API Key：{{ geminiKeyConfigured ? '已設定（環境變數）' : '未設定' }}</li>
+            <li>模型：{{ getGeminiModel() }}</li>
+            <li>累計成功呼叫：{{ store.geminiUsage.totalSuccessCalls }} 次</li>
+            <li>最後呼叫：{{ geminiLastCalled }}</li>
+            <li v-if="store.geminiUsage.lastError">
+              最近錯誤：{{ store.geminiUsage.lastError }}
+            </li>
+          </ul>
+        </div>
+      </template>
+
+      <template #about>
+        <div class="settings-card">
+          <h2>關於</h2>
+          <p class="desc">Bullet Journal 工作狀態紀錄 Web App</p>
+          <ul class="info">
+            <li>Vue 3 + Vite + TypeScript</li>
+            <li>Pinia + Vue Router</li>
+            <li>版本 1.0.0</li>
+          </ul>
+        </div>
+      </template>
+    </AppTabs>
 
     <ConfirmDialog
       :visible="confirmVisible"
@@ -495,5 +579,58 @@ function saveAiManagerPrompt() {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.feature-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 8px;
+  border-radius: $radius-sm;
+
+  &:hover {
+    background: $bg;
+  }
+}
+
+.feature-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: $primary-light;
+  color: $primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.feature-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.feature-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text;
+}
+
+.feature-desc {
+  font-size: 12px;
+  color: $text-muted;
+  line-height: 1.4;
 }
 </style>
