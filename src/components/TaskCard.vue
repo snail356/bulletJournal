@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, provide, ref, watch } from 'vue'
 import type { Attachment, SubTask, Task, TaskStatus } from '@/types'
-import { formatDisplayDate, getOriginalScheduledDate, getPostponedDays } from '@/utils/date'
+import { formatDisplayDate, formatShortDate, getOriginalScheduledDate, getPostponedDays, getTaskEndDate } from '@/utils/date'
 import SubTaskItem from './SubTaskItem.vue'
 import TaskBodySection from './TaskBodySection.vue'
 import NoteBlock from './NoteBlock.vue'
@@ -112,6 +112,9 @@ const postponedLabel = computed(() => {
   if (postponedDays.value <= 0) return ''
   return `原排程 ${formatDisplayDate(getOriginalScheduledDate(props.task))}`
 })
+
+const startDateLabel = computed(() => formatShortDate(props.task.date))
+const endDateLabel = computed(() => formatShortDate(getTaskEndDate(props.task)))
 
 const difficultyOptions = computed(() => store.getDifficultyNoteOptions())
 
@@ -430,12 +433,21 @@ async function onContextPaste() {
         <template v-else>
           <div class="meta-primary">
             <div class="status-row">
+              <div class="date-range" :title="`${task.date} ～ ${getTaskEndDate(task)}`">
+                <span class="date-part">
+                  <span class="hours-label">開始</span>
+                  <span class="date-value">{{ startDateLabel }}</span>
+                </span>
+                <span class="date-part">
+                  <span class="hours-label">結束</span>
+                  <span class="date-value">{{ endDateLabel }}</span>
+                </span>
+              </div>
               <TaskStatusDropdown
                 :model-value="task.status"
                 @update:model-value="onStatusChange"
               />
               <TaskLabelsDropdown
-                v-if="store.isNavFeatureEnabled('labels')"
                 :model-value="task.labels"
                 @update:model-value="onLabelsChange"
               />
@@ -781,6 +793,30 @@ async function onContextPaste() {
   align-items: center;
   gap: 6px;
   max-width: 100%;
+}
+
+.date-range {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 10px;
+  border-radius: $radius-sm;
+  background: $bg;
+  border: 1px solid $border;
+}
+
+.date-part {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.date-value {
+  font-size: 13px;
+  font-weight: 600;
+  color: $text;
+  white-space: nowrap;
 }
 
 .status-hours {

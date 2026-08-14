@@ -59,6 +59,11 @@ export function formatDisplayDate(dateStr: string): string {
   return `${date.getMonth() + 1}月${date.getDate()}日 週${weekdays[date.getDay()]}`
 }
 
+export function formatShortDate(dateStr: string): string {
+  const date = parseDateString(dateStr)
+  return `${date.getMonth() + 1}/${date.getDate()}`
+}
+
 export function getMonthDays(year: number, month: number): Date[] {
   const days: Date[] = []
   const last = new Date(year, month + 1, 0)
@@ -123,6 +128,15 @@ export function formatDateRange(task: {
   const end = getTaskEndDate(task)
   if (end === task.date) return task.date
   return `${task.date} ～ ${end}`
+}
+
+export function formatShortDateRange(task: {
+  date: string
+  endDate?: string | null
+}): string {
+  const end = getTaskEndDate(task)
+  if (end === task.date) return formatShortDate(task.date)
+  return `${formatShortDate(task.date)}～${formatShortDate(end)}`
 }
 
 export function startOfWeek(date: Date): Date {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Task } from '@/types'
-import { getTaskDuration } from '@/utils/date'
+import { formatShortDateRange, getTaskDuration } from '@/utils/date'
 import type { CalendarDragMode } from '@/composables/useCalendarDrag'
 
 const props = defineProps<{
@@ -22,6 +22,7 @@ const emit = defineEmits<{
 }>()
 
 const duration = computed(() => getTaskDuration(props.task))
+const dateRange = computed(() => formatShortDateRange(props.task))
 
 const cursor = computed(() => {
   if (!props.dragging) return 'grab'
@@ -46,7 +47,7 @@ const cursor = computed(() => {
       '--task-bg': bgColor,
       cursor,
     }"
-    :title="`${task.title}（${duration} 天）`"
+    :title="`${task.title}（${dateRange} · ${duration} 天）`"
     @pointerdown="emit('moveStart', $event)"
     @click.stop="emit('select')"
   >
@@ -59,6 +60,7 @@ const cursor = computed(() => {
       @click.stop
     />
     <span class="title">{{ task.title }}</span>
+    <span class="dates">{{ dateRange }}</span>
     <span v-if="duration > 1" class="duration">{{ duration }}天</span>
     <button
       v-if="!continuesAfter"
@@ -123,6 +125,14 @@ const cursor = computed(() => {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dates {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.8;
   white-space: nowrap;
 }
 

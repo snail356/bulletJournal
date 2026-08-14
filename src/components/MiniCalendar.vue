@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useTaskStore } from '@/stores/taskStore'
 import { formatDate, getCalendarGrid, todayString } from '@/utils/date'
 import AppIcon from './AppIcon.vue'
 
 const store = useTaskStore()
+const router = useRouter()
 const viewDate = ref(new Date())
 
 const year = computed(() => viewDate.value.getFullYear())
@@ -27,6 +29,9 @@ function nextMonth() {
 
 function selectDay(date: Date) {
   store.setSelectedDate(formatDate(date))
+  if (router.currentRoute.value.path !== '/today') {
+    void router.push('/today')
+  }
 }
 
 function dayClass(date: Date | null) {
