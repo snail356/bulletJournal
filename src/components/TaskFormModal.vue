@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import type { Task } from '@/types'
 import { useTaskStore } from '@/stores/taskStore'
 import { getTaskDuration, normalizeEndDate } from '@/utils/date'
+import AppIcon from '@/components/AppIcon.vue'
 
 const props = defineProps<{
   visible: boolean
@@ -21,6 +22,7 @@ const title = ref('')
 const date = ref('')
 const endDate = ref('')
 const selectedLabels = ref<string[]>([])
+const avatarId = ref<string | null>(null)
 
 const duration = computed(() => {
   const end = endDate.value || date.value
@@ -37,11 +39,13 @@ watch(
       date.value = props.task.date
       endDate.value = props.task.endDate ?? ''
       selectedLabels.value = [...props.task.labels]
+      avatarId.value = props.task.avatarId
     } else {
       title.value = ''
       date.value = props.defaultDate ?? store.selectedDate
       endDate.value = ''
       selectedLabels.value = []
+      avatarId.value = null
     }
   },
   { immediate: true },
@@ -65,6 +69,7 @@ function save() {
       date: date.value,
       endDate: normalizeEndDate(date.value, endDate.value || null),
       labels: [...selectedLabels.value],
+      avatarId: avatarId.value,
     })
   } else {
     store.createTask({
@@ -72,6 +77,7 @@ function save() {
       date: date.value,
       endDate: normalizeEndDate(date.value, endDate.value || null),
       labels: [...selectedLabels.value],
+      avatarId: avatarId.value,
     })
   }
   emit('saved')
@@ -101,6 +107,30 @@ function save() {
         <p class="duration-hint">
           {{ endDate ? `共 ${duration} 天` : '未設定結束日期時為單日任務' }}
         </p>
+        <div class="field">
+          <span class="field-label">任務頭像</span>
+          <div class="avatar-row">
+            <button
+              type="button"
+              class="avatar-chip"
+              :class="{ active: avatarId === null }"
+              @click="avatarId = null"
+            >
+              無
+            </button>
+            <button
+              v-for="avatar in store.taskAvatars"
+              :key="avatar.id"
+              type="button"
+              class="avatar-chip"
+              :class="{ active: avatarId === avatar.id }"
+              @click="avatarId = avatar.id"
+            >
+              <AppIcon :name="avatar.icon" size="xs" />
+              {{ avatar.name }}
+            </button>
+          </div>
+        </div>
         <p v-if="mode === 'edit'" class="hint">狀態請點選任務卡片上的狀態標籤修改</p>
         <div v-if="store.labels.length" class="field">
           <span class="field-label">標籤</span>
@@ -217,6 +247,31 @@ input[type='date'] {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.avatar-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.avatar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  border: 1px solid $border;
+  color: $text-muted;
+  background: $bg;
+
+  &.active {
+    border-color: $primary;
+    color: $primary;
+    background: $primary-light;
+    font-weight: 600;
+  }
 }
 
 .label-chip {

@@ -18,6 +18,7 @@ const GEMINI_USAGE_KEY = "bullet-journal-gemini-usage";
 const AI_MANAGER_PROMPT_KEY = "bullet-journal-ai-manager-prompt";
 const TOOLBOX_LISTS_KEY = "bullet-journal-toolbox-lists";
 const NAV_FEATURES_KEY = "bullet-journal-nav-features";
+const TASK_AVATARS_KEY = "bullet-journal-task-avatars";
 
 const defaultMigrationReviewState: MigrationReviewState = {
   snoozedUntil: null,
@@ -73,6 +74,7 @@ export {
   AI_MANAGER_PROMPT_KEY,
   TOOLBOX_LISTS_KEY,
   NAV_FEATURES_KEY,
+  TASK_AVATARS_KEY,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
   defaultGeminiUsageState,

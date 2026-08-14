@@ -6,6 +6,7 @@ import AppSwitch from '@/components/AppSwitch.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppTabs, { type AppTabItem } from '@/components/AppTabs.vue'
 import LabelsManager from '@/components/LabelsManager.vue'
+import TaskAvatarsManager from '@/components/TaskAvatarsManager.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { mockLabels, mockTasks } from '@/mock/data'
 import { downloadBackupZip } from '@/utils/backup'
@@ -185,6 +186,7 @@ const activeTab = ref('features')
 const settingsTabs: AppTabItem[] = [
   { id: 'features', label: '功能頁面', icon: 'list-check' },
   { id: 'labels', label: '標籤管理', icon: 'tags' },
+  { id: 'avatars', label: '任務頭像', icon: 'user' },
   { id: 'data', label: '資料管理', icon: 'copy' },
   { id: 'ai', label: 'AI 設定', icon: 'file-lines' },
   { id: 'about', label: '關於', icon: 'book' },
@@ -254,6 +256,13 @@ watch(
 
       <template #labels>
         <LabelsManager />
+      </template>
+
+      <template #avatars>
+        <div class="settings-card">
+          <h2>任務頭像</h2>
+          <TaskAvatarsManager />
+        </div>
       </template>
 
       <template #data>

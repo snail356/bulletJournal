@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Task } from '@/types'
+import AppIcon from '@/components/AppIcon.vue'
+import { useTaskStore } from '@/stores/taskStore'
 import { formatShortDateRange, getTaskDuration } from '@/utils/date'
 import type { CalendarDragMode } from '@/composables/useCalendarDrag'
 
@@ -21,6 +23,8 @@ const emit = defineEmits<{
   select: []
 }>()
 
+const store = useTaskStore()
+const avatar = computed(() => store.getTaskAvatar(props.task.avatarId))
 const duration = computed(() => getTaskDuration(props.task))
 const dateRange = computed(() => formatShortDateRange(props.task))
 
@@ -59,8 +63,10 @@ const cursor = computed(() => {
       @pointerdown.stop="emit('resizeStart', $event)"
       @click.stop
     />
+    <span v-if="avatar" class="avatar" aria-hidden="true">
+      <AppIcon :name="avatar.icon" size="xs" />
+    </span>
     <span class="title">{{ task.title }}</span>
-    <span class="dates">{{ dateRange }}</span>
     <span v-if="duration > 1" class="duration">{{ duration }}天</span>
     <button
       v-if="!continuesAfter"
@@ -128,12 +134,12 @@ const cursor = computed(() => {
   white-space: nowrap;
 }
 
-.dates {
+.avatar {
   flex-shrink: 0;
-  font-size: 10px;
-  font-weight: 700;
-  opacity: 0.8;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
 }
 
 .duration {

@@ -18,6 +18,7 @@ import type {
   StatusItem,
   SubTask,
   Task,
+  TaskAvatar,
   TaskDayView,
   TaskStatus,
   TodayJournalState,
@@ -50,6 +51,7 @@ import {
   REFLECTION_PROMPT_KEY,
   SELECTED_DATE_KEY,
   STATUS_ITEMS_KEY,
+  TASK_AVATARS_KEY,
   TASKS_KEY,
   TOOLBOX_LISTS_KEY,
   defaultGeminiUsageState,
@@ -59,6 +61,11 @@ import {
   loadFromStorage,
   saveToStorage,
 } from "@/utils/storage";
+import {
+  DEFAULT_TASK_AVATARS,
+  findTaskAvatar,
+  normalizeTaskAvatars,
+} from "@/utils/taskAvatars";
 import {
   createDefaultStatusItems,
   getStatusBgForColor,
@@ -111,6 +118,7 @@ function normalizeTask(task: Task & { carriedFromDate?: string }): Task {
     bodyContentType: task.bodyContentType ?? "text",
     subtasks: task.subtasks.map(normalizeSubTask),
     notes: (task.notes ?? []).map(normalizeNote),
+    avatarId: task.avatarId ?? null,
   };
 }
 
@@ -289,6 +297,11 @@ export const useTaskStore = defineStore("task", () => {
       ),
     ),
   );
+  const taskAvatars = ref<TaskAvatar[]>(
+    normalizeTaskAvatars(
+      loadFromStorage<TaskAvatar[] | null>(TASK_AVATARS_KEY, null),
+    ),
+  );
 
   function persistDifficultyNotes() {
     saveToStorage(DIFFICULTY_NOTES_KEY, difficultyNoteRecords.value);
@@ -304,6 +317,10 @@ export const useTaskStore = defineStore("task", () => {
 
   function persistNavFeatures() {
     saveToStorage(NAV_FEATURES_KEY, navFeatureVisibility.value);
+  }
+
+  function persistTaskAvatars() {
+    saveToStorage(TASK_AVATARS_KEY, taskAvatars.value);
   }
 
   function isNavFeatureEnabled(id: NavFeatureId): boolean {
@@ -391,6 +408,7 @@ export const useTaskStore = defineStore("task", () => {
 
   watch(statusItems, persistStatusItems, { deep: true });
   watch(toolboxLists, persistToolboxLists, { deep: true });
+  watch(taskAvatars, persistTaskAvatars, { deep: true });
 
   const tasksForSelectedDate = computed(() =>
     getTasksByDate(selectedDate.value),
@@ -892,6 +910,7 @@ export const useTaskStore = defineStore("task", () => {
     status?: TaskStatus;
     labels?: string[];
     endDate?: string | null;
+    avatarId?: string | null;
   }): Task {
     const now = new Date().toISOString();
     const task: Task = {
@@ -909,6 +928,7 @@ export const useTaskStore = defineStore("task", () => {
       notes: [],
       attachments: [],
       labels: payload.labels ?? [],
+      avatarId: payload.avatarId ?? null,
       migrationHistory: [],
       createdAt: now,
       updatedAt: now,
@@ -1538,6 +1558,24 @@ export const useTaskStore = defineStore("task", () => {
     list.updatedAt = new Date().toISOString();
   }
 
+  function getTaskAvatar(avatarId: string | null | undefined) {
+    return findTaskAvatar(taskAvatars.value, avatarId);
+  }
+
+  function updateTaskAvatar(
+    id: string,
+    payload: Partial<Pick<TaskAvatar, "name" | "icon">>,
+  ) {
+    const avatar = taskAvatars.value.find((item) => item.id === id);
+    if (!avatar) return;
+    if (payload.name !== undefined) {
+      avatar.name = payload.name.trim() || avatar.name;
+    }
+    if (payload.icon !== undefined) {
+      avatar.icon = payload.icon;
+    }
+  }
+
   function taskDedupeKey(task: Task): string {
     return `${task.date}::${task.title.trim()}`;
   }
@@ -1671,6 +1709,7 @@ export const useTaskStore = defineStore("task", () => {
     statusItems.value = createDefaultStatusItems();
     toolboxLists.value = [];
     navFeatureVisibility.value = { ...defaultNavFeatureVisibility };
+    taskAvatars.value = [...DEFAULT_TASK_AVATARS];
     persist();
     persistMigrationReviewState();
     persistDifficultyNotes();
@@ -1680,6 +1719,7 @@ export const useTaskStore = defineStore("task", () => {
     persistStatusItems();
     persistToolboxLists();
     persistNavFeatures();
+    persistTaskAvatars();
   }
 
   return {
@@ -1707,6 +1747,7 @@ export const useTaskStore = defineStore("task", () => {
     toolboxLists,
     toolboxListsSorted,
     navFeatureVisibility,
+    taskAvatars,
     firstEnabledNavPath,
     isNavFeatureEnabled,
     setNavFeatureEnabled,
@@ -1782,6 +1823,8 @@ export const useTaskStore = defineStore("task", () => {
     updateToolboxItem,
     deleteToolboxItem,
     reorderToolboxItems,
+    getTaskAvatar,
+    updateTaskAvatar,
     mergeImportedBackup,
     clearAllData,
   };

@@ -9,6 +9,7 @@ import TaskContextMenu from './TaskContextMenu.vue'
 import type { ContextMenuItem } from './TaskContextMenu.vue'
 import TaskFormModal from './TaskFormModal.vue'
 import TaskStatusDropdown from './TaskStatusDropdown.vue'
+import TaskAvatarDropdown from './TaskAvatarDropdown.vue'
 import TaskLabelsDropdown from './TaskLabelsDropdown.vue'
 import SearchableCombobox from './SearchableCombobox.vue'
 import QuickInputModal from './QuickInputModal.vue'
@@ -35,6 +36,7 @@ const taskDrag = inject(TASK_DRAG_KEY, null)
 
 const isTaskDragging = computed(() => taskDrag?.draggingId.value === props.task.id)
 const isTaskDragOver = computed(() => taskDrag?.dragOverId.value === props.task.id)
+const avatar = computed(() => store.getTaskAvatar(props.task.avatarId))
 
 const subtaskDrag = useReorderDrag<SubTask>(
   () => props.task.subtasks,
@@ -399,6 +401,14 @@ async function onContextPaste() {
       </span>
 
       <div class="title-cell">
+        <TaskAvatarDropdown
+          v-if="avatar && !isMigrated"
+          :model-value="task.avatarId"
+          @update:model-value="store.updateTask(task.id, { avatarId: $event })"
+        />
+        <span v-else-if="avatar" class="task-avatar" :title="avatar.name">
+          <AppIcon :name="avatar.icon" size="xs" />
+        </span>
         <h3 v-if="isMigrated" class="title">{{ task.title }}</h3>
         <InlineEditable
           v-else
@@ -701,7 +711,7 @@ async function onContextPaste() {
   grid-template-areas:
     'drag check title actions'
     '. meta meta meta';
-  align-items: start;
+  align-items: center;
   gap: 6px 8px;
 }
 
@@ -714,12 +724,14 @@ async function onContextPaste() {
 
 .drag-handle {
   grid-area: drag;
-  padding-top: 4px;
   color: $text-muted;
   font-size: 16px;
   cursor: grab;
   opacity: 0.4;
   line-height: 1;
+  display: flex;
+  align-items: center;
+  height: 20px;
   flex-shrink: 0;
   user-select: none;
 
@@ -734,8 +746,10 @@ async function onContextPaste() {
 
 .check-wrap {
   grid-area: check;
-  padding-top: 4px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  height: 20px;
 
   input {
     display: none;
@@ -764,6 +778,23 @@ async function onContextPaste() {
 .title-cell {
   grid-area: title;
   min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+}
+
+.task-avatar {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: $primary-light;
+  color: $primary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 
 .meta-cell {
@@ -778,7 +809,10 @@ async function onContextPaste() {
 .title {
   font-size: 15px;
   font-weight: 600;
-  margin-bottom: 0;
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+  line-height: 20px;
 }
 
 .meta-primary {
