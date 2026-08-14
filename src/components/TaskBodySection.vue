@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import type { Attachment, ContentFormat, Task } from '@/types'
 import AttachmentList from './AttachmentList.vue'
 import CodeSnippet from './CodeSnippet.vue'
@@ -67,16 +67,20 @@ watch(
   },
 )
 
-watch(showEditor, async (visible) => {
-  if (!visible) return
-  await nextTick()
-  if (textareaRef.value) autoResize(textareaRef.value)
-})
+watch(
+  [expanded, showEditor, draft],
+  async () => {
+    if (!expanded.value || !showEditor.value) return
+    await nextTick()
+    if (textareaRef.value) autoResize(textareaRef.value)
+  },
+  { flush: 'post' },
+)
 
-watch(expanded, async (value) => {
-  if (!value || !showEditor.value) return
-  await nextTick()
-  if (textareaRef.value) autoResize(textareaRef.value)
+onMounted(() => {
+  if (expanded.value && showEditor.value && textareaRef.value) {
+    autoResize(textareaRef.value)
+  }
 })
 
 function commitDraft() {
@@ -112,7 +116,7 @@ function toggleExpanded() {
 
 function autoResize(el: HTMLTextAreaElement) {
   el.style.height = 'auto'
-  el.style.height = `${Math.max(el.scrollHeight, 72)}px`
+  el.style.height = `${el.scrollHeight}px`
 }
 
 function onInput(e: Event) {
@@ -270,7 +274,7 @@ function formatTag(type: ContentFormat): string | null {
         class="body-textarea"
         :class="{ 'is-code': isCode }"
         :value="draft"
-        rows="3"
+        rows="1"
         placeholder="輸入任務內容…"
         @input="onInput"
         @blur="commitDraft"
@@ -406,7 +410,7 @@ function formatTag(type: ContentFormat): string | null {
   display: block;
   width: 100%;
   box-sizing: border-box;
-  min-height: 72px;
+  min-height: 0;
   padding: 8px 10px;
   border: 1px solid $border;
   border-radius: $radius-sm;
@@ -415,8 +419,9 @@ function formatTag(type: ContentFormat): string | null {
   font-size: 13px;
   line-height: 1.55;
   font-family: inherit;
-  resize: vertical;
-  overflow-y: hidden;
+  resize: none;
+  overflow: hidden;
+  field-sizing: content;
 
   &::placeholder {
     color: $text-muted;

@@ -87,11 +87,11 @@ export const NAV_FEATURES: NavFeature[] = [
 export const defaultNavFeatureVisibility: NavFeatureVisibility = {
   today: true,
   calendar: true,
-  'all-tasks': true,
-  'difficulty-notes': true,
+  'all-tasks': false,
+  'difficulty-notes': false,
   toolbox: true,
-  reflections: true,
-  stats: true,
+  reflections: false,
+  stats: false,
   settings: true,
 }
 

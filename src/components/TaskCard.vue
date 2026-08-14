@@ -451,30 +451,32 @@ async function onContextPaste() {
                 :model-value="task.labels"
                 @update:model-value="onLabelsChange"
               />
-              <div class="status-hours" @click.stop="onStatusHoursClick">
-                <span class="hours-label">時數</span>
-                <input
-                  ref="hoursInput"
-                  v-model="hoursDraft"
-                  type="text"
-                  inputmode="decimal"
-                  class="hours-input"
-                  placeholder="0"
-                  aria-label="狀態時數"
-                  @focus="onHoursFocus"
-                  @click="onHoursClick"
-                  @blur="commitHours"
-                  @keydown="onHoursKeydown"
-                />
-                <span class="hours-unit">h</span>
+              <div class="meta-end">
+                <div class="status-hours" @click.stop="onStatusHoursClick">
+                  <span class="hours-label">時數</span>
+                  <input
+                    ref="hoursInput"
+                    v-model="hoursDraft"
+                    type="text"
+                    inputmode="decimal"
+                    class="hours-input"
+                    placeholder="0"
+                    aria-label="狀態時數"
+                    @focus="onHoursFocus"
+                    @click="onHoursClick"
+                    @blur="commitHours"
+                    @keydown="onHoursKeydown"
+                  />
+                  <span class="hours-unit">h</span>
+                </div>
+                <span
+                  v-if="postponedDays > 0"
+                  class="postponed-tag"
+                  :title="postponedLabel"
+                >
+                  推延 {{ postponedDays }} 天
+                </span>
               </div>
-              <span
-                v-if="postponedDays > 0"
-                class="postponed-tag"
-                :title="postponedLabel"
-              >
-                推延 {{ postponedDays }} 天
-              </span>
             </div>
           </div>
         </template>
@@ -792,18 +794,13 @@ async function onContextPaste() {
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
-  max-width: 100%;
+  width: 100%;
 }
 
 .date-range {
   display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  padding: 4px 10px;
-  border-radius: $radius-sm;
-  background: $bg;
-  border: 1px solid $border;
+  align-items: baseline;
+  gap: 10px;
 }
 
 .date-part {
@@ -814,9 +811,16 @@ async function onContextPaste() {
 
 .date-value {
   font-size: 13px;
-  font-weight: 600;
-  color: $text;
+  font-weight: 500;
+  color: $text-muted;
   white-space: nowrap;
+}
+
+.meta-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
 }
 
 .status-hours {
