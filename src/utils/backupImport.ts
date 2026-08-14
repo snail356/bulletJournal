@@ -437,15 +437,22 @@ function parseTaskMarkdown(
   const id = generateId()
   const createdAt = parseFlexibleDateTime(meta['建立時間'])
   const updatedAt = parseFlexibleDateTime(meta['更新時間'])
-  const date = /^\d{4}-\d{2}-\d{2}$/.test(meta['日期'] ?? '')
-    ? meta['日期']
+  const rawStart = meta['開始日期'] ?? meta['日期'] ?? ''
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(rawStart)
+    ? rawStart
     : new Date().toISOString().slice(0, 10)
+  const endDateRaw = meta['結束日期']
+  const endDate =
+    endDateRaw && /^\d{4}-\d{2}-\d{2}$/.test(endDateRaw) && endDateRaw !== '—'
+      ? endDateRaw
+      : null
   const body = parseStoredContent(sections['內容'] ?? '')
   const taskPhotos = parseMdImages(sections['照片'] ?? '')
 
   return {
     id,
     date,
+    endDate,
     title,
     status: parseStatus(meta['狀態'], statusItems),
     statusHours: parseHours(meta['狀態時數']),

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Task } from '@/types'
 import { useTaskStore } from '@/stores/taskStore'
+import { getTaskDuration, normalizeEndDate } from '@/utils/date'
 
 const props = defineProps<{
   visible: boolean
@@ -18,7 +19,14 @@ const emit = defineEmits<{
 const store = useTaskStore()
 const title = ref('')
 const date = ref('')
+const endDate = ref('')
 const selectedLabels = ref<string[]>([])
+
+const duration = computed(() => {
+  const end = endDate.value || date.value
+  if (!date.value) return 1
+  return getTaskDuration({ date: date.value, endDate: end || null })
+})
 
 watch(
   () => props.visible,
@@ -27,15 +35,21 @@ watch(
     if (props.mode === 'edit' && props.task) {
       title.value = props.task.title
       date.value = props.task.date
+      endDate.value = props.task.endDate ?? ''
       selectedLabels.value = [...props.task.labels]
     } else {
       title.value = ''
       date.value = props.defaultDate ?? store.selectedDate
+      endDate.value = ''
       selectedLabels.value = []
     }
   },
   { immediate: true },
 )
+
+watch(date, (start) => {
+  if (endDate.value && endDate.value < start) endDate.value = ''
+})
 
 function toggleLabel(id: string) {
   const idx = selectedLabels.value.indexOf(id)
@@ -49,12 +63,14 @@ function save() {
     store.updateTask(props.task.id, {
       title: title.value.trim(),
       date: date.value,
+      endDate: normalizeEndDate(date.value, endDate.value || null),
       labels: [...selectedLabels.value],
     })
   } else {
     store.createTask({
       title: title.value.trim(),
       date: date.value,
+      endDate: normalizeEndDate(date.value, endDate.value || null),
       labels: [...selectedLabels.value],
     })
   }
@@ -72,10 +88,19 @@ function save() {
           任務標題
           <input v-model="title" type="text" placeholder="輸入任務標題..." @keyup.enter="save" />
         </label>
-        <label>
-          日期
-          <input v-model="date" type="date" />
-        </label>
+        <div class="date-row">
+          <label>
+            開始日期
+            <input v-model="date" type="date" />
+          </label>
+          <label>
+            結束日期
+            <input v-model="endDate" type="date" :min="date" />
+          </label>
+        </div>
+        <p class="duration-hint">
+          {{ endDate ? `共 ${duration} 天` : '未設定結束日期時為單日任務' }}
+        </p>
         <p v-if="mode === 'edit'" class="hint">狀態請點選任務卡片上的狀態標籤修改</p>
         <div v-if="store.labels.length" class="field">
           <span class="field-label">標籤</span>
@@ -139,6 +164,22 @@ function save() {
   padding: 8px 12px;
   background: $bg;
   border-radius: $radius-sm;
+}
+
+.date-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+
+  @media (max-width: $breakpoint-xs) {
+    grid-template-columns: 1fr;
+  }
+}
+
+.duration-hint {
+  font-size: 12px;
+  color: $text-muted;
+  margin-top: -8px;
 }
 
 label {

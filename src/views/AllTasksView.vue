@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import type { TaskStatus } from '@/types'
 import { useTaskStore } from '@/stores/taskStore'
 import AppIcon from '@/components/AppIcon.vue'
+import { formatDateRange, getTaskDuration } from '@/utils/date'
 
 const store = useTaskStore()
 const router = useRouter()
@@ -54,6 +55,7 @@ function goDetail(id: string) {
           <tr>
             <th>標題</th>
             <th>日期</th>
+            <th>天數</th>
             <th>狀態</th>
             <th>子任務</th>
             <th>完成</th>
@@ -67,7 +69,8 @@ function goDetail(id: string) {
             @click="goDetail(task.id)"
           >
             <td class="title">{{ task.title }}</td>
-            <td>{{ task.date }}</td>
+            <td>{{ formatDateRange(task) }}</td>
+            <td>{{ getTaskDuration(task) }}</td>
             <td>
               <span
                 class="status-tag"

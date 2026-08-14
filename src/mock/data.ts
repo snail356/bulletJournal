@@ -25,6 +25,7 @@ export const mockTasks: Task[] = [
   {
     id: 'task-1',
     date: today,
+    endDate: addDays(today, 2),
     title: '完成 Bullet Journal 首頁版面',
     status: 'in_progress',
     statusHours: 2.5,
@@ -88,6 +89,7 @@ export const mockTasks: Task[] = [
   {
     id: 'task-2',
     date: today,
+    endDate: null,
     title: '修正登入頁 RWD 問題',
     status: 'pending_fix',
     statusHours: 1.5,
@@ -118,6 +120,7 @@ export const mockTasks: Task[] = [
   {
     id: 'task-3',
     date: today,
+    endDate: null,
     title: '撰寫 API 文件',
     status: 'done',
     statusHours: 3,
@@ -136,6 +139,7 @@ export const mockTasks: Task[] = [
   {
     id: 'task-4',
     date: yesterday,
+    endDate: today,
     title: '設計稿審核回饋整理',
     status: 'waiting_pm',
     statusHours: null,
@@ -177,6 +181,7 @@ export const mockTasks: Task[] = [
   {
     id: 'task-5',
     date: addDays(today, -3),
+    endDate: null,
     title: '上週衝刺回顧',
     status: 'done',
     statusHours: 1,
@@ -199,6 +204,7 @@ export function createEmptyTask(date: string, title: string): Task {
   return {
     id: generateId(),
     date,
+    endDate: null,
     title,
     status: 'in_progress',
     statusHours: null,

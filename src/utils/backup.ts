@@ -287,6 +287,8 @@ function buildTaskMarkdown(
   const meta = [
     `| 欄位 | 內容 |`,
     `| --- | --- |`,
+    `| 開始日期 | ${escapeTableCell(task.date)} |`,
+    `| 結束日期 | ${escapeTableCell(task.endDate ?? '—')} |`,
     `| 日期 | ${escapeTableCell(task.date)} |`,
     `| 狀態 | ${escapeTableCell(statusName)} |`,
     `| 完成 | ${task.completed ? '是' : '否'} |`,

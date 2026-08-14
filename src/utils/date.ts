@@ -76,3 +76,82 @@ export function getCalendarGrid(year: number, month: number): (Date | null)[] {
   while (grid.length % 7 !== 0) grid.push(null)
   return grid
 }
+
+/** 正規化結束日期：未設定、等於開始日、或早於開始日時皆視為單日任務 */
+export function normalizeEndDate(
+  startDate: string,
+  endDate?: string | null,
+): string | null {
+  if (!endDate || endDate <= startDate) return null
+  return endDate
+}
+
+export function getTaskEndDate(task: {
+  date: string
+  endDate?: string | null
+}): string {
+  return normalizeEndDate(task.date, task.endDate) ?? task.date
+}
+
+/** Duration = End Date − Start Date + 1 */
+export function getTaskDuration(task: {
+  date: string
+  endDate?: string | null
+}): number {
+  return daysBetween(task.date, getTaskEndDate(task)) + 1
+}
+
+export function taskOverlapsDate(
+  task: { date: string; endDate?: string | null },
+  date: string,
+): boolean {
+  return task.date <= date && getTaskEndDate(task) >= date
+}
+
+export function taskOverlapsRange(
+  task: { date: string; endDate?: string | null },
+  rangeStart: string,
+  rangeEnd: string,
+): boolean {
+  return task.date <= rangeEnd && getTaskEndDate(task) >= rangeStart
+}
+
+export function formatDateRange(task: {
+  date: string
+  endDate?: string | null
+}): string {
+  const end = getTaskEndDate(task)
+  if (end === task.date) return task.date
+  return `${task.date} ～ ${end}`
+}
+
+export function startOfWeek(date: Date): Date {
+  const start = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  start.setDate(start.getDate() - start.getDay())
+  return start
+}
+
+export function getWeekDates(anchor: Date): Date[] {
+  const start = startOfWeek(anchor)
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(start)
+    d.setDate(start.getDate() + i)
+    return d
+  })
+}
+
+/** 月視圖固定 6 週，含前後月日期，方便跨週任務條連續顯示 */
+export function getFilledCalendarWeeks(year: number, month: number): Date[][] {
+  const start = startOfWeek(new Date(year, month, 1))
+  const weeks: Date[][] = []
+  for (let w = 0; w < 6; w++) {
+    const days: Date[] = []
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(start)
+      date.setDate(start.getDate() + w * 7 + d)
+      days.push(date)
+    }
+    weeks.push(days)
+  }
+  return weeks
+}

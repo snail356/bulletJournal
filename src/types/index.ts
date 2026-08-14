@@ -122,8 +122,10 @@ export interface GeminiUsageState {
 
 export interface Task {
   id: string
-  /** 計畫執行日期（scheduled date） */
+  /** 開始日期（Start Date）；亦為計畫執行日 */
   date: string
+  /** 結束日期（End Date）；未設定則為單日任務 */
+  endDate: string | null
   title: string
   status: TaskStatus
   /** 此狀態累計／估計時數 */

@@ -28,7 +28,13 @@ import type {
 import type { BackupSource } from "@/utils/backup";
 import { createAttachmentFromFile } from "@/utils/attachment";
 import { resolveContentType } from "@/utils/detectContentType";
-import { addDays, daysBetween, todayString } from "@/utils/date";
+import {
+  addDays,
+  daysBetween,
+  getTaskEndDate,
+  normalizeEndDate,
+  todayString,
+} from "@/utils/date";
 import { generateAiManagerAdvice as requestAiManagerAdvice } from "@/utils/gemini";
 import { generateId } from "@/utils/id";
 import {
@@ -90,6 +96,7 @@ function normalizeTask(task: Task & { carriedFromDate?: string }): Task {
   return {
     ...rest,
     migrationHistory,
+    endDate: normalizeEndDate(rest.date, task.endDate),
     statusHours: task.statusHours ?? null,
     difficultyNote: task.difficultyNote ?? "",
     bodyContent: task.bodyContent ?? "",
@@ -373,7 +380,12 @@ export const useTaskStore = defineStore("task", () => {
   function getTaskDatesWithActivity(): Set<string> {
     const set = new Set<string>();
     for (const task of tasks.value) {
-      set.add(task.date);
+      let cursor = task.date;
+      const end = getTaskEndDate(task);
+      while (cursor <= end) {
+        set.add(cursor);
+        cursor = addDays(cursor, 1);
+      }
       for (const record of task.migrationHistory) {
         set.add(record.fromDate);
       }
@@ -388,11 +400,14 @@ export const useTaskStore = defineStore("task", () => {
       migrationReviewState.value.keptTodayTaskIds[today] ?? [],
     );
     return tasks.value
-      .filter((t) => !t.completed && t.date < today && !kept.has(t.id))
+      .filter((t) => {
+        if (t.completed || kept.has(t.id)) return false;
+        return getTaskEndDate(t) < today;
+      })
       .map((task) => ({
         task,
-        overdueFrom: task.date,
-        daysOverdue: daysBetween(task.date, today),
+        overdueFrom: getTaskEndDate(task),
+        daysOverdue: daysBetween(getTaskEndDate(task), today),
       }))
       .sort((a, b) => a.overdueFrom.localeCompare(b.overdueFrom));
   }
@@ -688,6 +703,7 @@ export const useTaskStore = defineStore("task", () => {
 
   function rescheduleTask(task: Task, newDate: string) {
     if (task.date === newDate) return;
+    const delta = daysBetween(task.date, newDate);
     const record: MigrationRecord = {
       fromDate: task.date,
       toDate: newDate,
@@ -695,6 +711,9 @@ export const useTaskStore = defineStore("task", () => {
     };
     task.migrationHistory.push(record);
     task.date = newDate;
+    if (task.endDate) {
+      task.endDate = addDays(task.endDate, delta);
+    }
     touchTask(task);
   }
 
@@ -825,11 +844,13 @@ export const useTaskStore = defineStore("task", () => {
     title: string;
     status?: TaskStatus;
     labels?: string[];
+    endDate?: string | null;
   }): Task {
     const now = new Date().toISOString();
     const task: Task = {
       id: generateId(),
       date: payload.date,
+      endDate: normalizeEndDate(payload.date, payload.endDate),
       title: payload.title,
       status: payload.status ?? "in_progress",
       statusHours: null,
@@ -852,14 +873,23 @@ export const useTaskStore = defineStore("task", () => {
   function updateTask(id: string, payload: Partial<Omit<Task, "id">>) {
     const task = findTask(id);
     if (!task) return;
-    if (payload.date && payload.date !== task.date) {
-      rescheduleTask(task, payload.date);
-      const { date: _, ...rest } = payload;
-      Object.assign(task, rest);
-    } else {
-      Object.assign(task, payload);
+    const { date, endDate, ...rest } = payload;
+    if (date && date !== task.date) {
+      rescheduleTask(task, date);
+    }
+    Object.assign(task, rest);
+    if (endDate !== undefined) {
+      task.endDate = normalizeEndDate(task.date, endDate);
     }
     touchTask(task);
+  }
+
+  function setTaskDateRange(
+    taskId: string,
+    startDate: string,
+    endDate: string | null,
+  ) {
+    updateTask(taskId, { date: startDate, endDate });
   }
 
   function deleteTask(id: string) {
@@ -890,6 +920,11 @@ export const useTaskStore = defineStore("task", () => {
     const newId = generateId();
     copy.id = newId;
     copy.date = targetDate ?? source.date;
+    copy.endDate = source.endDate
+      ? targetDate && targetDate !== source.date
+        ? addDays(source.endDate, daysBetween(source.date, targetDate))
+        : source.endDate
+      : null;
     copy.migrationHistory = [];
     copy.completed = false;
     copy.createdAt = now;
@@ -1190,7 +1225,7 @@ export const useTaskStore = defineStore("task", () => {
 
   function catchUpUnfinishedTasksToToday(today: string = todayString()) {
     const unfinished = tasks.value.filter(
-      (t) => !t.completed && t.date < today,
+      (t) => !t.completed && getTaskEndDate(t) < today,
     );
     for (const task of unfinished) {
       rescheduleTask(task, today);
@@ -1655,6 +1690,7 @@ export const useTaskStore = defineStore("task", () => {
     todayProgress,
     createTask,
     updateTask,
+    setTaskDateRange,
     deleteTask,
     duplicateTask,
     moveTask,
