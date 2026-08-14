@@ -2,6 +2,8 @@
 
 Vue 3 + Vite + TypeScript 前端專案，用於每日工作任務追蹤。
 
+線上使用：https://snail356.github.io/bulletJournal/
+
 ## 技術棧
 
 - Vue 3 (Composition API)
