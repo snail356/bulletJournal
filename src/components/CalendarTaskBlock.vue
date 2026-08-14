@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Task } from '@/types'
-import AppIcon from '@/components/AppIcon.vue'
+import TaskAvatarFace from '@/components/TaskAvatarFace.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { formatShortDateRange, getTaskDuration } from '@/utils/date'
 import type { CalendarDragMode } from '@/composables/useCalendarDrag'
@@ -63,9 +63,7 @@ const cursor = computed(() => {
       @pointerdown.stop="emit('resizeStart', $event)"
       @click.stop
     />
-    <span v-if="avatar" class="avatar" aria-hidden="true">
-      <AppIcon :name="avatar.icon" size="xs" />
-    </span>
+    <TaskAvatarFace v-if="avatar" :avatar="avatar" size="xs" />
     <span class="title">{{ task.title }}</span>
     <span v-if="duration > 1" class="duration">{{ duration }}天</span>
     <button
@@ -132,14 +130,6 @@ const cursor = computed(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.avatar {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
 }
 
 .duration {

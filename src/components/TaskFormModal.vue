@@ -3,7 +3,7 @@ import { computed, ref, watch } from 'vue'
 import type { Task } from '@/types'
 import { useTaskStore } from '@/stores/taskStore'
 import { getTaskDuration, normalizeEndDate } from '@/utils/date'
-import AppIcon from '@/components/AppIcon.vue'
+import TaskAvatarFace from '@/components/TaskAvatarFace.vue'
 
 const props = defineProps<{
   visible: boolean
@@ -126,7 +126,7 @@ function save() {
               :class="{ active: avatarId === avatar.id }"
               @click="avatarId = avatar.id"
             >
-              <AppIcon :name="avatar.icon" size="xs" />
+              <TaskAvatarFace :avatar="avatar" size="sm" />
               {{ avatar.name }}
             </button>
           </div>

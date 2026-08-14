@@ -2,6 +2,7 @@ import { library } from "@fortawesome/fontawesome-svg-core";
 import {
   faArrowLeft,
   faArrowRight,
+  faArrowRotateLeft,
   faArrowUp,
   faBolt,
   faBookOpen,
@@ -41,6 +42,7 @@ import {
 library.add(
   faArrowLeft,
   faArrowRight,
+  faArrowRotateLeft,
   faArrowUp,
   faBolt,
   faBookOpen,
@@ -81,6 +83,7 @@ export const appIcons = {
   "arrow-left": faArrowLeft,
   "arrow-right": faArrowRight,
   "arrow-up": faArrowUp,
+  "rotate-left": faArrowRotateLeft,
   bolt: faBolt,
   book: faBookOpen,
   briefcase: faBriefcase,

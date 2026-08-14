@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useTaskStore } from '@/stores/taskStore'
-import AppIcon from './AppIcon.vue'
+import TaskAvatarFace from './TaskAvatarFace.vue'
 
 const props = defineProps<{
   modelValue: string | null
@@ -46,7 +46,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
       aria-haspopup="listbox"
       @click.stop="toggle"
     >
-      <AppIcon :name="current.icon" size="xs" />
+      <TaskAvatarFace :avatar="current" size="sm" />
     </button>
 
     <div v-if="open" class="menu" role="listbox">
@@ -58,9 +58,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
         :class="{ active: modelValue === avatar.id }"
         @click.stop="select(avatar.id)"
       >
-        <span class="option-icon">
-          <AppIcon :name="avatar.icon" size="xs" />
-        </span>
+        <TaskAvatarFace :avatar="avatar" size="sm" />
         {{ avatar.name }}
       </button>
       <button type="button" class="option clear" @click.stop="select(null)">
@@ -81,9 +79,8 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
 .trigger {
   width: 20px;
   height: 20px;
+  padding: 0;
   border-radius: 50%;
-  background: $primary-light;
-  color: $primary;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -137,17 +134,5 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
     border-radius: 0 0 6px 6px;
     padding-top: 8px;
   }
-}
-
-.option-icon {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: $primary-light;
-  color: $primary;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
 }
 </style>

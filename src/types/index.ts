@@ -120,11 +120,13 @@ export interface GeminiUsageState {
   lastError: string | null;
 }
 
-/** 任務頭像（設定頁預設 5 個，任務可選擇顯示） */
+/** 任務頭像（設定頁預設 5 個，可上傳圖片） */
 export interface TaskAvatar {
   id: string;
   name: string;
   icon: import("@/plugins/fontawesome").AppIconName;
+  /** 上傳的頭像圖；有值時優先於 icon 顯示 */
+  imageUrl: string | null;
 }
 
 export interface Task {

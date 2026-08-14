@@ -63,7 +63,9 @@ import {
 } from "@/utils/storage";
 import {
   DEFAULT_TASK_AVATARS,
+  fileToAvatarDataUrl,
   findTaskAvatar,
+  isDefaultTaskAvatar,
   normalizeTaskAvatars,
 } from "@/utils/taskAvatars";
 import {
@@ -1564,7 +1566,7 @@ export const useTaskStore = defineStore("task", () => {
 
   function updateTaskAvatar(
     id: string,
-    payload: Partial<Pick<TaskAvatar, "name" | "icon">>,
+    payload: Partial<Pick<TaskAvatar, "name" | "icon" | "imageUrl">>,
   ) {
     const avatar = taskAvatars.value.find((item) => item.id === id);
     if (!avatar) return;
@@ -1573,6 +1575,43 @@ export const useTaskStore = defineStore("task", () => {
     }
     if (payload.icon !== undefined) {
       avatar.icon = payload.icon;
+    }
+    if (payload.imageUrl !== undefined) {
+      avatar.imageUrl = payload.imageUrl;
+    }
+  }
+
+  async function setTaskAvatarImage(id: string, file: File) {
+    const avatar = taskAvatars.value.find((item) => item.id === id);
+    if (!avatar) return;
+    avatar.imageUrl = await fileToAvatarDataUrl(file);
+  }
+
+  function clearTaskAvatarImage(id: string) {
+    updateTaskAvatar(id, { imageUrl: null });
+  }
+
+  async function createUploadedTaskAvatar(file: File, name = ""): Promise<TaskAvatar> {
+    const imageUrl = await fileToAvatarDataUrl(file);
+    const fromName = file.name.replace(/\.[^.]+$/, "").trim();
+    const avatar: TaskAvatar = {
+      id: generateId(),
+      name: name.trim() || fromName || "自訂頭像",
+      icon: "star",
+      imageUrl,
+    };
+    taskAvatars.value = [...taskAvatars.value, avatar];
+    return avatar;
+  }
+
+  function deleteCustomTaskAvatar(id: string) {
+    if (isDefaultTaskAvatar(id)) {
+      clearTaskAvatarImage(id);
+      return;
+    }
+    taskAvatars.value = taskAvatars.value.filter((item) => item.id !== id);
+    for (const task of tasks.value) {
+      if (task.avatarId === id) task.avatarId = null;
     }
   }
 
@@ -1825,6 +1864,10 @@ export const useTaskStore = defineStore("task", () => {
     reorderToolboxItems,
     getTaskAvatar,
     updateTaskAvatar,
+    setTaskAvatarImage,
+    clearTaskAvatarImage,
+    createUploadedTaskAvatar,
+    deleteCustomTaskAvatar,
     mergeImportedBackup,
     clearAllData,
   };

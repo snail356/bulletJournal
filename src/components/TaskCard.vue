@@ -10,6 +10,7 @@ import type { ContextMenuItem } from './TaskContextMenu.vue'
 import TaskFormModal from './TaskFormModal.vue'
 import TaskStatusDropdown from './TaskStatusDropdown.vue'
 import TaskAvatarDropdown from './TaskAvatarDropdown.vue'
+import TaskAvatarFace from './TaskAvatarFace.vue'
 import TaskLabelsDropdown from './TaskLabelsDropdown.vue'
 import SearchableCombobox from './SearchableCombobox.vue'
 import QuickInputModal from './QuickInputModal.vue'
@@ -407,7 +408,7 @@ async function onContextPaste() {
           @update:model-value="store.updateTask(task.id, { avatarId: $event })"
         />
         <span v-else-if="avatar" class="task-avatar" :title="avatar.name">
-          <AppIcon :name="avatar.icon" size="xs" />
+          <TaskAvatarFace :avatar="avatar" size="sm" />
         </span>
         <h3 v-if="isMigrated" class="title">{{ task.title }}</h3>
         <InlineEditable
