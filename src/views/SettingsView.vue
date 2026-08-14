@@ -3,12 +3,19 @@ import { computed, ref } from 'vue'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { mockLabels, mockTasks } from '@/mock/data'
+import { downloadBackupZip } from '@/utils/backup'
+import { importBackupZip } from '@/utils/backupImport'
 import { TASKS_KEY, LABELS_KEY, SELECTED_DATE_KEY, saveToStorage } from '@/utils/storage'
 import { todayString } from '@/utils/date'
 import { getGeminiModel, hasGeminiApiKey } from '@/utils/gemini'
 
 const store = useTaskStore()
 const message = ref('')
+const messageError = ref(false)
+const exporting = ref(false)
+const importing = ref(false)
+const importInput = ref<HTMLInputElement | null>(null)
+const busy = computed(() => exporting.value || importing.value)
 const aiPromptDraft = ref(store.aiManagerPrompt)
 const aiPromptMessage = ref('')
 const confirmVisible = ref(false)
@@ -56,8 +63,7 @@ function resetMockData() {
       saveToStorage(TASKS_KEY, store.tasks)
       saveToStorage(LABELS_KEY, store.labels)
       saveToStorage(SELECTED_DATE_KEY, store.selectedDate)
-      message.value = '已重置為 mock 資料'
-      setTimeout(() => (message.value = ''), 3000)
+      showFeedback('已重置為 mock 資料')
     },
   )
 }
@@ -68,11 +74,92 @@ function clearAllData() {
     '確定要清除所有任務、標籤與偏好設定？此操作無法復原，且不會還原為示範資料。',
     () => {
       store.clearAllData()
-      message.value = '已清除所有資料'
-      setTimeout(() => (message.value = ''), 3000)
+      showFeedback('已清除所有資料')
     },
     { danger: true, confirmLabel: '全部清除' },
   )
+}
+
+function showFeedback(text: string, error = false) {
+  message.value = text
+  messageError.value = error
+  setTimeout(() => {
+    if (message.value === text) {
+      message.value = ''
+      messageError.value = false
+    }
+  }, error ? 5000 : 3000)
+}
+
+async function backupData() {
+  if (busy.value) return
+  exporting.value = true
+  message.value = ''
+  messageError.value = false
+  try {
+    const result = await downloadBackupZip({
+      tasks: store.tasks,
+      labels: store.labels,
+      statusItems: store.statusItems,
+      toolboxLists: store.toolboxLists,
+    })
+    showFeedback(
+      `已下載 ${result.fileName}（任務 ${result.taskCount}、標籤 ${result.labelCount}、清單 ${result.toolboxCount}、照片 ${result.photoCount}）`,
+    )
+  } catch (err) {
+    const reason = err instanceof Error && err.message ? err.message : '請稍後再試'
+    showFeedback(`備份失敗：${reason}`, true)
+  } finally {
+    exporting.value = false
+  }
+}
+
+function chooseImportFile() {
+  if (busy.value) return
+  importInput.value?.click()
+}
+
+function onImportFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  openConfirm(
+    '匯入備份',
+    `將匯入「${file.name}」中尚未存在的任務、標籤、工具箱與思考清單。已存在的項目會跳過，不會覆蓋或重複新增。`,
+    () => {
+      void runImport(file)
+    },
+    { confirmLabel: '確定匯入' },
+  )
+}
+
+async function runImport(file: File) {
+  if (busy.value) return
+  importing.value = true
+  message.value = ''
+  messageError.value = false
+  try {
+    const source = await importBackupZip(file)
+    const summary = store.mergeImportedBackup(source)
+    const added =
+      summary.tasksAdded +
+      summary.labelsAdded +
+      summary.toolboxListsAdded +
+      summary.toolboxItemsAdded
+    if (!added) {
+      showFeedback('沒有新增資料，備份中的項目都已存在')
+    } else {
+      showFeedback(
+        `已匯入：任務 ${summary.tasksAdded}（跳過 ${summary.tasksSkipped}）、標籤 ${summary.labelsAdded}（跳過 ${summary.labelsSkipped}）、清單 ${summary.toolboxListsAdded}（跳過 ${summary.toolboxListsSkipped}）`,
+      )
+    }
+  } catch (err) {
+    const reason = err instanceof Error && err.message ? err.message : '請稍後再試'
+    showFeedback(`匯入失敗：${reason}`, true)
+  } finally {
+    importing.value = false
+  }
 }
 
 function saveAiManagerPrompt() {
@@ -94,16 +181,57 @@ function saveAiManagerPrompt() {
 
     <div class="settings-card">
       <h2>資料管理</h2>
-      <p class="desc">所有資料儲存於瀏覽器 localStorage，無需後端。</p>
+      <p class="desc">
+        所有資料儲存於瀏覽器 localStorage，無需後端。可備份或匯入任務、標籤、工具箱與思考清單。
+      </p>
       <div class="actions">
-        <button type="button" class="btn-secondary" @click="resetMockData">
+        <button
+          type="button"
+          class="btn-primary"
+          :disabled="busy"
+          @click="backupData"
+        >
+          {{ exporting ? '備份中…' : '備份資料' }}
+        </button>
+        <button
+          type="button"
+          class="btn-secondary"
+          :disabled="busy"
+          @click="chooseImportFile"
+        >
+          {{ importing ? '匯入中…' : '匯入備份' }}
+        </button>
+        <button type="button" class="btn-secondary" :disabled="busy" @click="resetMockData">
           重置為 Mock 資料
         </button>
-        <button type="button" class="btn-danger" @click="clearAllData">
+        <button type="button" class="btn-danger" :disabled="busy" @click="clearAllData">
           清除所有資料
         </button>
       </div>
-      <p v-if="message" class="feedback">{{ message }}</p>
+      <input
+        ref="importInput"
+        class="file-input"
+        type="file"
+        accept=".zip,application/zip"
+        @change="onImportFileChange"
+      />
+      <p v-if="message" class="feedback" :class="{ error: messageError }">{{ message }}</p>
+      <div class="usage">
+        <h3>使用說明</h3>
+        <ul>
+          <li>
+            <strong>備份資料</strong>：下載 ZIP。內含可閱讀的 Markdown、外置 WebP 照片，以及供還原用的
+            <code>data.json</code>。
+          </li>
+          <li>
+            <strong>匯入備份</strong>：選擇先前下載的 ZIP。只會新增目前沒有的項目，已存在的不會覆蓋、也不會重複。
+          </li>
+          <li>
+            判斷已存在：任務比對「同一筆 id」或「同一天相同標題」；標籤比對名稱；思考清單比對標題，清單內思考點比對內容。
+          </li>
+          <li>回顧日誌、困難點紀錄與狀態標籤不會被這份備份匯入更動。</li>
+        </ul>
+      </div>
     </div>
 
     <div class="settings-card">
@@ -269,8 +397,13 @@ function saveAiManagerPrompt() {
   color: white;
   font-weight: 500;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: $primary-dark;
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
   }
 }
 
@@ -280,9 +413,14 @@ function saveAiManagerPrompt() {
   border-radius: $radius-sm;
   color: $text;
 
-  &:hover {
+  &:hover:not(:disabled) {
     border-color: $primary;
     color: $primary;
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
   }
 }
 
@@ -293,8 +431,51 @@ function saveAiManagerPrompt() {
   border-radius: $radius-sm;
   font-weight: 500;
 
-  &:hover {
+  &:hover:not(:disabled) {
     background: #fee2e2;
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
+}
+
+.file-input {
+  display: none;
+}
+
+.usage {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid $border;
+
+  h3 {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  ul {
+    color: $text-muted;
+    font-size: 13px;
+    line-height: 1.6;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  strong {
+    color: $text;
+    font-weight: 600;
+  }
+
+  code {
+    font-size: 12px;
+    background: $bg;
+    padding: 1px 6px;
+    border-radius: 4px;
   }
 }
 
@@ -302,6 +483,10 @@ function saveAiManagerPrompt() {
   margin-top: 12px;
   color: #22c55e;
   font-size: 13px;
+
+  &.error {
+    color: #ef4444;
+  }
 }
 
 .info {

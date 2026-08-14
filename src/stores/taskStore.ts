@@ -25,6 +25,7 @@ import type {
   ToolboxItem,
   ToolboxList,
 } from "@/types";
+import type { BackupSource } from "@/utils/backup";
 import { createAttachmentFromFile } from "@/utils/attachment";
 import { resolveContentType } from "@/utils/detectContentType";
 import { addDays, daysBetween, todayString } from "@/utils/date";
@@ -1457,6 +1458,123 @@ export const useTaskStore = defineStore("task", () => {
     list.updatedAt = new Date().toISOString();
   }
 
+  function taskDedupeKey(task: Task): string {
+    return `${task.date}::${task.title.trim()}`;
+  }
+
+  function mergeImportedBackup(source: BackupSource) {
+    const summary = {
+      labelsAdded: 0,
+      labelsSkipped: 0,
+      tasksAdded: 0,
+      tasksSkipped: 0,
+      toolboxListsAdded: 0,
+      toolboxListsSkipped: 0,
+      toolboxItemsAdded: 0,
+      toolboxItemsSkipped: 0,
+    };
+
+    const labelIdMap = new Map<string, string>();
+    const labelsById = new Map(labels.value.map((label) => [label.id, label]));
+    const labelsByName = new Map(
+      labels.value.map((label) => [label.name.trim(), label]),
+    );
+
+    for (const label of source.labels) {
+      const name = label.name.trim();
+      if (!name) {
+        summary.labelsSkipped += 1;
+        continue;
+      }
+      const existing = labelsById.get(label.id) ?? labelsByName.get(name);
+      if (existing) {
+        labelIdMap.set(label.id, existing.id);
+        summary.labelsSkipped += 1;
+        continue;
+      }
+      const next: Label = { ...label, name };
+      labels.value.push(next);
+      labelsById.set(next.id, next);
+      labelsByName.set(name, next);
+      labelIdMap.set(label.id, next.id);
+      summary.labelsAdded += 1;
+    }
+
+    const taskIds = new Set(tasks.value.map((task) => task.id));
+    const taskKeys = new Set(tasks.value.map(taskDedupeKey));
+    const addedTasks: Task[] = [];
+
+    for (const incoming of source.tasks.map(normalizeTask)) {
+      const key = taskDedupeKey(incoming);
+      if (taskIds.has(incoming.id) || taskKeys.has(key)) {
+        summary.tasksSkipped += 1;
+        continue;
+      }
+      const mappedLabels = [
+        ...new Set(
+          incoming.labels
+            .map((id) => labelIdMap.get(id) ?? (labelsById.has(id) ? id : ""))
+            .filter(Boolean),
+        ),
+      ];
+      addedTasks.push({ ...incoming, labels: mappedLabels });
+      taskIds.add(incoming.id);
+      taskKeys.add(key);
+      summary.tasksAdded += 1;
+    }
+
+    if (addedTasks.length) {
+      tasks.value = [...addedTasks, ...tasks.value];
+    }
+
+    const listsById = new Map(
+      toolboxLists.value.map((list) => [list.id, list]),
+    );
+    const listsByTitle = new Map(
+      toolboxLists.value.map((list) => [list.title.trim(), list]),
+    );
+    const addedLists: ToolboxList[] = [];
+
+    for (const incoming of source.toolboxLists.map(normalizeToolboxList)) {
+      const title = incoming.title.trim() || "未命名清單";
+      const existing = listsById.get(incoming.id) ?? listsByTitle.get(title);
+      if (existing) {
+        summary.toolboxListsSkipped += 1;
+        const itemIds = new Set(existing.items.map((item) => item.id));
+        const itemContents = new Set(
+          existing.items.map((item) => item.content.trim()).filter(Boolean),
+        );
+        let changed = false;
+        for (const item of incoming.items) {
+          const content = item.content.trim();
+          if (itemIds.has(item.id) || (content && itemContents.has(content))) {
+            summary.toolboxItemsSkipped += 1;
+            continue;
+          }
+          existing.items.push(normalizeToolboxItem(item));
+          itemIds.add(item.id);
+          if (content) itemContents.add(content);
+          summary.toolboxItemsAdded += 1;
+          changed = true;
+        }
+        if (changed) existing.updatedAt = new Date().toISOString();
+        continue;
+      }
+
+      const next = { ...incoming, title };
+      addedLists.push(next);
+      listsById.set(next.id, next);
+      listsByTitle.set(title, next);
+      summary.toolboxListsAdded += 1;
+    }
+
+    if (addedLists.length) {
+      toolboxLists.value = [...addedLists, ...toolboxLists.value];
+    }
+
+    return summary;
+  }
+
   function clearAllData() {
     tasks.value = [];
     labels.value = [];
@@ -1577,6 +1695,7 @@ export const useTaskStore = defineStore("task", () => {
     updateToolboxItem,
     deleteToolboxItem,
     reorderToolboxItems,
+    mergeImportedBackup,
     clearAllData,
   };
 });
