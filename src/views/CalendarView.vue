@@ -86,6 +86,7 @@ const {
   dragMode,
   preview,
   previewByTask,
+  pointerPos,
   consumeClickSuppression,
 } = useCalendarDrag({
   hitTestDate,
@@ -124,10 +125,15 @@ function taskColors(task: Task) {
   return { color: status.color, bgColor: status.bgColor }
 }
 
+const laneRowSize = computed(() => (mode.value === 'week' ? 28 : 22))
+
 function weekMinHeight(index: number) {
   const lanes = layouts.value[index]?.laneCount ?? 1
-  const base = mode.value === 'week' ? 420 : 112
-  return Math.max(base, 36 + lanes * 25)
+  return Math.max(112, 36 + lanes * 25)
+}
+
+function shouldShowWeekMonth(date: Date, days: Date[]) {
+  return date.getDate() === 1 || formatDate(date) === formatDate(days[0])
 }
 
 function goPrev() {
@@ -203,6 +209,28 @@ const previewHint = computed(() => {
     : preview.value.date
   return `${modeLabel} · ${range} · ${duration} 天`
 })
+
+const HINT_GAP = 8
+const HINT_MAX_WIDTH = 320
+const HINT_HEIGHT = 36
+
+const hintStyle = computed(() => {
+  const pos = pointerPos.value
+  if (!pos) return undefined
+  const x = Math.min(
+    window.innerWidth - 8,
+    Math.max(HINT_MAX_WIDTH + 8, pos.x - HINT_GAP),
+  )
+  const y = Math.min(
+    window.innerHeight - 8,
+    Math.max(HINT_HEIGHT + 8, pos.y - HINT_GAP),
+  )
+  return {
+    left: `${x}px`,
+    top: `${y}px`,
+    transform: 'translate(-100%, -100%)',
+  }
+})
 </script>
 
 <template>
@@ -211,6 +239,7 @@ const previewHint = computed(() => {
     :class="{
       dragging: Boolean(draggingTaskId),
       resizing: dragMode === 'resize-start' || dragMode === 'resize-end',
+      'week-mode': mode === 'week',
     }"
   >
     <header class="page-header">
@@ -250,10 +279,18 @@ const previewHint = computed(() => {
       </div>
     </header>
 
-    <p v-if="previewHint" class="drag-hint">{{ previewHint }}</p>
+    <Teleport to="body">
+      <p
+        v-if="previewHint && hintStyle"
+        class="calendar-drag-hint"
+        :style="hintStyle"
+      >
+        {{ previewHint }}
+      </p>
+    </Teleport>
 
     <div class="board" :class="mode">
-      <div class="weekday-row">
+      <div v-if="mode === 'month'" class="weekday-row">
         <span v-for="day in weekdays" :key="day">{{ day }}</span>
       </div>
 
@@ -262,38 +299,49 @@ const previewHint = computed(() => {
         :key="weekIndex"
         :ref="(el) => setWeekEl(weekIndex, el)"
         class="week"
-        :style="{ minHeight: `${weekMinHeight(weekIndex)}px` }"
+        :style="mode === 'month' ? { minHeight: `${weekMinHeight(weekIndex)}px` } : undefined"
       >
-        <div
-          v-for="date in days"
-          :key="formatDate(date)"
-          class="day-cell"
-          :data-date="formatDate(date)"
-          :class="{
-            today: formatDate(date) === today,
-            selected: formatDate(date) === store.selectedDate,
-            outside: mode === 'month' && isOutsideMonth(date),
-          }"
-          @click="selectDay(date)"
-          @dblclick="openCreate(date)"
-        >
-          <div class="day-head">
-            <span class="day-num">{{ date.getDate() }}</span>
-            <button
-              type="button"
-              class="add-day"
-              :aria-label="`在 ${formatDate(date)} 新增任務`"
-              @click.stop="openCreate(date)"
-            >
-              +
-            </button>
+        <div class="week-days">
+          <div
+            v-for="date in days"
+            :key="formatDate(date)"
+            class="day-cell"
+            :data-date="formatDate(date)"
+            :class="{
+              today: formatDate(date) === today,
+              selected: formatDate(date) === store.selectedDate,
+              outside: mode === 'month' && isOutsideMonth(date),
+            }"
+            @click="selectDay(date)"
+            @dblclick="openCreate(date)"
+          >
+            <div class="day-head">
+              <div class="day-label">
+                <span v-if="mode === 'week'" class="day-weekday">{{ weekdays[date.getDay()] }}</span>
+                <span class="day-num">{{ date.getDate() }}</span>
+                <span
+                  v-if="mode === 'week' && shouldShowWeekMonth(date, days)"
+                  class="day-month"
+                >
+                  {{ date.getMonth() + 1 }}月
+                </span>
+              </div>
+              <button
+                type="button"
+                class="add-day"
+                :aria-label="`在 ${formatDate(date)} 新增任務`"
+                @click.stop="openCreate(date)"
+              >
+                +
+              </button>
+            </div>
           </div>
         </div>
 
         <div
           class="week-lanes"
           :style="{
-            gridTemplateRows: `repeat(${layouts[weekIndex].laneCount}, 22px)`,
+            gridTemplateRows: `repeat(${layouts[weekIndex].laneCount}, ${laneRowSize}px)`,
           }"
         >
           <CalendarTaskBlock
@@ -335,7 +383,13 @@ const previewHint = computed(() => {
 .calendar-view {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 64px);
+  min-height: 100%;
+
+  &.week-mode {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
 
   &.dragging {
     cursor: grabbing;
@@ -353,6 +407,7 @@ const previewHint = computed(() => {
   gap: 16px;
   margin-bottom: 16px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 
   h1 {
     font-size: 24px;
@@ -418,7 +473,7 @@ const previewHint = computed(() => {
 }
 
 .period-label {
-  min-width: 160px;
+  min-width: 200px;
   text-align: center;
   font-weight: 700;
   font-size: 15px;
@@ -438,14 +493,8 @@ const previewHint = computed(() => {
   }
 }
 
-.drag-hint {
-  margin-bottom: 10px;
-  font-size: 12px;
-  font-weight: 600;
-  color: $primary;
-}
-
 .board {
+  position: relative;
   background: $surface;
   border-radius: $radius;
   box-shadow: $shadow;
@@ -453,6 +502,7 @@ const previewHint = computed(() => {
   display: flex;
   flex-direction: column;
   flex: 1;
+  min-height: 0;
 }
 
 .weekday-row {
@@ -472,8 +522,6 @@ const previewHint = computed(() => {
 
 .week {
   position: relative;
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
   min-height: 112px;
   border-bottom: 1px solid $border;
 
@@ -482,9 +530,28 @@ const previewHint = computed(() => {
   }
 }
 
+.week-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  min-height: inherit;
+  height: 100%;
+}
+
+.board.week {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
 .board.week .week {
-  min-height: 420px;
   flex: 1;
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+}
+
+.board.week .week-days {
+  flex: 1;
+  min-height: 0;
 }
 
 .day-cell {
@@ -521,11 +588,46 @@ const previewHint = computed(() => {
   }
 }
 
+.board.week .day-cell {
+  padding: 8px 8px 12px;
+  min-width: 80px;
+
+  &.today {
+    background: color-mix(in srgb, $primary 6%, $surface);
+  }
+
+  &.selected:not(.today) {
+    background: color-mix(in srgb, $primary 4%, $surface);
+  }
+}
+
 .day-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 4px;
+}
+
+.day-label {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
+.day-weekday {
+  width: 100%;
+  font-size: 12px;
+  font-weight: 600;
+  color: $text-muted;
+  line-height: 1.2;
+}
+
+.day-month {
+  font-size: 11px;
+  font-weight: 600;
+  color: $text-muted;
 }
 
 .day-num {
@@ -563,15 +665,23 @@ const previewHint = computed(() => {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   grid-auto-rows: 22px;
-  gap: 3px 4px;
-  padding: 0 4px;
+  gap: 3px 0;
+  padding: 0;
   pointer-events: none;
   align-content: start;
+  overflow: hidden;
 
   > * {
     pointer-events: auto;
     min-width: 0;
   }
+}
+
+.board.week .week-lanes {
+  top: 52px;
+  grid-auto-rows: 28px;
+  gap: 4px 0;
+  overflow-y: auto;
 }
 
 @media (max-width: $breakpoint-sm) {
@@ -593,11 +703,33 @@ const previewHint = computed(() => {
   }
 
   .board.week .week {
-    min-height: 280px;
+    min-height: min(70vh, 560px);
   }
 
   .add-day {
     opacity: 1;
   }
+}
+</style>
+
+<style lang="scss">
+@use '@/styles/variables' as *;
+
+.calendar-drag-hint {
+  position: fixed;
+  z-index: 3000;
+  margin: 0;
+  padding: 6px 12px;
+  max-width: 320px;
+  border: 1px solid $border;
+  border-radius: 999px;
+  background: $surface;
+  box-shadow: $shadow-lg;
+  color: $primary;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+  pointer-events: none;
 }
 </style>

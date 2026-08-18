@@ -86,7 +86,8 @@ const cursor = computed(() => {
   align-items: center;
   gap: 6px;
   min-width: 0;
-  height: 22px;
+  height: 100%;
+  margin: 0 4px;
   padding: 0 10px;
   border-radius: 6px;
   background: var(--task-bg);
@@ -113,12 +114,14 @@ const cursor = computed(() => {
   }
 
   &.continues-before {
+    margin-left: 0;
     border-top-left-radius: 0;
     border-bottom-left-radius: 0;
     padding-left: 8px;
   }
 
   &.continues-after {
+    margin-right: 0;
     border-top-right-radius: 0;
     border-bottom-right-radius: 0;
     padding-right: 8px;

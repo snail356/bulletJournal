@@ -61,6 +61,7 @@ export function useCalendarDrag(options: {
 }) {
   const session = ref<DragSession | null>(null)
   const preview = ref<CalendarDragPreview | null>(null)
+  const pointerPos = ref<{ x: number; y: number } | null>(null)
   const ignoreNextClick = ref(false)
 
   const draggingTaskId = computed(() => session.value?.taskId ?? null)
@@ -98,12 +99,15 @@ export function useCalendarDrag(options: {
       date: payload.originStart,
       endDate: payload.originEndStored,
     }
+    pointerPos.value = { x: event.clientX, y: event.clientY }
     document.body.style.userSelect = 'none'
   }
 
   function onPointerMove(event: PointerEvent) {
     const current = session.value
     if (!current || event.pointerId !== current.pointerId) return
+
+    pointerPos.value = { x: event.clientX, y: event.clientY }
 
     if (!current.moved) {
       const dx = event.clientX - current.startX
@@ -124,6 +128,7 @@ export function useCalendarDrag(options: {
     if (current?.moved) ignoreNextClick.value = true
     session.value = null
     preview.value = null
+    pointerPos.value = null
     document.body.style.userSelect = ''
     if (
       commit &&
@@ -177,6 +182,7 @@ export function useCalendarDrag(options: {
     dragMode,
     preview,
     previewByTask,
+    pointerPos,
     consumeClickSuppression,
   }
 }

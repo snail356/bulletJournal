@@ -67,15 +67,18 @@ onUnmounted(() => {
 
 .layout {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   padding: 32px 40px;
   overflow-y: auto;
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: $breakpoint-md) {
@@ -85,7 +88,6 @@ onUnmounted(() => {
 
   .main {
     padding: 20px 16px;
-    min-height: auto;
   }
 }
 
