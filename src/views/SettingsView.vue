@@ -6,6 +6,7 @@ import AppSwitch from '@/components/AppSwitch.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppTabs, { type AppTabItem } from '@/components/AppTabs.vue'
 import LabelsManager from '@/components/LabelsManager.vue'
+import SidebarCarouselManager from '@/components/SidebarCarouselManager.vue'
 import TaskAvatarsManager from '@/components/TaskAvatarsManager.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { mockLabels, mockTasks } from '@/mock/data'
@@ -14,9 +15,15 @@ import { importBackupZip } from '@/utils/backupImport'
 import { TASKS_KEY, LABELS_KEY, SELECTED_DATE_KEY, saveToStorage } from '@/utils/storage'
 import { todayString } from '@/utils/date'
 import { getGeminiModel, hasGeminiApiKey } from '@/utils/gemini'
-import { NAV_FEATURES, type NavFeatureId } from '@/utils/navFeatures'
+import { useSimpleReorderDrag } from '@/composables/useReorderDrag'
+import { type NavFeatureId } from '@/utils/navFeatures'
 
 const store = useTaskStore()
+const { draggingId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd } =
+  useSimpleReorderDrag(
+    () => store.orderedNavFeatures,
+    (fromId, toId) => store.reorderNavFeatures(fromId, toId),
+  )
 const message = ref('')
 const messageError = ref(false)
 const exporting = ref(false)
@@ -187,6 +194,7 @@ const settingsTabs: AppTabItem[] = [
   { id: 'features', label: '功能頁面', icon: 'list-check' },
   { id: 'labels', label: '標籤管理', icon: 'tags' },
   { id: 'avatars', label: '任務頭像', icon: 'user' },
+  { id: 'carousel', label: '側邊圖片', icon: 'image' },
   { id: 'data', label: '資料管理', icon: 'copy' },
   { id: 'ai', label: 'AI 設定', icon: 'file-lines' },
   { id: 'about', label: '關於', icon: 'book' },
@@ -231,10 +239,29 @@ watch(
         <div class="settings-card">
           <h2>功能頁面</h2>
           <p class="desc">
-            選擇左側選單要顯示的功能。關閉後該頁面不會出現在選單中，直接開啟連結也會改到仍開啟的頁面。設定無法關閉，以便隨時再調整。
+            選擇左側選單要顯示的功能，拖曳左側把手可調整選單順序。關閉後該頁面不會出現在選單中，直接開啟連結也會改到仍開啟的頁面。設定無法關閉，以便隨時再調整。
           </p>
           <ul class="feature-list">
-            <li v-for="feature in NAV_FEATURES" :key="feature.id" class="feature-row">
+            <li
+              v-for="feature in store.orderedNavFeatures"
+              :key="feature.id"
+              class="feature-row"
+              :class="{
+                dragging: draggingId === feature.id,
+                'drag-over': dragOverId === feature.id,
+              }"
+              @dragover="onDragOver($event, feature.id)"
+              @drop="onDrop($event, feature.id)"
+            >
+              <span
+                class="drag-handle"
+                draggable="true"
+                aria-label="拖曳排序"
+                @dragstart="onDragStart($event, feature.id)"
+                @dragend="onDragEnd"
+              >
+                <AppIcon name="grip-vertical" />
+              </span>
               <span class="feature-icon">
                 <AppIcon :name="feature.icon" />
               </span>
@@ -262,6 +289,13 @@ watch(
         <div class="settings-card">
           <h2>任務頭像</h2>
           <TaskAvatarsManager />
+        </div>
+      </template>
+
+      <template #carousel>
+        <div class="settings-card">
+          <h2>側邊圖片輪播</h2>
+          <SidebarCarouselManager />
         </div>
       </template>
 
@@ -605,9 +639,35 @@ watch(
   gap: 12px;
   padding: 10px 8px;
   border-radius: $radius-sm;
+  transition: opacity 0.15s, box-shadow 0.15s;
 
   &:hover {
     background: $bg;
+  }
+
+  &.dragging {
+    opacity: 0.45;
+  }
+
+  &.drag-over {
+    box-shadow: inset 0 -2px 0 $primary;
+  }
+}
+
+.drag-handle {
+  color: $text-muted;
+  font-size: 14px;
+  cursor: grab;
+  opacity: 0.4;
+  line-height: 1;
+  flex-shrink: 0;
+
+  &:hover {
+    opacity: 0.8;
+  }
+
+  &:active {
+    cursor: grabbing;
   }
 }
 

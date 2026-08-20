@@ -191,6 +191,23 @@ export interface ToolboxItem {
   updatedAt: string;
 }
 
+export type SidebarCarouselMode = "daily" | "interval";
+
+export interface SidebarCarouselImage {
+  id: string;
+  fileName: string;
+  imageUrl: string;
+  createdAt: string;
+}
+
+export interface SidebarCarouselState {
+  enabled: boolean;
+  mode: SidebarCarouselMode;
+  /** 間隔輪播時，幾小時換下一張 */
+  intervalHours: number;
+  images: SidebarCarouselImage[];
+}
+
 /** 工具箱與思考清單（遇到方向決策時可快速對照） */
 export interface ToolboxList {
   id: string;

@@ -2,17 +2,17 @@
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import MiniCalendar from './MiniCalendar.vue'
+import SidebarCarousel from './SidebarCarousel.vue'
 import TodayProgress from './TodayProgress.vue'
 import AppIcon from './AppIcon.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { todayString } from '@/utils/date'
-import { NAV_FEATURES } from '@/utils/navFeatures'
 
 const route = useRoute()
 const store = useTaskStore()
 
 const navItems = computed(() =>
-  NAV_FEATURES.filter(
+  store.orderedNavFeatures.filter(
     (item) => item.showInSidebar !== false && store.isNavFeatureEnabled(item.id),
   ),
 )
@@ -75,6 +75,7 @@ function openMigrationReview() {
     </nav>
 
     <div class="sidebar-widgets">
+      <SidebarCarousel v-if="store.sidebarCarousel.enabled" />
       <MiniCalendar />
       <TodayProgress
         v-if="store.isNavFeatureEnabled('today')"

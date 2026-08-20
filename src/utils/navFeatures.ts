@@ -104,3 +104,31 @@ export function normalizeNavFeatureVisibility(
     settings: true,
   }
 }
+
+export const defaultNavFeatureOrder: NavFeatureId[] = NAV_FEATURES.map((feature) => feature.id)
+
+export function normalizeNavFeatureOrder(raw: unknown): NavFeatureId[] {
+  const known = new Set<NavFeatureId>(NAV_FEATURES.map((feature) => feature.id))
+  const ordered: NavFeatureId[] = []
+
+  if (Array.isArray(raw)) {
+    for (const id of raw) {
+      if (typeof id !== 'string' || !known.has(id as NavFeatureId)) continue
+      const featureId = id as NavFeatureId
+      if (!ordered.includes(featureId)) ordered.push(featureId)
+    }
+  }
+
+  for (const feature of NAV_FEATURES) {
+    if (!ordered.includes(feature.id)) ordered.push(feature.id)
+  }
+
+  return ordered
+}
+
+export function getOrderedNavFeatures(order: NavFeatureId[]): NavFeature[] {
+  const byId = new Map(NAV_FEATURES.map((feature) => [feature.id, feature]))
+  return order
+    .map((id) => byId.get(id))
+    .filter((feature): feature is NavFeature => Boolean(feature))
+}

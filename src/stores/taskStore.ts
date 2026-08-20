@@ -15,6 +15,9 @@ import type {
   MigrationReviewState,
   Note,
   ReflectionPromptState,
+  SidebarCarouselImage,
+  SidebarCarouselMode,
+  SidebarCarouselState,
   StatusItem,
   SubTask,
   Task,
@@ -48,8 +51,10 @@ import {
   LABELS_KEY,
   MIGRATION_REVIEW_KEY,
   NAV_FEATURES_KEY,
+  NAV_FEATURE_ORDER_KEY,
   REFLECTION_PROMPT_KEY,
   SELECTED_DATE_KEY,
+  SIDEBAR_CAROUSEL_KEY,
   STATUS_ITEMS_KEY,
   TASK_AVATARS_KEY,
   TASKS_KEY,
@@ -69,13 +74,23 @@ import {
   normalizeTaskAvatars,
 } from "@/utils/taskAvatars";
 import {
+  clampCarouselIntervalHours,
+  defaultSidebarCarouselState,
+  fileToCarouselDataUrl,
+  normalizeSidebarCarouselState,
+  SIDEBAR_CAROUSEL_MAX_IMAGES,
+} from "@/utils/sidebarCarousel";
+import {
   createDefaultStatusItems,
   getStatusBgForColor,
   normalizeStatusItems,
 } from "@/utils/status";
 import {
   NAV_FEATURES,
+  defaultNavFeatureOrder,
   defaultNavFeatureVisibility,
+  getOrderedNavFeatures,
+  normalizeNavFeatureOrder,
   normalizeNavFeatureVisibility,
   type NavFeatureId,
   type NavFeatureVisibility,
@@ -299,9 +314,22 @@ export const useTaskStore = defineStore("task", () => {
       ),
     ),
   );
+  const navFeatureOrder = ref<NavFeatureId[]>(
+    normalizeNavFeatureOrder(
+      loadFromStorage<NavFeatureId[] | null>(NAV_FEATURE_ORDER_KEY, null),
+    ),
+  );
+  const orderedNavFeatures = computed(() =>
+    getOrderedNavFeatures(navFeatureOrder.value),
+  );
   const taskAvatars = ref<TaskAvatar[]>(
     normalizeTaskAvatars(
       loadFromStorage<TaskAvatar[] | null>(TASK_AVATARS_KEY, null),
+    ),
+  );
+  const sidebarCarousel = ref<SidebarCarouselState>(
+    normalizeSidebarCarouselState(
+      loadFromStorage<SidebarCarouselState | null>(SIDEBAR_CAROUSEL_KEY, null),
     ),
   );
 
@@ -321,8 +349,21 @@ export const useTaskStore = defineStore("task", () => {
     saveToStorage(NAV_FEATURES_KEY, navFeatureVisibility.value);
   }
 
+  function persistNavFeatureOrder() {
+    saveToStorage(NAV_FEATURE_ORDER_KEY, navFeatureOrder.value);
+  }
+
   function persistTaskAvatars() {
     saveToStorage(TASK_AVATARS_KEY, taskAvatars.value);
+  }
+
+  function persistSidebarCarousel() {
+    try {
+      saveToStorage(SIDEBAR_CAROUSEL_KEY, sidebarCarousel.value);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   function isNavFeatureEnabled(id: NavFeatureId): boolean {
@@ -344,8 +385,19 @@ export const useTaskStore = defineStore("task", () => {
     }
   }
 
+  function reorderNavFeatures(fromId: string, toId: string) {
+    const fromIdx = navFeatureOrder.value.findIndex((id) => id === fromId);
+    const toIdx = navFeatureOrder.value.findIndex((id) => id === toId);
+    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+    const updated = [...navFeatureOrder.value];
+    const [moved] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, moved);
+    navFeatureOrder.value = updated;
+    persistNavFeatureOrder();
+  }
+
   const firstEnabledNavPath = computed(() => {
-    const feature = NAV_FEATURES.find(
+    const feature = orderedNavFeatures.value.find(
       (item) => item.showInSidebar !== false && isNavFeatureEnabled(item.id),
     );
     return feature?.path ?? "/settings";
@@ -411,6 +463,7 @@ export const useTaskStore = defineStore("task", () => {
   watch(statusItems, persistStatusItems, { deep: true });
   watch(toolboxLists, persistToolboxLists, { deep: true });
   watch(taskAvatars, persistTaskAvatars, { deep: true });
+  watch(sidebarCarousel, persistSidebarCarousel, { deep: true });
 
   const tasksForSelectedDate = computed(() =>
     getTasksByDate(selectedDate.value),
@@ -1615,6 +1668,72 @@ export const useTaskStore = defineStore("task", () => {
     }
   }
 
+  function setSidebarCarouselEnabled(enabled: boolean) {
+    sidebarCarousel.value = { ...sidebarCarousel.value, enabled };
+  }
+
+  function setSidebarCarouselMode(mode: SidebarCarouselMode) {
+    sidebarCarousel.value = { ...sidebarCarousel.value, mode };
+  }
+
+  function setSidebarCarouselIntervalHours(hours: number) {
+    sidebarCarousel.value = {
+      ...sidebarCarousel.value,
+      intervalHours: clampCarouselIntervalHours(hours),
+    };
+  }
+
+  async function addSidebarCarouselImages(files: File[]) {
+    const remaining =
+      SIDEBAR_CAROUSEL_MAX_IMAGES - sidebarCarousel.value.images.length;
+    if (remaining <= 0) {
+      throw new Error(`最多上傳 ${SIDEBAR_CAROUSEL_MAX_IMAGES} 張圖片`);
+    }
+    const selected = files.slice(0, remaining);
+    const added: SidebarCarouselImage[] = [];
+    for (const file of selected) {
+      added.push({
+        id: generateId(),
+        fileName: file.name || `image-${Date.now()}.png`,
+        imageUrl: await fileToCarouselDataUrl(file),
+        createdAt: new Date().toISOString(),
+      });
+    }
+    const previous = sidebarCarousel.value;
+    sidebarCarousel.value = {
+      ...previous,
+      images: [...previous.images, ...added],
+    };
+    if (!persistSidebarCarousel()) {
+      sidebarCarousel.value = previous;
+      throw new Error("儲存空間不足，請刪除部分圖片後再試");
+    }
+    if (files.length > remaining) {
+      throw new Error(`已達上限，僅新增前 ${remaining} 張`);
+    }
+  }
+
+  function deleteSidebarCarouselImage(id: string) {
+    sidebarCarousel.value = {
+      ...sidebarCarousel.value,
+      images: sidebarCarousel.value.images.filter((item) => item.id !== id),
+    };
+  }
+
+  function reorderSidebarCarouselImages(fromId: string, toId: string) {
+    const fromIdx = sidebarCarousel.value.images.findIndex(
+      (item) => item.id === fromId,
+    );
+    const toIdx = sidebarCarousel.value.images.findIndex(
+      (item) => item.id === toId,
+    );
+    if (fromIdx < 0 || toIdx < 0 || fromIdx === toIdx) return;
+    const updated = [...sidebarCarousel.value.images];
+    const [moved] = updated.splice(fromIdx, 1);
+    updated.splice(toIdx, 0, moved);
+    sidebarCarousel.value = { ...sidebarCarousel.value, images: updated };
+  }
+
   function taskDedupeKey(task: Task): string {
     return `${task.date}::${task.title.trim()}`;
   }
@@ -1748,7 +1867,9 @@ export const useTaskStore = defineStore("task", () => {
     statusItems.value = createDefaultStatusItems();
     toolboxLists.value = [];
     navFeatureVisibility.value = { ...defaultNavFeatureVisibility };
+    navFeatureOrder.value = [...defaultNavFeatureOrder];
     taskAvatars.value = [...DEFAULT_TASK_AVATARS];
+    sidebarCarousel.value = { ...defaultSidebarCarouselState, images: [] };
     persist();
     persistMigrationReviewState();
     persistDifficultyNotes();
@@ -1758,7 +1879,9 @@ export const useTaskStore = defineStore("task", () => {
     persistStatusItems();
     persistToolboxLists();
     persistNavFeatures();
+    persistNavFeatureOrder();
     persistTaskAvatars();
+    persistSidebarCarousel();
   }
 
   return {
@@ -1786,10 +1909,14 @@ export const useTaskStore = defineStore("task", () => {
     toolboxLists,
     toolboxListsSorted,
     navFeatureVisibility,
+    navFeatureOrder,
+    orderedNavFeatures,
     taskAvatars,
+    sidebarCarousel,
     firstEnabledNavPath,
     isNavFeatureEnabled,
     setNavFeatureEnabled,
+    reorderNavFeatures,
     init,
     getTasksByDate,
     getTaskDatesWithActivity,
@@ -1868,6 +1995,12 @@ export const useTaskStore = defineStore("task", () => {
     clearTaskAvatarImage,
     createUploadedTaskAvatar,
     deleteCustomTaskAvatar,
+    setSidebarCarouselEnabled,
+    setSidebarCarouselMode,
+    setSidebarCarouselIntervalHours,
+    addSidebarCarouselImages,
+    deleteSidebarCarouselImage,
+    reorderSidebarCarouselImages,
     mergeImportedBackup,
     clearAllData,
   };
