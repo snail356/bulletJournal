@@ -21,6 +21,10 @@ import { SUBTASK_DRAG_KEY, TASK_DRAG_KEY } from '@/composables/taskDrag'
 import { useReorderDrag } from '@/composables/useReorderDrag'
 import { useTaskStore } from '@/stores/taskStore'
 import { getNotesExpanded, setNotesExpanded } from '@/utils/sectionCollapseState'
+import {
+  getSubtasksExpanded,
+  setSubtasksExpanded,
+} from '@/utils/sectionCollapseState'
 
 const props = defineProps<{
   task: Task
@@ -59,6 +63,7 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const hoursInput = ref<HTMLInputElement | null>(null)
 const expanded = ref(store.expandAllTasks)
 const notesExpanded = ref(getNotesExpanded(props.task.id, true))
+const subtasksExpanded = ref(getSubtasksExpanded(props.task.id, true))
 
 watch(
   () => store.expandAllTasks,
@@ -71,10 +76,15 @@ watch(notesExpanded, (value) => {
   setNotesExpanded(props.task.id, value)
 })
 
+watch(subtasksExpanded, (value) => {
+  setSubtasksExpanded(props.task.id, value)
+})
+
 watch(
   () => props.task.id,
   (taskId) => {
     notesExpanded.value = getNotesExpanded(taskId, true)
+    subtasksExpanded.value = getSubtasksExpanded(taskId, true)
   },
 )
 
@@ -84,6 +94,10 @@ function toggleExpanded() {
 
 function toggleNotesExpanded() {
   notesExpanded.value = !notesExpanded.value
+}
+
+function toggleSubtasksExpanded() {
+  subtasksExpanded.value = !subtasksExpanded.value
 }
 
 const notesPreview = computed(() => {
@@ -226,6 +240,8 @@ function saveTitle(title: string) {
 }
 
 function addSubtaskInline() {
+  // 新增子任務時自動展開，避免使用者看不到剛建立的項目
+  subtasksExpanded.value = true
   const sub = store.createSubTask(props.task.id, '')
   if (sub) {
     pendingFocusSubtaskId.value = sub.id
@@ -505,24 +521,43 @@ async function onContextPaste() {
 
       <div class="section">
         <div class="section-header">
-          <p class="section-title">
-            子任務
-            <span v-if="subtaskProgress.total" class="section-count">
-              {{ subtaskProgress.done }}/{{ subtaskProgress.total }}
-            </span>
-          </p>
+          <button
+            type="button"
+            class="section-toggle"
+            :aria-expanded="subtasksExpanded"
+            @click="toggleSubtasksExpanded"
+          >
+            <AppIcon :name="subtasksExpanded ? 'chevron-down' : 'chevron-right'" size="xs" />
+            <p class="section-title">
+              子任務
+              <span v-if="subtaskProgress.total" class="section-count">
+                {{ subtaskProgress.done }}/{{ subtaskProgress.total }}
+              </span>
+            </p>
+          </button>
           <button type="button" class="add-btn" @click="addSubtaskInline">
             + 新增
           </button>
         </div>
-        <SubTaskItem
-          v-for="sub in task.subtasks"
-          :key="sub.id"
-          :subtask="sub"
-          :task-id="task.id"
-          :autofocus="pendingFocusSubtaskId === sub.id"
-          @preview="emit('preview', $event)"
-        />
+
+        <p
+          v-if="!subtasksExpanded && task.subtasks.length"
+          class="notes-collapsed-preview"
+          @click="subtasksExpanded = true"
+        >
+          已完成 {{ subtaskProgress.done }}/{{ subtaskProgress.total }} 項
+        </p>
+
+        <template v-else>
+          <SubTaskItem
+            v-for="sub in task.subtasks"
+            :key="sub.id"
+            :subtask="sub"
+            :task-id="task.id"
+            :autofocus="pendingFocusSubtaskId === sub.id"
+            @preview="emit('preview', $event)"
+          />
+        </template>
       </div>
 
       <div class="section">

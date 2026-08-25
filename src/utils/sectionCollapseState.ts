@@ -4,6 +4,7 @@ const bodyExpandedByTaskId = new Map<string, boolean>()
 const notesExpandedByTaskId = new Map<string, boolean>()
 const noteCollapsedById = new Map<string, boolean>()
 const subtaskNoteExpandedById = new Map<string, boolean>()
+const subtasksExpandedByTaskId = new Map<string, boolean>()
 
 export function getBodyExpanded(taskId: string, fallback: boolean): boolean {
   return bodyExpandedByTaskId.has(taskId)
@@ -49,4 +50,20 @@ export function setSubtaskNoteExpanded(
   expanded: boolean,
 ): void {
   subtaskNoteExpandedById.set(subtaskId, expanded)
+}
+
+export function getSubtasksExpanded(
+  taskId: string,
+  fallback: boolean,
+): boolean {
+  return subtasksExpandedByTaskId.has(taskId)
+    ? subtasksExpandedByTaskId.get(taskId)!
+    : fallback
+}
+
+export function setSubtasksExpanded(
+  taskId: string,
+  expanded: boolean,
+): void {
+  subtasksExpandedByTaskId.set(taskId, expanded)
 }
