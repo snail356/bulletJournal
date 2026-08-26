@@ -2,6 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import type { ToolboxItem } from '@/types'
 import AppIcon from './AppIcon.vue'
+import DeleteIconButton from './DeleteIconButton.vue'
 import CodeSnippet from './CodeSnippet.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import { useTaskStore } from '@/stores/taskStore'
@@ -166,14 +167,11 @@ function onPaste(e: ClipboardEvent) {
           <AppIcon name="file-lines" size="xs" />
         </button>
       </template>
-      <button
-        type="button"
-        class="item-delete"
+      <DeleteIconButton
         title="刪除項目"
-        @click="remove"
-      >
-        <AppIcon name="trash" size="xs" />
-      </button>
+        message="確定刪除此思考點？"
+        @confirm="remove"
+      />
     </div>
   </li>
 </template>
@@ -306,10 +304,5 @@ function onPaste(e: ClipboardEvent) {
       background: rgba(255, 255, 255, 0.8);
     }
   }
-}
-
-.item-delete:hover {
-  color: #ef4444 !important;
-  background: rgba(#ef4444, 0.1) !important;
 }
 </style>

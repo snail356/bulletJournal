@@ -1,11 +1,8 @@
-export type TaskStatus =
-  | "in_progress"
-  | "pending_test"
-  | "pending_fix"
-  | "waiting_pm"
-  | "waiting_release"
-  | "paused"
-  | "done";
+/** 任務狀態 id（內建代碼或自訂新增） */
+export type TaskStatus = string;
+
+/** 套用此狀態時，將任務移至頂部或未完成區底部（已完成之上） */
+export type StatusSortOnSelect = "none" | "top" | "bottom";
 
 export type AttachmentOwnerType = "task" | "subtask" | "note";
 
@@ -174,6 +171,7 @@ export interface StatusItem {
   name: string;
   color: string;
   bgColor: string;
+  sortOnSelect: StatusSortOnSelect;
 }
 
 export interface TodayProgress {

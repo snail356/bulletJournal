@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
+import ConfirmDialog from '@/components/ConfirmDialog.vue'
 
 export interface ContextMenuItem {
   key: string
   label: string
   danger?: boolean
   divider?: boolean
+  confirmTitle?: string
+  confirmMessage?: string
+  confirmLabel?: string
 }
 
 const props = defineProps<{
@@ -21,8 +25,11 @@ const emit = defineEmits<{
 }>()
 
 const menuRef = ref<HTMLElement | null>(null)
+const pending = ref<ContextMenuItem | null>(null)
+const confirmVisible = ref(false)
 
 function onClickOutside(e: MouseEvent) {
+  if (confirmVisible.value) return
   if (menuRef.value && !menuRef.value.contains(e.target as Node)) {
     emit('close')
   }
@@ -39,6 +46,27 @@ function style() {
     top: `${Math.min(props.y, maxY)}px`,
   }
 }
+
+function onItemClick(item: ContextMenuItem) {
+  if (item.confirmTitle) {
+    pending.value = item
+    confirmVisible.value = true
+    emit('close')
+    return
+  }
+  emit('select', item.key)
+}
+
+function onConfirmDelete() {
+  if (!pending.value) return
+  emit('select', pending.value.key)
+  pending.value = null
+}
+
+function onConfirmClose() {
+  confirmVisible.value = false
+  pending.value = null
+}
 </script>
 
 <template>
@@ -49,12 +77,22 @@ function style() {
         <button
           type="button"
           :class="{ danger: item.danger }"
-          @click="emit('select', item.key)"
+          @click="onItemClick(item)"
         >
           {{ item.label }}
         </button>
       </template>
     </div>
+    <ConfirmDialog
+      :visible="confirmVisible"
+      :title="pending?.confirmTitle ?? '刪除'"
+      :message="pending?.confirmMessage"
+      :confirm-label="pending?.confirmLabel ?? '確定'"
+      cancel-label="取消"
+      danger
+      @confirm="onConfirmDelete"
+      @close="onConfirmClose"
+    />
   </Teleport>
 </template>
 

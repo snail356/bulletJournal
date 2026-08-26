@@ -1,5 +1,6 @@
 import { library } from "@fortawesome/fontawesome-svg-core";
 import {
+  faArrowDown,
   faArrowLeft,
   faArrowRight,
   faArrowRotateLeft,
@@ -40,6 +41,7 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 
 library.add(
+  faArrowDown,
   faArrowLeft,
   faArrowRight,
   faArrowRotateLeft,
@@ -80,6 +82,7 @@ library.add(
 );
 
 export const appIcons = {
+  "arrow-down": faArrowDown,
   "arrow-left": faArrowLeft,
   "arrow-right": faArrowRight,
   "arrow-up": faArrowUp,

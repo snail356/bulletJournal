@@ -1,14 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
-import AppIcon from '@/components/AppIcon.vue'
+import DeleteIconButton from '@/components/DeleteIconButton.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import type { DifficultyNoteRecord } from '@/types'
 
 const store = useTaskStore()
 const keyword = ref('')
-const confirmVisible = ref(false)
-const pendingDelete = ref<DifficultyNoteRecord | null>(null)
 
 const records = computed(() => {
   const query = keyword.value.trim().toLowerCase()
@@ -28,26 +25,13 @@ function formatDateTime(iso: string): string {
   return `${y}-${m}-${d} ${hh}:${mm}`
 }
 
-function requestDelete(record: DifficultyNoteRecord) {
-  pendingDelete.value = record
-  confirmVisible.value = true
-}
-
-function confirmDelete() {
-  if (pendingDelete.value) {
-    store.deleteDifficultyNote(pendingDelete.value.id)
-    pendingDelete.value = null
-  }
-}
-
-const deleteMessage = computed(() => {
-  if (!pendingDelete.value) return ''
-  const count = store.getDifficultyNoteTaskCount(pendingDelete.value.content)
+function difficultyDeleteMessage(record: DifficultyNoteRecord) {
+  const count = store.getDifficultyNoteTaskCount(record.content)
   if (count > 0) {
     return `此困難點目前有 ${count} 項任務使用中，刪除後將不再出現於下拉選單（任務上已填寫的文字不受影響）。`
   }
   return '確定刪除此困難點紀錄？'
-})
+}
 </script>
 
 <template>
@@ -78,14 +62,12 @@ const deleteMessage = computed(() => {
             <span class="date">最後使用 {{ formatDateTime(record.lastUsedAt) }}</span>
           </div>
         </div>
-        <button
-          type="button"
-          class="delete"
-          aria-label="刪除困難點"
-          @click="requestDelete(record)"
-        >
-          <AppIcon name="trash" size="sm" />
-        </button>
+        <DeleteIconButton
+          title="刪除困難點"
+          :message="difficultyDeleteMessage(record)"
+          label="刪除困難點"
+          @confirm="store.deleteDifficultyNote(record.id)"
+        />
       </div>
     </div>
 
@@ -93,17 +75,6 @@ const deleteMessage = computed(() => {
       <p v-if="keyword.trim()">找不到符合「{{ keyword.trim() }}」的困難點</p>
       <p v-else>尚無困難點紀錄，於任務卡的困難點欄位輸入後即會自動建立</p>
     </div>
-
-    <ConfirmDialog
-      :visible="confirmVisible"
-      title="刪除困難點"
-      :message="deleteMessage"
-      confirm-label="刪除"
-      cancel-label="取消"
-      danger
-      @confirm="confirmDelete"
-      @close="confirmVisible = false"
-    />
   </div>
 </template>
 
@@ -201,19 +172,6 @@ const deleteMessage = computed(() => {
 .date {
   font-size: 12px;
   color: $text-muted;
-}
-
-.delete {
-  flex-shrink: 0;
-  color: $text-muted;
-  padding: 6px;
-  border-radius: $radius-sm;
-  transition: all 0.15s;
-
-  &:hover {
-    color: #ef4444;
-    background: rgba(#ef4444, 0.1);
-  }
 }
 
 .empty {

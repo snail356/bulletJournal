@@ -119,6 +119,8 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
   z-index: 100;
   min-width: max(160px, 100%);
   max-width: min(280px, calc(100vw - 32px));
+  max-height: 240px;
+  overflow-y: auto;
   background: $surface;
   border: 1px solid $border;
   border-radius: $radius-sm;

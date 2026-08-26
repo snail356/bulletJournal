@@ -19,6 +19,7 @@ import type {
   SidebarCarouselMode,
   SidebarCarouselState,
   StatusItem,
+  StatusSortOnSelect,
   SubTask,
   Task,
   TaskAvatar,
@@ -81,8 +82,12 @@ import {
   SIDEBAR_CAROUSEL_MAX_IMAGES,
 } from "@/utils/sidebarCarousel";
 import {
+  COMPLETED_STATUS_ID,
   createDefaultStatusItems,
+  createUnknownStatusItem,
+  DEFAULT_STATUS_ID,
   getStatusBgForColor,
+  isCompletedStatus,
   normalizeStatusItems,
 } from "@/utils/status";
 import {
@@ -585,12 +590,17 @@ export const useTaskStore = defineStore("task", () => {
         case "migrate":
           rescheduleTask(task, targetDate ?? today);
           break;
-        case "complete":
-          task.completed = true;
-          task.status = "done";
-          touchTask(task);
-          reorderCompletedToBottom(task.date);
+        case "complete": {
+          const completedId = getCompletedStatusId();
+          if (completedId) {
+            applyTaskStatus(taskId, completedId);
+          } else {
+            task.completed = true;
+            touchTask(task);
+            reorderCompletedToBottom(task.date);
+          }
           break;
+        }
         case "keep":
           keptIds.push(taskId);
           break;
@@ -968,17 +978,18 @@ export const useTaskStore = defineStore("task", () => {
     avatarId?: string | null;
   }): Task {
     const now = new Date().toISOString();
+    const status = payload.status ?? getDefaultStatusId();
     const task: Task = {
       id: generateId(),
       date: payload.date,
       endDate: normalizeEndDate(payload.date, payload.endDate),
       title: payload.title,
-      status: payload.status ?? "in_progress",
+      status,
       statusHours: null,
       difficultyNote: "",
       bodyContent: "",
       bodyContentType: "text",
-      completed: false,
+      completed: isCompletedStatus(status),
       subtasks: [],
       notes: [],
       attachments: [],
@@ -1105,9 +1116,10 @@ export const useTaskStore = defineStore("task", () => {
     if (!task) return;
     task.completed = !task.completed;
     if (task.completed) {
-      task.status = "done";
-    } else if (task.status === "done") {
-      task.status = "in_progress";
+      const completedId = getCompletedStatusId();
+      if (completedId) task.status = completedId;
+    } else if (isCompletedStatus(task.status)) {
+      task.status = getDefaultStatusId();
     }
     touchTask(task);
     reorderCompletedToBottom(task.date);
@@ -1124,7 +1136,7 @@ export const useTaskStore = defineStore("task", () => {
       ...pending.map((s) => ({ ...s, completed: true, updatedAt: now })),
     ];
     task.completed = true;
-    task.status = "done";
+    task.status = getCompletedStatusId() ?? task.status;
     touchTask(task);
     reorderCompletedToBottom(task.date);
   }
@@ -1370,6 +1382,19 @@ export const useTaskStore = defineStore("task", () => {
     }
   }
 
+  /** 將任務移至該日清單最上方（已完成任務仍維持在底部） */
+  function moveTaskToPendingTop(taskId: string) {
+    const task = findTask(taskId);
+    if (!task || task.completed) return;
+    const date = task.date;
+    const others = tasks.value.filter((t) => t.date !== date);
+    const dayTasks = tasks.value.filter((t) => t.date === date);
+    const rest = dayTasks.filter((t) => t.id !== taskId);
+    const pending = rest.filter((t) => !t.completed);
+    const done = rest.filter((t) => t.completed);
+    tasks.value = [...others, task, ...pending, ...done];
+  }
+
   /** 將任務移至該日「未完成任務」的最下方（仍在已完成任務之上） */
   function moveTaskToPendingBottom(taskId: string) {
     const task = findTask(taskId);
@@ -1457,16 +1482,77 @@ export const useTaskStore = defineStore("task", () => {
     labels.value = updated;
   }
 
+  function getDefaultStatusId(): TaskStatus {
+    const items = statusItems.value;
+    const inProgress = items.find((item) => item.id === DEFAULT_STATUS_ID);
+    if (inProgress) return inProgress.id;
+    const notCompleted = items.find((item) => !isCompletedStatus(item.id));
+    return notCompleted?.id ?? items[0]?.id ?? DEFAULT_STATUS_ID;
+  }
+
+  function getCompletedStatusId(): TaskStatus | null {
+    return statusItems.value.some((item) => isCompletedStatus(item.id))
+      ? COMPLETED_STATUS_ID
+      : null;
+  }
+
+  function applyTaskStatus(taskId: string, status: TaskStatus) {
+    const task = findTask(taskId);
+    if (!task) return;
+    const item = getStatusItem(status);
+    const completed = isCompletedStatus(status);
+    updateTask(taskId, { status, completed });
+    if (completed) {
+      reorderCompletedToBottom(task.date);
+      return;
+    }
+    if (item.sortOnSelect === "top") {
+      moveTaskToPendingTop(taskId);
+    } else if (item.sortOnSelect === "bottom") {
+      moveTaskToPendingBottom(taskId);
+    }
+  }
+
   function getStatusItem(id: TaskStatus): StatusItem {
     return (
       statusItems.value.find((item) => item.id === id) ??
-      createDefaultStatusItems().find((item) => item.id === id)!
+      createDefaultStatusItems().find((item) => item.id === id) ??
+      createUnknownStatusItem(id)
     );
+  }
+
+  function createStatusItem(
+    name: string,
+    color: string,
+    sortOnSelect: StatusSortOnSelect = "none",
+  ): StatusItem | null {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    const item: StatusItem = {
+      id: generateId(),
+      name: trimmed,
+      color,
+      bgColor: getStatusBgForColor(color),
+      sortOnSelect,
+    };
+    const doneIdx = statusItems.value.findIndex((s) =>
+      isCompletedStatus(s.id),
+    );
+    if (doneIdx >= 0) {
+      const updated = [...statusItems.value];
+      updated.splice(doneIdx, 0, item);
+      statusItems.value = updated;
+    } else {
+      statusItems.value.push(item);
+    }
+    return item;
   }
 
   function updateStatusItem(
     id: TaskStatus,
-    payload: Partial<Pick<StatusItem, "name" | "color" | "bgColor">>,
+    payload: Partial<
+      Pick<StatusItem, "name" | "color" | "bgColor" | "sortOnSelect">
+    >,
   ) {
     const item = statusItems.value.find((s) => s.id === id);
     if (!item) return;
@@ -1475,6 +1561,23 @@ export const useTaskStore = defineStore("task", () => {
       next.bgColor = getStatusBgForColor(next.color);
     }
     Object.assign(item, next);
+  }
+
+  function deleteStatusItem(id: TaskStatus) {
+    if (statusItems.value.length <= 1) return;
+    const remaining = statusItems.value.filter((item) => item.id !== id);
+    if (remaining.length === statusItems.value.length) return;
+    const fallback =
+      remaining.find((item) => item.id === DEFAULT_STATUS_ID)?.id ??
+      remaining.find((item) => !isCompletedStatus(item.id))?.id ??
+      remaining[0].id;
+    statusItems.value = remaining;
+    for (const task of tasks.value) {
+      if (task.status === id) {
+        task.status = fallback;
+        touchTask(task);
+      }
+    }
   }
 
   function reorderStatusItems(fromId: TaskStatus, toId: TaskStatus) {
@@ -1966,7 +2069,9 @@ export const useTaskStore = defineStore("task", () => {
     carryOverUnfinishedTasks,
     catchUpUnfinishedTasksToToday,
     reorderCompletedToBottom,
+    moveTaskToPendingTop,
     moveTaskToPendingBottom,
+    applyTaskStatus,
     getTodayProgress,
     setSelectedDate,
     createLabel,
@@ -1976,7 +2081,9 @@ export const useTaskStore = defineStore("task", () => {
     reorderSubTasks,
     reorderLabels,
     getStatusItem,
+    createStatusItem,
     updateStatusItem,
+    deleteStatusItem,
     reorderStatusItems,
     getStatusTaskCount,
     getAllTasksFiltered,

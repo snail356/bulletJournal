@@ -6,6 +6,7 @@ import ColorDotPicker from './ColorDotPicker.vue'
 import CodeSnippet from './CodeSnippet.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import AppIcon from './AppIcon.vue'
+import DeleteIconButton from './DeleteIconButton.vue'
 import InlineEditable from './InlineEditable.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { resolveContentType } from '@/utils/detectContentType'
@@ -197,9 +198,11 @@ function formatTag(type: ContentFormat): string | null {
           menu-align="end"
           @update:model-value="setColor"
         />
-        <button type="button" title="刪除" @click="remove">
-          <AppIcon name="trash" size="xs" />
-        </button>
+        <DeleteIconButton
+          title="刪除備註"
+          message="確定刪除此備註？"
+          @confirm="remove"
+        />
       </div>
     </div>
 

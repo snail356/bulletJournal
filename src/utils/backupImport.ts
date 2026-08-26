@@ -23,8 +23,9 @@ import { resolveContentType } from "@/utils/detectContentType";
 import { generateId } from "@/utils/id";
 import { DEFAULT_LABEL_COLOR } from "@/utils/labelColors";
 import {
-  ALL_STATUSES,
+  DEFAULT_STATUS_ID,
   getStatusBgForColor,
+  parseStatusSortOnSelect,
   STATUS_LABELS,
 } from "@/utils/status";
 
@@ -262,15 +263,20 @@ function parseStatus(
   value: string | undefined,
   statusItems: StatusItem[],
 ): TaskStatus {
+  const fallback =
+    statusItems.find((item) => item.id === DEFAULT_STATUS_ID)?.id ??
+    statusItems[0]?.id ??
+    DEFAULT_STATUS_ID;
   const raw = value?.trim();
-  if (!raw || raw === "—") return "in_progress";
-  if (ALL_STATUSES.includes(raw as TaskStatus)) return raw as TaskStatus;
+  if (!raw || raw === "—") return fallback;
+  if (statusItems.some((item) => item.id === raw)) return raw;
   const byName = statusItems.find((item) => item.name === raw);
   if (byName) return byName.id;
-  const byLabel = (
-    Object.entries(STATUS_LABELS) as Array<[TaskStatus, string]>
-  ).find(([, name]) => name === raw);
-  return byLabel?.[0] ?? "in_progress";
+  const byLabel = Object.entries(STATUS_LABELS).find(([, name]) => name === raw);
+  if (byLabel && statusItems.some((item) => item.id === byLabel[0])) {
+    return byLabel[0];
+  }
+  return fallback;
 }
 
 function parseMdImages(text: string): Array<{ alt: string; path: string }> {
@@ -573,13 +579,14 @@ function parseLabelsMarkdown(markdown: string): {
       const name = row[0];
       const idRaw = (row[1] ?? "").replace(/`/g, "").trim();
       const color = row[2] || "";
-      if (!ALL_STATUSES.includes(idRaw as TaskStatus)) return null;
-      const id = idRaw as TaskStatus;
+      if (!name && !idRaw) return null;
+      const id = idRaw || generateId();
       return {
         id,
-        name: name || STATUS_LABELS[id],
+        name: name || STATUS_LABELS[id as keyof typeof STATUS_LABELS] || id,
         color,
         bgColor: getStatusBgForColor(color),
+        sortOnSelect: parseStatusSortOnSelect(row[3], id),
       };
     })
     .filter((item): item is StatusItem => Boolean(item));

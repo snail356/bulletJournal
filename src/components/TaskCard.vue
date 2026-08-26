@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, provide, ref, watch } from 'vue'
-import type { Attachment, SubTask, Task, TaskStatus } from '@/types'
+import type { Attachment, SubTask, Task } from '@/types'
 import {
   formatDisplayDate,
   formatShortDate,
@@ -62,7 +62,6 @@ const menuY = ref(0)
 const showEditModal = ref(false)
 const showNoteModal = ref(false)
 const showCompleteConfirm = ref(false)
-const showDeleteConfirm = ref(false)
 const pendingFocusSubtaskId = ref<string | null>(null)
 const datePickerMode = ref<'start' | 'end' | 'move' | null>(null)
 const datePickerValue = ref('')
@@ -216,15 +215,22 @@ function goToCurrentDate() {
   store.setSelectedDate(props.task.date)
 }
 
-const menuItems: ContextMenuItem[] = [
+const menuItems = computed<ContextMenuItem[]>(() => [
   { key: 'edit', label: '編輯任務' },
   { key: 'add-subtask', label: '新增子任務' },
   { key: 'add-note', label: '新增備註' },
   { key: 'paste-image', label: '貼上圖片' },
   { key: 'duplicate', label: '複製任務' },
   { key: 'move', label: '移動到其他日期' },
-  { key: 'delete', label: '刪除任務', danger: true, divider: true },
-]
+  {
+    key: 'delete',
+    label: '刪除任務',
+    danger: true,
+    divider: true,
+    confirmTitle: '刪除任務',
+    confirmMessage: `確定要刪除「${props.task.title}」嗎？此操作將一併刪除所有子任務、備註與附件。`,
+  },
+])
 
 function openMenu(e: MouseEvent) {
   menuX.value = e.clientX
@@ -286,15 +292,6 @@ function confirmCompleteWithSubtasks() {
   store.completeTaskWithSubtasks(props.task.id)
 }
 
-function confirmDelete() {
-  emit('deleted', props.task)
-  showDeleteConfirm.value = false
-}
-
-function requestDelete() {
-  showDeleteConfirm.value = true
-}
-
 function onMenuSelect(key: string) {
   menuVisible.value = false
   switch (key) {
@@ -318,7 +315,7 @@ function onMenuSelect(key: string) {
       openDatePicker('move')
       break
     case 'delete':
-      requestDelete()
+      emit('deleted', props.task)
       break
   }
 }
@@ -397,16 +394,8 @@ function onDatePickerKeydown(e: KeyboardEvent) {
   }
 }
 
-function onStatusChange(status: TaskStatus) {
-  store.updateTask(props.task.id, {
-    status,
-    completed: status === 'done',
-  })
-  if (status === 'done') {
-    store.reorderCompletedToBottom(props.task.date)
-  } else if (status === 'waiting_pm') {
-    store.moveTaskToPendingBottom(props.task.id)
-  }
+function onStatusChange(status: string) {
+  store.applyTaskStatus(props.task.id, status)
 }
 
 function onLabelsChange(labels: string[]) {
@@ -762,17 +751,6 @@ async function onContextPaste() {
       :task="task"
       @close="showEditModal = false"
       @saved="showEditModal = false"
-    />
-
-    <ConfirmDialog
-      :visible="showDeleteConfirm"
-      title="刪除任務"
-      :message="`確定要刪除「${task.title}」嗎？此操作將一併刪除所有子任務、備註與附件。`"
-      confirm-label="刪除"
-      cancel-label="取消"
-      danger
-      @confirm="confirmDelete"
-      @close="showDeleteConfirm = false"
     />
 
     <ConfirmDialog

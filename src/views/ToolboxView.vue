@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import DeleteIconButton from '@/components/DeleteIconButton.vue'
 import InlineEditable from '@/components/InlineEditable.vue'
 import ToolboxItemBlock from '@/components/ToolboxItemBlock.vue'
 import { useTaskStore } from '@/stores/taskStore'
@@ -10,8 +10,6 @@ import type { ToolboxList } from '@/types'
 const store = useTaskStore()
 const selectedId = ref<string | null>(null)
 const keyword = ref('')
-const confirmVisible = ref(false)
-const pendingDelete = ref<ToolboxList | null>(null)
 const pendingFocusItemId = ref<string | null>(null)
 
 const lists = computed(() => {
@@ -75,17 +73,6 @@ function addItem() {
   nextTick(() => {
     pendingFocusItemId.value = null
   })
-}
-
-function requestDeleteList(list: ToolboxList) {
-  pendingDelete.value = list
-  confirmVisible.value = true
-}
-
-function confirmDeleteList() {
-  if (!pendingDelete.value) return
-  store.deleteToolboxList(pendingDelete.value.id)
-  pendingDelete.value = null
 }
 
 function previewItems(list: ToolboxList): string {
@@ -160,14 +147,12 @@ function previewItems(list: ToolboxList): string {
               @save="savePurpose"
             />
           </div>
-          <button
-            type="button"
-            class="delete"
-            aria-label="刪除此清單"
-            @click="requestDeleteList(selected)"
-          >
-            <AppIcon name="trash" size="sm" />
-          </button>
+          <DeleteIconButton
+            title="刪除清單"
+            :message="`確定刪除「${selected.title}」？清單內的思考點會一併刪除。`"
+            label="刪除清單"
+            @confirm="store.deleteToolboxList(selected.id)"
+          />
         </div>
 
         <div class="items-header">
@@ -203,17 +188,6 @@ function previewItems(list: ToolboxList): string {
         建立第一份清單
       </button>
     </div>
-
-    <ConfirmDialog
-      :visible="confirmVisible"
-      title="刪除清單"
-      :message="`確定刪除「${pendingDelete?.title ?? ''}」？清單內的思考點會一併刪除。`"
-      confirm-label="刪除"
-      cancel-label="取消"
-      danger
-      @confirm="confirmDeleteList"
-      @close="confirmVisible = false"
-    />
   </div>
 </template>
 
@@ -379,18 +353,6 @@ function previewItems(list: ToolboxList): string {
   font-size: 13px;
   line-height: 1.6;
   color: $text-muted;
-}
-
-.delete {
-  color: $text-muted;
-  padding: 6px;
-  border-radius: $radius-sm;
-  flex-shrink: 0;
-
-  &:hover {
-    color: #ef4444;
-    background: rgba(#ef4444, 0.1);
-  }
 }
 
 .items-header {

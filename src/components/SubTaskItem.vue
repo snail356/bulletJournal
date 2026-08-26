@@ -3,6 +3,7 @@ import { computed, inject, nextTick, onMounted, ref, watch } from "vue";
 import type { Attachment, ContentFormat, SubTask } from "@/types";
 import AttachmentList from "./AttachmentList.vue";
 import AppIcon from "./AppIcon.vue";
+import DeleteIconButton from "./DeleteIconButton.vue";
 import CodeSnippet from "./CodeSnippet.vue";
 import MarkdownContent from "./MarkdownContent.vue";
 import InlineEditable from "./InlineEditable.vue";
@@ -326,9 +327,11 @@ function formatTag(type: ContentFormat): string | null {
       <button type="button" title="貼上圖片" @click="triggerUpload">
         <AppIcon name="image" size="xs" />
       </button>
-      <button type="button" title="刪除" @click="remove">
-        <AppIcon name="trash" size="xs" />
-      </button>
+      <DeleteIconButton
+        title="刪除子任務"
+        :message="`確定刪除「${subtask.title || '未命名子任務'}」？`"
+        @confirm="remove"
+      />
     </div>
 
     <input

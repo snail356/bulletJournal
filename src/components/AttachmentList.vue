@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import type { Attachment } from '@/types'
-import AppIcon from './AppIcon.vue'
+import DeleteIconButton from './DeleteIconButton.vue'
 import { useTaskStore } from '@/stores/taskStore'
 
 defineProps<{
@@ -44,15 +44,16 @@ function onImageClick(att: Attachment) {
           :alt="att.fileName"
           @click="onImageClick(att)"
         />
-        <button
-          v-show="hoveredId === att.id"
-          type="button"
+        <DeleteIconButton
           class="remove"
-          aria-label="刪除圖片"
-          @click.stop="remove(att.id)"
-        >
-          <AppIcon name="xmark" size="xs" />
-        </button>
+          :class="{ shown: hoveredId === att.id }"
+          variant="overlay"
+          title="刪除圖片"
+          :message="`確定刪除「${att.fileName}」？`"
+          label="刪除圖片"
+          @click.stop
+          @confirm="remove(att.id)"
+        />
       </div>
     </div>
   </div>
@@ -125,23 +126,12 @@ function onImageClick(att: Attachment) {
 }
 
 .remove {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 1;
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.65);
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
 
-  &:hover {
-    background: #ef4444;
+  &.shown {
+    opacity: 1;
+    pointer-events: auto;
   }
 }
 </style>

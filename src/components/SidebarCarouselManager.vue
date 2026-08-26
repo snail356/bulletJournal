@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
+import DeleteIconButton from '@/components/DeleteIconButton.vue'
 import { useSimpleReorderDrag } from '@/composables/useReorderDrag'
 import { useTaskStore } from '@/stores/taskStore'
 import {
@@ -158,15 +159,12 @@ async function onUpload(event: Event) {
           <span class="name">{{ image.fileName }}</span>
           <span v-if="currentImage?.id === image.id" class="badge">目前顯示</span>
         </div>
-        <button
-          type="button"
-          class="icon-action danger"
-          data-tip="刪除圖片"
-          aria-label="刪除圖片"
-          @click="store.deleteSidebarCarouselImage(image.id)"
-        >
-          <AppIcon name="trash" size="xs" />
-        </button>
+        <DeleteIconButton
+          title="刪除圖片"
+          :message="`確定刪除「${image.fileName}」？`"
+          label="刪除圖片"
+          @confirm="store.deleteSidebarCarouselImage(image.id)"
+        />
       </li>
     </ul>
   </div>

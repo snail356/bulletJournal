@@ -4,6 +4,7 @@ import DOMPurify from 'dompurify'
 import { marked } from 'marked'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import DeleteIconButton from '@/components/DeleteIconButton.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { formatDisplayDate, todayString } from '@/utils/date'
 import { getGeminiModel, hasGeminiApiKey, normalizeAiAdviceText } from '@/utils/gemini'
@@ -11,8 +12,6 @@ import type { DailyReflection } from '@/types'
 
 const store = useTaskStore()
 const selectedDate = ref<string | null>(null)
-const confirmVisible = ref(false)
-const pendingDelete = ref<DailyReflection | null>(null)
 const detailScrollRef = ref<HTMLElement | null>(null)
 const showBackToTop = ref(false)
 
@@ -140,17 +139,6 @@ function formatDateTime(iso: string): string {
   return `${y}-${m}-${d} ${hh}:${mm}`
 }
 
-function requestDelete(reflection: DailyReflection) {
-  pendingDelete.value = reflection
-  confirmVisible.value = true
-}
-
-function confirmDelete() {
-  if (!pendingDelete.value) return
-  store.deleteDailyReflection(pendingDelete.value.id)
-  pendingDelete.value = null
-}
-
 function requestAiAdvice() {
   aiError.value = ''
   if (!hasGeminiApiKey()) {
@@ -238,14 +226,12 @@ async function confirmAiAdvice() {
                   class="edit-label"
                 >退回編輯</span>
               </button>
-              <button
-                type="button"
-                class="delete"
-                aria-label="刪除此日回顧"
-                @click="requestDelete(selected)"
-              >
-                <AppIcon name="trash" size="sm" />
-              </button>
+              <DeleteIconButton
+                title="刪除回顧"
+                message="確定刪除這一天的回顧日誌？此操作無法復原。"
+                label="刪除此日回顧"
+                @confirm="store.deleteDailyReflection(selected.id)"
+              />
             </div>
           </div>
 
@@ -330,17 +316,6 @@ async function confirmAiAdvice() {
         尚無回顧紀錄。於今日任務頁新增並儲存日誌後，當日內容會顯示於此，可直接呼叫 AI 主管。
       </p>
     </div>
-
-    <ConfirmDialog
-      :visible="confirmVisible"
-      title="刪除回顧"
-      message="確定刪除這一天的回顧日誌？此操作無法復原。"
-      confirm-label="刪除"
-      cancel-label="取消"
-      danger
-      @confirm="confirmDelete"
-      @close="confirmVisible = false"
-    />
 
     <ConfirmDialog
       :visible="aiConfirmVisible"
@@ -525,14 +500,14 @@ async function confirmAiAdvice() {
   flex-shrink: 0;
 }
 
-.edit,
-.delete {
+.edit {
   color: $text-muted;
   padding: 6px;
   border-radius: $radius-sm;
 
   &:hover {
     background: rgba(0, 0, 0, 0.05);
+    color: $primary;
   }
 }
 
@@ -546,15 +521,6 @@ async function confirmAiAdvice() {
 .edit-label {
   font-size: 12px;
   font-weight: 600;
-}
-
-.edit:hover {
-  color: $primary;
-}
-
-.delete:hover {
-  color: #ef4444;
-  background: rgba(#ef4444, 0.1);
 }
 
 .report {

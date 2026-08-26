@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import DeleteIconButton from '@/components/DeleteIconButton.vue'
 import TaskAvatarFace from '@/components/TaskAvatarFace.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { isDefaultTaskAvatar, TASK_AVATAR_ICON_OPTIONS } from '@/utils/taskAvatars'
@@ -86,16 +87,13 @@ async function onUploadNew(event: Event) {
           >
             <AppIcon name="rotate-left" size="xs" />
           </button>
-          <button
+          <DeleteIconButton
             v-if="!isDefaultTaskAvatar(avatar.id)"
-            type="button"
-            class="icon-action danger"
-            data-tip="刪除頭像"
-            aria-label="刪除頭像"
-            @click="store.deleteCustomTaskAvatar(avatar.id)"
-          >
-            <AppIcon name="trash" size="xs" />
-          </button>
+            title="刪除頭像"
+            :message="`確定刪除「${avatar.name}」？使用中的任務將改為未選頭像。`"
+            label="刪除頭像"
+            @confirm="store.deleteCustomTaskAvatar(avatar.id)"
+          />
         </div>
         <div class="icon-field">
           <span class="field-label">圖示{{ avatar.imageUrl ? '（無圖片時顯示）' : '' }}</span>

@@ -1,21 +1,28 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { TaskStatus } from '@/types'
 import ColorDotPicker from '@/components/ColorDotPicker.vue'
-import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppIcon from '@/components/AppIcon.vue'
+import DeleteIconButton from '@/components/DeleteIconButton.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { useSimpleReorderDrag } from '@/composables/useReorderDrag'
 import { DEFAULT_LABEL_COLOR, LABEL_COLOR_OPTIONS } from '@/utils/labelColors'
-import { STATUS_COLOR_OPTIONS } from '@/utils/status'
+import {
+  COMPLETED_STATUS_ID,
+  DEFAULT_STATUS_ID,
+  STATUS_COLOR_OPTIONS,
+} from '@/utils/status'
+import type { StatusSortOnSelect } from '@/types'
+import StatusSortIcons from '@/components/StatusSortIcons.vue'
+import PopoverIconButton from '@/components/PopoverIconButton.vue'
 
 const store = useTaskStore()
 const newName = ref('')
 const newColor = ref(DEFAULT_LABEL_COLOR)
-const confirmVisible = ref(false)
-const pendingDeleteId = ref<string | null>(null)
+const newStatusName = ref('')
+const newStatusColor = ref(STATUS_COLOR_OPTIONS[0].value)
+const newStatusSort = ref<StatusSortOnSelect>('none')
 const editingLabelId = ref<string | null>(null)
-const editingStatusId = ref<TaskStatus | null>(null)
+const editingStatusId = ref<string | null>(null)
 
 function focusOnMount(el: unknown) {
   if (el instanceof HTMLInputElement) {
@@ -49,7 +56,7 @@ const {
   onDragEnd: onStatusDragEnd,
 } = useSimpleReorderDrag(
   () => store.statusItems,
-  (fromId, toId) => store.reorderStatusItems(fromId as TaskStatus, toId as TaskStatus),
+  (fromId, toId) => store.reorderStatusItems(fromId, toId),
 )
 
 function addLabel() {
@@ -58,27 +65,40 @@ function addLabel() {
   newName.value = ''
 }
 
-function removeLabel(id: string) {
-  pendingDeleteId.value = id
-  confirmVisible.value = true
+function addStatus() {
+  if (!newStatusName.value.trim()) return
+  store.createStatusItem(newStatusName.value.trim(), newStatusColor.value, newStatusSort.value)
+  newStatusName.value = ''
+  newStatusSort.value = 'none'
+  newStatusColor.value = nextStatusColor()
 }
 
-function confirmRemoveLabel() {
-  if (pendingDeleteId.value) {
-    store.deleteLabel(pendingDeleteId.value)
-    pendingDeleteId.value = null
-  }
-}
-
-function saveStatusName(id: TaskStatus, name: string) {
+function saveStatusName(id: string, name: string) {
   editingStatusId.value = null
   const trimmed = name.trim()
   if (trimmed) store.updateStatusItem(id, { name: trimmed })
 }
 
-function updateStatusColor(id: TaskStatus, color: string) {
+function updateStatusColor(id: string, color: string) {
   store.updateStatusItem(id, { color })
 }
+
+function statusDeleteMessage(id: string) {
+  const remaining = store.statusItems.filter((item) => item.id !== id)
+  const fallbackName =
+    remaining.find((item) => item.id === DEFAULT_STATUS_ID)?.name ??
+    remaining[0]?.name ??
+    '其他狀態'
+  return `確定刪除此狀態？使用中的任務將改為「${fallbackName}」。`
+}
+
+function nextStatusColor(): string {
+  const used = new Set(store.statusItems.map((item) => item.color))
+  const unused = STATUS_COLOR_OPTIONS.find((opt) => !used.has(opt.value))
+  return unused?.value ?? STATUS_COLOR_OPTIONS[0].value
+}
+
+newStatusColor.value = nextStatusColor()
 </script>
 
 <template>
@@ -139,19 +159,37 @@ function updateStatusColor(id: TaskStatus, color: string) {
               <AppIcon name="pen" size="xs" />
             </button>
           </template>
+          <DeleteIconButton
+            title="刪除標籤"
+            message="確定刪除此標籤？使用中的任務將移除此標籤。"
+            @confirm="store.deleteLabel(label.id)"
+          />
           <span class="count">
             {{ store.tasks.filter((t) => t.labels.includes(label.id)).length }} 項任務
           </span>
-          <button type="button" class="delete" @click="removeLabel(label.id)">刪除</button>
         </div>
       </div>
     </section>
 
     <section class="section">
       <h2 class="section-title">狀態標籤</h2>
-      <p class="section-desc">任務狀態下拉選單的選項與顏色，拖曳可調整順序</p>
+      <p class="section-desc">
+        任務狀態可自由新增、刪除與重新命名。箭頭圖示可設定套用後將任務移至頂部或底部（已完成之上）。拖曳可調整選單順序。
+      </p>
 
-      <div class="label-grid">
+      <div class="add-form">
+        <input
+          v-model="newStatusName"
+          type="text"
+          placeholder="新狀態名稱"
+          @keyup.enter="addStatus"
+        />
+        <ColorDotPicker v-model="newStatusColor" :options="STATUS_COLOR_OPTIONS" />
+        <StatusSortIcons v-model="newStatusSort" />
+        <button type="button" class="btn-primary" @click="addStatus">新增狀態</button>
+      </div>
+
+      <div class="label-grid status-grid">
         <div
           v-for="item in store.statusItems"
           :key="item.id"
@@ -197,23 +235,32 @@ function updateStatusColor(id: TaskStatus, color: string) {
               <AppIcon name="pen" size="xs" />
             </button>
           </template>
-          <span class="count">
-            {{ store.getStatusTaskCount(item.id) }} 項任務
-          </span>
+          <DeleteIconButton
+            v-if="store.statusItems.length > 1"
+            title="刪除狀態"
+            :message="statusDeleteMessage(item.id)"
+            @confirm="store.deleteStatusItem(item.id)"
+          />
+          <div class="status-meta">
+            <span class="count">
+              {{ store.getStatusTaskCount(item.id) }} 項任務
+            </span>
+            <StatusSortIcons
+              v-if="item.id !== COMPLETED_STATUS_ID"
+              :model-value="item.sortOnSelect"
+              @update:model-value="(value) => store.updateStatusItem(item.id, { sortOnSelect: value })"
+            />
+            <PopoverIconButton
+              v-else
+              icon="check"
+              label="標記為已完成，並移到清單底部"
+              active
+              disabled
+            />
+          </div>
         </div>
       </div>
     </section>
-
-    <ConfirmDialog
-      :visible="confirmVisible"
-      title="刪除標籤"
-      message="確定刪除此標籤？使用中的任務將移除此標籤。"
-      confirm-label="確定"
-      cancel-label="取消"
-      danger
-      @confirm="confirmRemoveLabel"
-      @close="confirmVisible = false"
-    />
   </div>
 </template>
 
@@ -248,8 +295,9 @@ function updateStatusColor(id: TaskStatus, color: string) {
   align-items: center;
 
   input[type='text'] {
-    flex: 1;
-    min-width: 160px;
+    width: 180px;
+    max-width: 100%;
+    flex: none;
     padding: 10px 12px;
     border: 1px solid $border;
     border-radius: $radius-sm;
@@ -329,6 +377,25 @@ function updateStatusColor(id: TaskStatus, color: string) {
   padding-left: 22px;
 }
 
+.status-grid {
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.status-meta {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-left: 22px;
+
+  .count {
+    width: auto;
+    padding-left: 0;
+    flex: 1;
+  }
+}
+
 .edit {
   color: $text-muted;
   padding: 4px;
@@ -338,15 +405,6 @@ function updateStatusColor(id: TaskStatus, color: string) {
   &:hover {
     color: $primary;
     background: rgba(0, 0, 0, 0.05);
-  }
-}
-
-.delete {
-  font-size: 12px;
-  color: #ef4444;
-
-  &:hover {
-    text-decoration: underline;
   }
 }
 </style>

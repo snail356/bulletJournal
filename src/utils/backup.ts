@@ -10,7 +10,7 @@ import type {
   Task,
   ToolboxList,
 } from "@/types";
-import { STATUS_LABELS } from "@/utils/status";
+import { getBuiltinStatusName, STATUS_SORT_BACKUP_LABELS } from "@/utils/status";
 
 export const BACKUP_JSON_FILE = "data.json";
 export const BACKUP_FORMAT = "bullet-journal-md-webp";
@@ -286,7 +286,7 @@ function buildTaskMarkdown(
 ): string {
   const statusName =
     statusItems.find((item) => item.id === task.status)?.name ??
-    STATUS_LABELS[task.status] ??
+    getBuiltinStatusName(task.status) ??
     task.status;
   const labelNames = task.labels
     .map((id) => labelsById.get(id)?.name)
@@ -363,11 +363,11 @@ function buildLabelsMarkdown(
 
   const statusRows = statusItems.length
     ? [
-        "| 名稱 | 代碼 | 顏色 |",
-        "| --- | --- | --- |",
+        "| 名稱 | 代碼 | 顏色 | 套用時排序 |",
+        "| --- | --- | --- | --- |",
         ...statusItems.map(
           (item) =>
-            `| ${escapeTableCell(item.name)} | \`${item.id}\` | ${item.color} |`,
+            `| ${escapeTableCell(item.name)} | \`${item.id}\` | ${item.color} | ${STATUS_SORT_BACKUP_LABELS[item.sortOnSelect] ?? STATUS_SORT_BACKUP_LABELS.none} |`,
         ),
       ].join("\n")
     : "_尚無狀態標籤_";
