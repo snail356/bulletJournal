@@ -45,6 +45,10 @@ function changeClass(change: number | null | undefined) {
   return change > 0 ? 'up' : 'down'
 }
 
+function hasStockDividend(dividend: { stockDividendRatio: number | null } | null | undefined) {
+  return Boolean(dividend?.stockDividendRatio && dividend.stockDividendRatio > 0)
+}
+
 function selectStock(code: string) {
   const stock = matches.value.find((item) => item.code === code)
   if (!stock) return
@@ -200,9 +204,6 @@ onUnmounted(() => {
               <span class="code">{{ card.code }}</span>
               <span class="name">{{ card.name }}</span>
             </p>
-            <p class="trade-date" v-if="card.quote?.tradeDate">
-              行情日 {{ card.quote.tradeDate }}
-            </p>
           </div>
           <div class="card-actions">
             <button
@@ -258,14 +259,20 @@ onUnmounted(() => {
             <dd>{{ formatCashDividend(card.dividend ?? undefined) }}</dd>
           </div>
           <div>
-            <dt>配股</dt>
-            <dd>{{ formatStockDividend(card.dividend ?? undefined) }}</dd>
-          </div>
-          <div>
             <dt>殖利率</dt>
             <dd>{{ formatDividendYield(card.dividend ?? undefined, card.quote?.price) }}</dd>
           </div>
-          <div class="ex-date" :class="{ soon: isExDateSoon(card.dividend?.exDate ?? null) }">
+          <div v-if="hasStockDividend(card.dividend)">
+            <dt>配股</dt>
+            <dd>{{ formatStockDividend(card.dividend ?? undefined) }}</dd>
+          </div>
+          <div
+            class="ex-date"
+            :class="{
+              soon: isExDateSoon(card.dividend?.exDate ?? null),
+              'span-row': !hasStockDividend(card.dividend),
+            }"
+          >
             <dt>除權息日</dt>
             <dd>{{ formatExDate(card.dividend ?? undefined) }}</dd>
           </div>
@@ -526,12 +533,6 @@ onUnmounted(() => {
   }
 }
 
-.trade-date {
-  margin-top: 4px;
-  font-size: 12px;
-  color: $text-muted;
-}
-
 .card-actions {
   display: inline-flex;
   align-items: center;
@@ -616,7 +617,9 @@ dd {
 }
 
 .ex-date {
-  grid-column: 1 / -1;
+  &.span-row {
+    grid-column: 1 / -1;
+  }
 
   &.soon dd {
     color: $primary;
