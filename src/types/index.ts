@@ -216,3 +216,59 @@ export interface ToolboxList {
   createdAt: string;
   updatedAt: string;
 }
+
+export type TwStockMarket = "twse" | "tpex";
+
+export type DividendFrequency =
+  | "monthly"
+  | "quarterly"
+  | "semiannual"
+  | "annual"
+  | "none";
+
+export interface FavoriteStock {
+  code: string;
+  name: string;
+  market: TwStockMarket;
+  addedAt: string;
+  /** 點星號置頂後為 true，星號顯示黃色 */
+  pinned: boolean;
+}
+
+export interface TwStockQuote {
+  code: string;
+  name: string;
+  market: TwStockMarket;
+  price: number | null;
+  priceText: string;
+  change: number | null;
+  changePercent: number | null;
+  open: number | null;
+  high: number | null;
+  low: number | null;
+  volume: number | null;
+  tradeDate: string | null;
+}
+
+export interface TwStockDividend {
+  code: string;
+  /** 現金股利（元／股） */
+  cashDividend: number | null;
+  cashDividendText: string;
+  /** 無償配股率 */
+  stockDividendRatio: number | null;
+  /** 殖利率（%） */
+  yieldPercent: number | null;
+  /** 除權息日 YYYY-MM-DD（預告中的下一檔） */
+  exDate: string | null;
+  /** 最近一次除息日 */
+  lastExDate: string | null;
+  /** 最近一次現金股利 */
+  lastCashDividend: number | null;
+  /** 近一年現金股利合計（用來推算殖利率） */
+  trailingCash: number | null;
+  /** 息／權／權息 */
+  exType: string;
+  /** 月配／季配／半年配／年配／無配息 */
+  frequency: DividendFrequency;
+}

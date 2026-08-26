@@ -21,6 +21,7 @@ const NAV_FEATURES_KEY = "bullet-journal-nav-features";
 const NAV_FEATURE_ORDER_KEY = "bullet-journal-nav-feature-order";
 const TASK_AVATARS_KEY = "bullet-journal-task-avatars";
 const SIDEBAR_CAROUSEL_KEY = "bullet-journal-sidebar-carousel";
+const STOCK_FAVORITES_KEY = "bullet-journal-stock-favorites";
 
 const defaultMigrationReviewState: MigrationReviewState = {
   snoozedUntil: null,
@@ -79,6 +80,7 @@ export {
   NAV_FEATURE_ORDER_KEY,
   TASK_AVATARS_KEY,
   SIDEBAR_CAROUSEL_KEY,
+  STOCK_FAVORITES_KEY,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
   defaultGeminiUsageState,

@@ -9,6 +9,7 @@ import LabelsManager from '@/components/LabelsManager.vue'
 import SidebarCarouselManager from '@/components/SidebarCarouselManager.vue'
 import TaskAvatarsManager from '@/components/TaskAvatarsManager.vue'
 import { useTaskStore } from '@/stores/taskStore'
+import { useStockStore } from '@/stores/stockStore'
 import { mockLabels, mockTasks } from '@/mock/data'
 import { downloadBackupZip } from '@/utils/backup'
 import { importBackupZip } from '@/utils/backupImport'
@@ -19,6 +20,7 @@ import { useSimpleReorderDrag } from '@/composables/useReorderDrag'
 import { type NavFeatureId } from '@/utils/navFeatures'
 
 const store = useTaskStore()
+const stockStore = useStockStore()
 const { draggingId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd } =
   useSimpleReorderDrag(
     () => store.orderedNavFeatures,
@@ -88,6 +90,7 @@ function clearAllData() {
     '確定要清除所有任務、標籤與偏好設定？此操作無法復原，且不會還原為示範資料。',
     () => {
       store.clearAllData()
+      stockStore.clearAll()
       showFeedback('已清除所有資料')
     },
     { danger: true, confirmLabel: '全部清除' },

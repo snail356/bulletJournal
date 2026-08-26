@@ -69,6 +69,12 @@ const router = createRouter({
       meta: { title: '統計分析', navFeature: 'stats' },
     },
     {
+      path: '/xiaoguli',
+      name: 'xiaoguli',
+      component: () => import('@/views/StockWatchView.vue'),
+      meta: { title: '小股力', navFeature: 'xiaoguli' },
+    },
+    {
       path: '/settings',
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),

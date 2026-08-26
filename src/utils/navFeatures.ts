@@ -8,6 +8,7 @@ export type NavFeatureId =
   | 'toolbox'
   | 'reflections'
   | 'stats'
+  | 'xiaoguli'
   | 'settings'
 
 export type NavFeatureVisibility = Record<NavFeatureId, boolean>
@@ -75,6 +76,13 @@ export const NAV_FEATURES: NavFeature[] = [
     icon: 'chart-column',
   },
   {
+    id: 'xiaoguli',
+    path: '/xiaoguli',
+    label: '小股力',
+    description: '查找台股、加入最愛，並動態顯示股價、配息與除權息日',
+    icon: 'chart-line',
+  },
+  {
     id: 'settings',
     path: '/settings',
     label: '設定',
@@ -92,6 +100,7 @@ export const defaultNavFeatureVisibility: NavFeatureVisibility = {
   toolbox: true,
   reflections: false,
   stats: false,
+  xiaoguli: true,
   settings: true,
 }
 
@@ -120,7 +129,14 @@ export function normalizeNavFeatureOrder(raw: unknown): NavFeatureId[] {
   }
 
   for (const feature of NAV_FEATURES) {
-    if (!ordered.includes(feature.id)) ordered.push(feature.id)
+    if (ordered.includes(feature.id)) continue
+    if (feature.id === 'settings') {
+      ordered.push(feature.id)
+      continue
+    }
+    const settingsIdx = ordered.indexOf('settings')
+    if (settingsIdx >= 0) ordered.splice(settingsIdx, 0, feature.id)
+    else ordered.push(feature.id)
   }
 
   return ordered
