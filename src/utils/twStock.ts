@@ -2,6 +2,7 @@ import type {
   DividendFrequency,
   FavoriteStock,
   TwStockDividend,
+  TwStockExEvent,
   TwStockMarket,
   TwStockQuote,
 } from "@/types";
@@ -302,6 +303,7 @@ function parseExRows(payload: unknown, codeKeys: string[]): TwStockDividend[] {
         trailingCash: null,
         exType,
         frequency: "none",
+        history: [],
       },
     ];
   });
@@ -330,16 +332,16 @@ interface ExHistorySummary {
   lastExDate: string | null;
   lastCash: number | null;
   trailingCash: number;
+  events: TwStockExEvent[];
 }
 
 function parseExHistory(payloads: unknown[]): Map<string, ExHistorySummary> {
-  const events = new Map<string, { date: string; cash: number | null }[]>();
+  const events = new Map<string, TwStockExEvent[]>();
   for (const payload of payloads) {
     for (const row of asRows(payload)) {
       const code = rowText(row, ["股票代號", "Code", "證券代號"]);
       if (!code) continue;
       const kind = rowText(row, ["權/息", "除權息", "ExType"]);
-      if (kind && !kind.includes("息")) continue;
       const date =
         parseTwDate(
           rowText(row, [
@@ -350,24 +352,55 @@ function parseExHistory(payloads: unknown[]): Map<string, ExHistorySummary> {
           ]),
         ) ?? "";
       if (!date) continue;
+      const combined = parseTwNumber(rowText(row, ["權值+息值"]));
       const cash =
         parseTwNumber(rowText(row, ["息值", "現金股利"])) ??
-        (kind === "權" ? null : parseTwNumber(rowText(row, ["權值+息值"])));
+        (kind.includes("息") ? combined : null);
+      const stock =
+        parseTwNumber(rowText(row, ["無償配股率", "配股率"])) ?? null;
+      const preClose = parseTwNumber(
+        rowText(row, ["除權息前收盤價", "前收盤價"]),
+      );
       const list = events.get(code) ?? [];
-      if (!list.some((item) => item.date === date)) list.push({ date, cash });
+      const existing = list.find((item) => item.exDate === date);
+      if (existing) {
+        if (cash != null) existing.cashDividend = cash;
+        if (stock != null) existing.stockDividendRatio = stock;
+        if (kind && !existing.kind.includes(kind)) {
+          existing.kind = [existing.kind, kind].filter(Boolean).join("");
+        }
+        if (preClose != null) existing.preClose = preClose;
+        continue;
+      }
+      list.push({
+        exDate: date,
+        cashDividend: cash,
+        stockDividendRatio: stock,
+        kind,
+        preClose,
+        fillDate: null,
+        fillChecked: false,
+      });
       events.set(code, list);
     }
   }
 
   const map = new Map<string, ExHistorySummary>();
   for (const [code, list] of events) {
-    const sorted = [...list].sort((a, b) => a.date.localeCompare(b.date));
-    const last = sorted[sorted.length - 1];
+    const sorted = [...list].sort((a, b) => a.exDate.localeCompare(b.exDate));
+    const cashEvents = sorted.filter(
+      (item) => item.kind.includes("息") || item.cashDividend,
+    );
+    const last = cashEvents[cashEvents.length - 1] ?? sorted[sorted.length - 1];
     map.set(code, {
-      count: sorted.length,
-      lastExDate: last?.date ?? null,
-      lastCash: last?.cash ?? null,
-      trailingCash: sorted.reduce((sum, item) => sum + (item.cash ?? 0), 0),
+      count: cashEvents.length,
+      lastExDate: last?.exDate ?? null,
+      lastCash: last?.cashDividend ?? null,
+      trailingCash: cashEvents.reduce(
+        (sum, item) => sum + (item.cashDividend ?? 0),
+        0,
+      ),
+      events: [...sorted].reverse(),
     });
   }
   return map;
@@ -408,6 +441,125 @@ export async function fetchStockExHistory(): Promise<Map<string, ExHistorySummar
     }
   }
   return new Map();
+}
+
+interface DailyClose {
+  date: string;
+  close: number;
+}
+
+const dailyCloseCache = new Map<string, DailyClose[]>();
+
+function yearMonthsBetween(startIso: string, end: Date): string[] {
+  const start = new Date(`${startIso}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return [];
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1);
+  const last = new Date(end.getFullYear(), end.getMonth(), 1);
+  const months: string[] = [];
+  while (cursor <= last) {
+    months.push(yyyymmdd(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months;
+}
+
+function parseDailyCloses(payload: unknown): DailyClose[] {
+  const root = asRecord(payload);
+  if (root && Array.isArray(root.aaData)) {
+    return (root.aaData as unknown[]).flatMap((item) => {
+      if (!Array.isArray(item)) return [];
+      const date = parseTwDate(String(item[0] ?? "")) ?? "";
+      const close = parseTwNumber(String(item[6] ?? ""));
+      if (!date || close == null) return [];
+      return [{ date, close }];
+    });
+  }
+  return asRows(payload).flatMap((row) => {
+    const date = parseTwDate(rowText(row, ["日期", "Date", "成交日期"])) ?? "";
+    const close = parseTwNumber(rowText(row, ["收盤價", "Close", "收盤"]));
+    if (!date || close == null) return [];
+    return [{ date, close }];
+  });
+}
+
+async function fetchDailyCloses(
+  code: string,
+  market: TwStockMarket,
+  fromIso: string,
+): Promise<DailyClose[]> {
+  const cached = dailyCloseCache.get(`${market}:${code}`);
+  if (cached?.length) return cached;
+
+  const months = yearMonthsBetween(fromIso, new Date());
+  const urls =
+    market === "tpex"
+      ? months.map((month) => {
+          const roc = `${Number(month.slice(0, 4)) - 1911}/${month.slice(4, 6)}`;
+          return stockApi(
+            "tpex",
+            `/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d=${encodeURIComponent(roc)}&stkno=${encodeURIComponent(code)}`,
+          );
+        })
+      : months.map((month) =>
+          stockApi(
+            "twse-www",
+            `/rwd/zh/afterTrading/STOCK_DAY?response=json&date=${month}&stockNo=${encodeURIComponent(code)}`,
+          ),
+        );
+
+  const results = await Promise.allSettled(urls.map((url) => fetchJson(url)));
+  const closes = results.flatMap((result) =>
+    result.status === "fulfilled" ? parseDailyCloses(result.value) : [],
+  );
+  const unique = new Map<string, number>();
+  for (const item of closes) unique.set(item.date, item.close);
+  const list = [...unique.entries()]
+    .map(([date, close]) => ({ date, close }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  dailyCloseCache.set(`${market}:${code}`, list);
+  return list;
+}
+
+function fillDateForEvent(event: TwStockExEvent, closes: DailyClose[]): string | null {
+  if (event.preClose == null || event.preClose <= 0) return null;
+  for (const day of closes) {
+    if (day.date < event.exDate) continue;
+    if (day.close >= event.preClose) return day.date;
+  }
+  return null;
+}
+
+export async function attachFillDates(
+  code: string,
+  market: TwStockMarket,
+  events: TwStockExEvent[],
+): Promise<TwStockExEvent[]> {
+  if (!events.length) return events;
+  if (events.every((event) => event.fillChecked)) return events;
+  const fromIso = [...events].sort((a, b) => a.exDate.localeCompare(b.exDate))[0]?.exDate;
+  if (!fromIso) return events;
+  const closes = await fetchDailyCloses(code, market, fromIso);
+  return events.map((event) => ({
+    ...event,
+    fillDate: fillDateForEvent(event, closes),
+    fillChecked: true,
+  }));
+}
+
+export function keepFillDates(
+  previous: TwStockExEvent[] | undefined,
+  next: TwStockExEvent[],
+): TwStockExEvent[] {
+  if (!previous?.length) return next;
+  return next.map((event) => {
+    const old = previous.find((item) => item.exDate === event.exDate);
+    if (!old?.fillChecked) return event;
+    return {
+      ...event,
+      fillDate: old.fillDate,
+      fillChecked: true,
+    };
+  });
 }
 
 function hasCashPayout(
@@ -452,7 +604,28 @@ function emptyDividend(code: string, yieldPercent: number | null = null): TwStoc
     trailingCash: null,
     exType: "",
     frequency: "none",
+    history: [],
   };
+}
+
+function attachUpcomingToEvents(
+  events: TwStockExEvent[],
+  upcoming: TwStockDividend[],
+  code: string,
+): TwStockExEvent[] {
+  if (!events.length) return events;
+  return events.map((event) => {
+    const match = upcoming.find(
+      (item) => item.code === code && item.exDate === event.exDate,
+    );
+    if (!match) return event;
+    return {
+      ...event,
+      cashDividend: event.cashDividend ?? match.cashDividend,
+      stockDividendRatio: event.stockDividendRatio ?? match.stockDividendRatio,
+      kind: event.kind || match.exType,
+    };
+  });
 }
 
 function mergeDividends(
@@ -501,6 +674,14 @@ function mergeDividends(
       lastExDate,
       lastCashDividend,
       trailingCash,
+      history: keepFillDates(
+        item.history,
+        attachUpcomingToEvents(
+          history?.events ?? item.history ?? [],
+          upcoming,
+          item.code,
+        ),
+      ),
       frequency: classifyDividendFrequency(
         periodsByCode.get(item.code) ?? [],
         history?.count ?? 0,
@@ -528,6 +709,7 @@ export function overlayDividendHistory(
       lastExDate: history.lastExDate,
       lastCashDividend: history.lastCash,
       trailingCash: history.trailingCash,
+      history: keepFillDates(current.history, history.events.length ? history.events : current.history),
       frequency: classifyDividendFrequency(
         [],
         history.count,
@@ -799,6 +981,28 @@ export function formatDividendYield(
     return `${((item.trailingCash / price) * 100).toFixed(2)}%`;
   }
   return "—";
+}
+
+export function formatHistoryAmount(value: number | null | undefined): string {
+  if (value == null || value === 0) return "—";
+  return value.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+export function formatHistoryStock(value: number | null | undefined): string {
+  if (value == null || value === 0) return "—";
+  return value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
+}
+
+export function formatFillDays(event: TwStockExEvent | undefined): string {
+  if (!event) return "—";
+  if (!event.fillChecked) return "計算中…";
+  if (!event.fillDate) return event.preClose == null ? "—" : "未回填";
+  const start = new Date(`${event.exDate}T00:00:00`);
+  const filled = new Date(`${event.fillDate}T00:00:00`);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(filled.getTime())) return "—";
+  const days = Math.round((filled.getTime() - start.getTime()) / 86_400_000);
+  if (days <= 0) return "當天";
+  return `${days} 天`;
 }
 
 export function isExDateSoon(exDate: string | null, withinDays = 7): boolean {

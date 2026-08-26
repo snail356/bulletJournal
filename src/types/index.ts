@@ -250,6 +250,23 @@ export interface TwStockQuote {
   tradeDate: string | null;
 }
 
+export interface TwStockExEvent {
+  /** 除權息日 YYYY-MM-DD */
+  exDate: string;
+  /** 現金股利（元／股） */
+  cashDividend: number | null;
+  /** 無償配股率 */
+  stockDividendRatio: number | null;
+  /** 息／權／權息 */
+  kind: string;
+  /** 除權息前收盤價，用來判斷填息 */
+  preClose: number | null;
+  /** 回填（填息）完成日 */
+  fillDate: string | null;
+  /** 是否已查過日線以判斷填息 */
+  fillChecked: boolean;
+}
+
 export interface TwStockDividend {
   code: string;
   /** 現金股利（元／股） */
@@ -271,4 +288,6 @@ export interface TwStockDividend {
   exType: string;
   /** 月配／季配／半年配／年配／無配息 */
   frequency: DividendFrequency;
+  /** 近一年除權息明細 */
+  history: TwStockExEvent[];
 }

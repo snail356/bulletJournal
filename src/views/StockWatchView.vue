@@ -10,6 +10,9 @@ import {
   formatChangePercent,
   formatDividendYield,
   formatExDate,
+  formatFillDays,
+  formatHistoryAmount,
+  formatHistoryStock,
   formatStockDividend,
   formatVolume,
   isExDateSoon,
@@ -22,6 +25,7 @@ const searchOpen = ref(false)
 const activeIndex = ref(0)
 const searchRoot = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
+const flippedCode = ref<string | null>(null)
 
 const matches = computed(() => store.search(keyword.value))
 
@@ -47,6 +51,21 @@ function changeClass(change: number | null | undefined) {
 
 function hasStockDividend(dividend: { stockDividendRatio: number | null } | null | undefined) {
   return Boolean(dividend?.stockDividendRatio && dividend.stockDividendRatio > 0)
+}
+
+function historyHasStockDividend(
+  history: { stockDividendRatio: number | null }[] | null | undefined,
+) {
+  return Boolean(history?.some((event) => hasStockDividend(event)))
+}
+
+function toggleFlip(code: string) {
+  if (flippedCode.value === code) {
+    flippedCode.value = null
+    return
+  }
+  flippedCode.value = code
+  void store.ensureFillDates(code)
 }
 
 function selectStock(code: string) {
@@ -184,100 +203,154 @@ onUnmounted(() => {
     </div>
 
     <div v-else class="card-grid">
-      <article
+      <div
         v-for="card in store.favoriteCards"
         :key="card.code"
-        class="stock-card"
+        class="flip-card"
+        :class="{ flipped: flippedCode === card.code }"
       >
-        <header class="card-head">
-          <div>
-            <div class="title-row">
-              <span class="badge">{{ marketLabel(card.market) }}</span>
-              <span
-                class="badge freq"
-                :class="`freq-${card.dividend?.frequency ?? 'none'}`"
-              >
-                {{ dividendFrequencyLabel(card.dividend?.frequency ?? 'none') }}
+        <div class="card-actions" @click.stop>
+          <button
+            type="button"
+            class="star-btn"
+            :class="{ pinned: card.pinned }"
+            :aria-label="card.pinned ? '取消置頂' : '置頂'"
+            @click="store.pinFavorite(card.code)"
+          >
+            <AppIcon name="star" />
+          </button>
+          <DeleteIconButton
+            title="移出清單"
+            :message="`確定將「${card.code} ${card.name}」移出清單？`"
+            label="移出清單"
+            @confirm="store.removeFavorite(card.code)"
+          />
+        </div>
+        <div
+          class="flip-inner"
+          role="button"
+          tabindex="0"
+          :aria-pressed="flippedCode === card.code"
+          :aria-label="
+            flippedCode === card.code
+              ? `翻回 ${card.code} 行情`
+              : `查看 ${card.code} 歷史除權息`
+          "
+          :title="flippedCode === card.code ? '點擊翻回' : '點擊查看歷史除權息'"
+          @click="toggleFlip(card.code)"
+          @keydown.enter.prevent="toggleFlip(card.code)"
+          @keydown.space.prevent="toggleFlip(card.code)"
+        >
+          <article class="stock-card face front">
+            <header class="card-head">
+              <div>
+                <div class="title-row">
+                  <span class="badge">{{ marketLabel(card.market) }}</span>
+                  <span
+                    class="badge freq"
+                    :class="`freq-${card.dividend?.frequency ?? 'none'}`"
+                  >
+                    {{ dividendFrequencyLabel(card.dividend?.frequency ?? 'none') }}
+                  </span>
+                </div>
+                <p class="stock-title">
+                  <span class="code">{{ card.code }}</span>
+                  <span class="name">{{ card.name }}</span>
+                </p>
+              </div>
+            </header>
+
+            <div class="price-row">
+              <span class="price" :class="changeClass(card.quote?.change)">
+                {{ card.quote?.priceText ?? '—' }}
+              </span>
+              <span class="change" :class="changeClass(card.quote?.change)">
+                {{ formatChange(card.quote?.change ?? null) }}
+                {{ formatChangePercent(card.quote?.changePercent ?? null) }}
               </span>
             </div>
-            <p class="stock-title">
-              <span class="code">{{ card.code }}</span>
-              <span class="name">{{ card.name }}</span>
+
+            <dl class="ohlc">
+              <div>
+                <dt>開</dt>
+                <dd>{{ card.quote?.open?.toFixed(2) ?? '—' }}</dd>
+              </div>
+              <div>
+                <dt>高</dt>
+                <dd>{{ card.quote?.high?.toFixed(2) ?? '—' }}</dd>
+              </div>
+              <div>
+                <dt>低</dt>
+                <dd>{{ card.quote?.low?.toFixed(2) ?? '—' }}</dd>
+              </div>
+              <div>
+                <dt>量</dt>
+                <dd>{{ formatVolume(card.quote?.volume ?? null) }}</dd>
+              </div>
+            </dl>
+
+            <dl class="dividend">
+              <div>
+                <dt>配息</dt>
+                <dd>{{ formatCashDividend(card.dividend ?? undefined) }}</dd>
+              </div>
+              <div>
+                <dt>殖利率</dt>
+                <dd>{{ formatDividendYield(card.dividend ?? undefined, card.quote?.price) }}</dd>
+              </div>
+              <div v-if="hasStockDividend(card.dividend)">
+                <dt>配股</dt>
+                <dd>{{ formatStockDividend(card.dividend ?? undefined) }}</dd>
+              </div>
+              <div
+                class="ex-date"
+                :class="{
+                  soon: isExDateSoon(card.dividend?.exDate ?? null),
+                  'span-row': !hasStockDividend(card.dividend),
+                }"
+              >
+                <dt>除權息日</dt>
+                <dd>{{ formatExDate(card.dividend ?? undefined) }}</dd>
+              </div>
+            </dl>
+          </article>
+
+          <article class="stock-card face back">
+            <header class="back-head">
+              <p class="back-title">
+                <span class="code">{{ card.code }}</span>
+                <span class="name">{{ card.name }}</span>
+              </p>
+              <p class="back-hint">歷史除權息 · 再點一次翻回</p>
+            </header>
+            <p v-if="!card.dividend?.history?.length" class="back-empty">
+              近一年尚無除權息紀錄
             </p>
-          </div>
-          <div class="card-actions">
-            <button
-              type="button"
-              class="star-btn"
-              :class="{ pinned: card.pinned }"
-              :aria-label="card.pinned ? '取消置頂' : '置頂'"
-              @click="store.pinFavorite(card.code)"
-            >
-              <AppIcon name="star" />
-            </button>
-            <DeleteIconButton
-              title="移出清單"
-              :message="`確定將「${card.code} ${card.name}」移出清單？`"
-              label="移出清單"
-              @confirm="store.removeFavorite(card.code)"
-            />
-          </div>
-        </header>
-
-        <div class="price-row">
-          <span class="price" :class="changeClass(card.quote?.change)">
-            {{ card.quote?.priceText ?? '—' }}
-          </span>
-          <span class="change" :class="changeClass(card.quote?.change)">
-            {{ formatChange(card.quote?.change ?? null) }}
-            {{ formatChangePercent(card.quote?.changePercent ?? null) }}
-          </span>
+            <div v-else class="history-wrap">
+              <table class="history-table">
+                <thead>
+                  <tr>
+                    <th>除權息日</th>
+                    <th>配息</th>
+                    <th v-if="historyHasStockDividend(card.dividend.history)">配股</th>
+                    <th>回填</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="event in card.dividend.history" :key="event.exDate">
+                    <td>{{ event.exDate }}</td>
+                    <td>{{ formatHistoryAmount(event.cashDividend) }}</td>
+                    <td v-if="historyHasStockDividend(card.dividend.history)">
+                      {{ formatHistoryStock(event.stockDividendRatio) }}
+                    </td>
+                    <td>{{ formatFillDays(event) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
         </div>
-
-        <dl class="ohlc">
-          <div>
-            <dt>開</dt>
-            <dd>{{ card.quote?.open?.toFixed(2) ?? '—' }}</dd>
-          </div>
-          <div>
-            <dt>高</dt>
-            <dd>{{ card.quote?.high?.toFixed(2) ?? '—' }}</dd>
-          </div>
-          <div>
-            <dt>低</dt>
-            <dd>{{ card.quote?.low?.toFixed(2) ?? '—' }}</dd>
-          </div>
-          <div>
-            <dt>量</dt>
-            <dd>{{ formatVolume(card.quote?.volume ?? null) }}</dd>
-          </div>
-        </dl>
-
-        <dl class="dividend">
-          <div>
-            <dt>配息</dt>
-            <dd>{{ formatCashDividend(card.dividend ?? undefined) }}</dd>
-          </div>
-          <div>
-            <dt>殖利率</dt>
-            <dd>{{ formatDividendYield(card.dividend ?? undefined, card.quote?.price) }}</dd>
-          </div>
-          <div v-if="hasStockDividend(card.dividend)">
-            <dt>配股</dt>
-            <dd>{{ formatStockDividend(card.dividend ?? undefined) }}</dd>
-          </div>
-          <div
-            class="ex-date"
-            :class="{
-              soon: isExDateSoon(card.dividend?.exDate ?? null),
-              'span-row': !hasStockDividend(card.dividend),
-            }"
-          >
-            <dt>除權息日</dt>
-            <dd>{{ formatExDate(card.dividend ?? undefined) }}</dd>
-          </div>
-        </dl>
-      </article>
+      </div>
     </div>
   </div>
 </template>
@@ -456,6 +529,48 @@ onUnmounted(() => {
   gap: 14px;
 }
 
+.flip-card {
+  position: relative;
+  perspective: 1200px;
+}
+
+.flip-inner {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  cursor: pointer;
+  outline: none;
+
+  &:focus-visible {
+    box-shadow: 0 0 0 3px $primary-light;
+    border-radius: $radius;
+  }
+}
+
+.flip-card.flipped .flip-inner {
+  transform: rotateY(180deg);
+}
+
+.face {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.face.front {
+  position: relative;
+  padding-right: 56px;
+}
+
+.face.back {
+  position: absolute;
+  inset: 0;
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-right: 8px;
+}
+
 .stock-card {
   background: $surface;
   border-radius: $radius;
@@ -534,6 +649,10 @@ onUnmounted(() => {
 }
 
 .card-actions {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 2px;
@@ -623,6 +742,86 @@ dd {
 
   &.soon dd {
     color: $primary;
+  }
+}
+
+.back-head {
+  margin-bottom: 10px;
+  padding-right: 48px;
+}
+
+.back-title {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.3;
+
+  .code {
+    font-size: 16px;
+  }
+
+  .name {
+    font-size: 14px;
+  }
+}
+
+.back-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: $text-muted;
+}
+
+.back-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: $text-muted;
+  font-size: 13px;
+}
+
+.history-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 6px;
+  scrollbar-gutter: stable;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+
+  th,
+  td {
+    text-align: left;
+    padding: 5px 8px 5px 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  th {
+    color: $text-muted;
+    font-weight: 600;
+    border-bottom: 1px solid $border;
+  }
+
+  td {
+    font-weight: 600;
+    vertical-align: top;
+  }
+
+  th:last-child,
+  td:last-child {
+    text-align: right;
+    padding-right: 14px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner {
+    transition: none;
   }
 }
 

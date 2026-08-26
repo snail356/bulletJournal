@@ -11,9 +11,11 @@ import {
   STOCK_FAVORITES_KEY,
 } from "@/utils/storage";
 import {
+  attachFillDates,
   fetchLiveQuotes,
   fetchStockExHistory,
   fetchTwStockSnapshot,
+  keepFillDates,
   normalizeFavoriteStocks,
   overlayDividendHistory,
   searchTwStocks,
@@ -32,6 +34,7 @@ export const useStockStore = defineStore("stock", () => {
   const refreshing = ref(false);
   const error = ref("");
   const lastUpdatedAt = ref<string | null>(null);
+  const fillLoading = ref<Record<string, boolean>>({});
   let pollTimer: number | null = null;
 
   const favoriteCards = computed(() => {
@@ -58,7 +61,13 @@ export const useStockStore = defineStore("stock", () => {
 
     const nextDividends: Record<string, TwStockDividend> = {};
     for (const item of dividends) {
-      nextDividends[item.code] = item;
+      nextDividends[item.code] = {
+        ...item,
+        history: keepFillDates(
+          dividendsByCode.value[item.code]?.history,
+          item.history ?? [],
+        ),
+      };
     }
     dividendsByCode.value = nextDividends;
 
@@ -157,6 +166,41 @@ export const useStockStore = defineStore("stock", () => {
     void enrichFavoriteDividends(stock.code);
   }
 
+  async function ensureFillDates(code: string) {
+    const current = dividendsByCode.value[code];
+    const favorite = favorites.value.find((stock) => stock.code === code);
+    if (!current?.history.length || !favorite) return;
+    if (current.history.every((event) => event.fillChecked)) return;
+    if (fillLoading.value[code]) return;
+    fillLoading.value = { ...fillLoading.value, [code]: true };
+    try {
+      const history = await attachFillDates(
+        code,
+        favorite.market,
+        current.history,
+      );
+      const latest = dividendsByCode.value[code];
+      if (!latest) return;
+      dividendsByCode.value = {
+        ...dividendsByCode.value,
+        [code]: { ...latest, history },
+      };
+    } catch {
+      dividendsByCode.value = {
+        ...dividendsByCode.value,
+        [code]: {
+          ...current,
+          history: current.history.map((event) => ({
+            ...event,
+            fillChecked: true,
+          })),
+        },
+      };
+    } finally {
+      fillLoading.value = { ...fillLoading.value, [code]: false };
+    }
+  }
+
   async function enrichFavoriteDividends(code: string) {
     const current = dividendsByCode.value[code];
     if (current && current.frequency !== "none") return;
@@ -237,6 +281,7 @@ export const useStockStore = defineStore("stock", () => {
     refreshing,
     error,
     lastUpdatedAt,
+    fillLoading,
     refresh,
     search,
     isFavorite,
@@ -244,6 +289,7 @@ export const useStockStore = defineStore("stock", () => {
     pinFavorite,
     removeFavorite,
     toggleFavorite,
+    ensureFillDates,
     startPolling,
     stopPolling,
     clearAll,
