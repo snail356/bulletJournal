@@ -1,7 +1,14 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, provide, ref, watch } from 'vue'
 import type { Attachment, SubTask, Task, TaskStatus } from '@/types'
-import { formatDisplayDate, formatShortDate, getOriginalScheduledDate, getPostponedDays, getTaskEndDate } from '@/utils/date'
+import {
+  formatDisplayDate,
+  formatShortDate,
+  getOriginalScheduledDate,
+  getPostponedDays,
+  getTaskEndDate,
+  normalizeEndDate,
+} from '@/utils/date'
 import SubTaskItem from './SubTaskItem.vue'
 import TaskBodySection from './TaskBodySection.vue'
 import NoteBlock from './NoteBlock.vue'
@@ -54,11 +61,13 @@ const menuX = ref(0)
 const menuY = ref(0)
 const showEditModal = ref(false)
 const showNoteModal = ref(false)
-const showMoveDate = ref(false)
 const showCompleteConfirm = ref(false)
 const showDeleteConfirm = ref(false)
 const pendingFocusSubtaskId = ref<string | null>(null)
-const moveDateValue = ref('')
+const datePickerMode = ref<'start' | 'end' | 'move' | null>(null)
+const datePickerValue = ref('')
+const datePickerInput = ref<HTMLInputElement | null>(null)
+const datePickerApplying = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 const hoursInput = ref<HTMLInputElement | null>(null)
 const expanded = ref(store.expandAllTasks)
@@ -132,6 +141,10 @@ const postponedLabel = computed(() => {
 
 const startDateLabel = computed(() => formatShortDate(props.task.date))
 const endDateLabel = computed(() => formatShortDate(getTaskEndDate(props.task)))
+
+const datePickerMin = computed(() =>
+  datePickerMode.value === 'end' ? props.task.date : undefined,
+)
 
 const difficultyOptions = computed(() => store.getDifficultyNoteOptions())
 
@@ -302,12 +315,85 @@ function onMenuSelect(key: string) {
       store.duplicateTask(props.task.id)
       break
     case 'move':
-      moveDateValue.value = props.task.date
-      showMoveDate.value = true
+      openDatePicker('move')
       break
     case 'delete':
       requestDelete()
       break
+  }
+}
+
+function openDatePicker(mode: 'start' | 'end' | 'move') {
+  datePickerMode.value = mode
+  datePickerApplying.value = false
+  if (mode === 'end') {
+    datePickerValue.value = getTaskEndDate(props.task)
+  } else {
+    datePickerValue.value = props.task.date
+  }
+  nextTick(() => {
+    const el = datePickerInput.value
+    if (!el) return
+    el.focus({ preventScroll: true })
+    try {
+      el.showPicker?.()
+    } catch {
+      /* 部分瀏覽器不支援或需使用者手勢，略過即可 */
+    }
+  })
+}
+
+function closeDatePicker() {
+  datePickerMode.value = null
+  datePickerApplying.value = false
+}
+
+function applySelectedDate(value: string) {
+  if (!value || !datePickerMode.value) {
+    closeDatePicker()
+    return
+  }
+
+  if (datePickerMode.value === 'move') {
+    store.moveTask(props.task.id, value)
+  } else if (datePickerMode.value === 'start') {
+    store.setTaskDateRange(
+      props.task.id,
+      value,
+      normalizeEndDate(value, props.task.endDate),
+    )
+  } else {
+    store.setTaskDateRange(
+      props.task.id,
+      props.task.date,
+      normalizeEndDate(props.task.date, value),
+    )
+  }
+  closeDatePicker()
+}
+
+function onDatePickerChange(e: Event) {
+  if (!datePickerMode.value) return
+  const value = (e.target as HTMLInputElement).value
+  datePickerApplying.value = true
+  applySelectedDate(value)
+}
+
+function onDatePickerBlur() {
+  if (!datePickerMode.value) return
+  // 原生日曆彈層互動時可能短暫失焦，稍等再決定是否取消
+  window.setTimeout(() => {
+    if (!datePickerMode.value || datePickerApplying.value) return
+    if (document.activeElement === datePickerInput.value) return
+    closeDatePicker()
+  }, 150)
+}
+
+function onDatePickerKeydown(e: KeyboardEvent) {
+  if (!datePickerMode.value) return
+  if (e.key === 'Escape') {
+    e.preventDefault()
+    closeDatePicker()
   }
 }
 
@@ -330,13 +416,6 @@ function onLabelsChange(labels: string[]) {
 function addNote(content: string) {
   store.createNote(props.task.id, content)
   notesExpanded.value = true
-}
-
-function confirmMove() {
-  if (moveDateValue.value) {
-    store.moveTask(props.task.id, moveDateValue.value)
-  }
-  showMoveDate.value = false
 }
 
 async function onPaste(e: ClipboardEvent) {
@@ -460,15 +539,53 @@ async function onContextPaste() {
         <template v-else>
           <div class="meta-primary">
             <div class="status-row">
-              <div class="date-range" :title="`${task.date} ～ ${getTaskEndDate(task)}`">
-                <span class="date-part">
-                  <span class="hours-label">開始</span>
-                  <span class="date-value">{{ startDateLabel }}</span>
-                </span>
-                <span class="date-part">
-                  <span class="hours-label">結束</span>
-                  <span class="date-value">{{ endDateLabel }}</span>
-                </span>
+              <div class="date-field">
+                <div class="date-range" :title="`${task.date} ～ ${getTaskEndDate(task)}`">
+                  <button
+                    type="button"
+                    class="date-part"
+                    :class="{ active: datePickerMode === 'start' || datePickerMode === 'move' }"
+                    title="重新選擇開始日期"
+                    @mousedown.prevent
+                    @click.stop="openDatePicker('start')"
+                  >
+                    <span class="hours-label">開始</span>
+                    <span class="date-value">{{ startDateLabel }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="date-part"
+                    :class="{ active: datePickerMode === 'end' }"
+                    title="重新選擇結束日期"
+                    @mousedown.prevent
+                    @click.stop="openDatePicker('end')"
+                  >
+                    <span class="hours-label">結束</span>
+                    <span class="date-value">{{ endDateLabel }}</span>
+                  </button>
+                </div>
+                <input
+                  ref="datePickerInput"
+                  v-model="datePickerValue"
+                  type="date"
+                  class="hidden-date-picker"
+                  :class="{
+                    'under-end': datePickerMode === 'end',
+                  }"
+                  :min="datePickerMin"
+                  tabindex="-1"
+                  :aria-hidden="!datePickerMode"
+                  :aria-label="
+                    datePickerMode === 'end'
+                      ? '選擇結束日期'
+                      : datePickerMode === 'move'
+                        ? '移動到其他日期'
+                        : '選擇開始日期'
+                  "
+                  @change="onDatePickerChange"
+                  @blur="onDatePickerBlur"
+                  @keydown="onDatePickerKeydown"
+                />
               </div>
               <TaskStatusDropdown
                 :model-value="task.status"
@@ -677,19 +794,6 @@ async function onContextPaste() {
       @close="showNoteModal = false"
     />
 
-    <Teleport to="body">
-      <div v-if="showMoveDate" class="picker-overlay" @click.self="showMoveDate = false">
-        <div class="picker-panel">
-          <h4>移動到其他日期</h4>
-          <input v-model="moveDateValue" type="date" />
-          <div class="picker-actions">
-            <button type="button" @click="showMoveDate = false">取消</button>
-            <button type="button" class="confirm" @click="confirmMove">確認</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
     <input ref="fileInput" type="file" accept="image/*" hidden @change="onFileChange" />
   </article>
 </template>
@@ -867,6 +971,12 @@ async function onContextPaste() {
   width: 100%;
 }
 
+.date-field {
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+}
+
 .date-range {
   display: inline-flex;
   align-items: baseline;
@@ -877,6 +987,19 @@ async function onContextPaste() {
   display: inline-flex;
   align-items: baseline;
   gap: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: 4px;
+  color: inherit;
+
+  &:hover,
+  &.active {
+    background: $bg;
+
+    .date-value {
+      color: $primary;
+    }
+  }
 }
 
 .date-value {
@@ -884,6 +1007,25 @@ async function onContextPaste() {
   font-weight: 500;
   color: $text-muted;
   white-space: nowrap;
+}
+
+/* 只用來掛原生日曆，不佔版面、不顯示輸入框 */
+.hidden-date-picker {
+  position: absolute;
+  left: 0;
+  top: 100%;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  overflow: hidden;
+
+  &.under-end {
+    left: auto;
+    right: 0;
+  }
 }
 
 .meta-end {
@@ -1109,50 +1251,6 @@ async function onContextPaste() {
 .empty-hint {
   font-size: 12px;
   padding: 4px 0;
-}
-
-.picker-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1300;
-  background: rgba(0, 0, 0, 0.35);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.picker-panel {
-  background: $surface;
-  border-radius: $radius;
-  padding: 20px;
-  min-width: 280px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-
-  h4 {
-    font-size: 14px;
-    font-weight: 600;
-  }
-
-  input[type='date'] {
-    padding: 8px;
-    border: 1px solid $border;
-    border-radius: $radius-sm;
-  }
-}
-
-.picker-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 8px;
-
-  .confirm {
-    background: $primary;
-    color: white;
-    padding: 6px 14px;
-    border-radius: $radius-sm;
-  }
 }
 
 @media (max-width: $breakpoint-sm) {
