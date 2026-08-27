@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import type { Task } from '@/types'
 import AppIcon from '@/components/AppIcon.vue'
+import CalendarMonthCard from '@/components/CalendarMonthCard.vue'
 import CalendarTaskBlock from '@/components/CalendarTaskBlock.vue'
 import TaskFormModal from '@/components/TaskFormModal.vue'
 import { useCalendarDrag, type CalendarDragMode } from '@/composables/useCalendarDrag'
@@ -17,6 +18,8 @@ import {
   addDays,
   formatDate,
   getFilledCalendarWeeks,
+  getQuarter,
+  getQuarterMonths,
   getTaskDuration,
   getTaskEndDate,
   getWeekDates,
@@ -24,7 +27,7 @@ import {
   todayString,
 } from '@/utils/date'
 
-type CalendarMode = 'month' | 'week'
+type CalendarMode = 'week' | 'month' | 'quarter' | 'year'
 
 const store = useTaskStore()
 const router = useRouter()
@@ -41,6 +44,12 @@ const year = computed(() => viewDate.value.getFullYear())
 const month = computed(() => viewDate.value.getMonth())
 
 const periodLabel = computed(() => {
+  if (mode.value === 'year') return `${year.value} 年`
+  if (mode.value === 'quarter') {
+    const quarter = getQuarter(viewDate.value)
+    const startMonth = (quarter - 1) * 3 + 1
+    return `${year.value} 年第 ${quarter} 季（${startMonth}–${startMonth + 2} 月）`
+  }
   if (mode.value === 'month') {
     return `${year.value} 年 ${month.value + 1} 月`
   }
@@ -54,9 +63,26 @@ const periodLabel = computed(() => {
   return `${start.getMonth() + 1}月${start.getDate()}日 – ${end.getMonth() + 1}月${end.getDate()}日`
 })
 
+const overviewMonths = computed(() => {
+  if (mode.value === 'year') {
+    return Array.from({ length: 12 }, (_, index) => ({
+      year: year.value,
+      month: index,
+    }))
+  }
+  if (mode.value === 'quarter') {
+    return getQuarterMonths(year.value, getQuarter(viewDate.value))
+  }
+  return []
+})
+
+const taskDates = computed(() => store.getTaskDatesWithActivity())
+const isOverview = computed(() => mode.value === 'quarter' || mode.value === 'year')
+
 const weekRows = computed(() => {
   if (mode.value === 'week') return [getWeekDates(viewDate.value)]
-  return getFilledCalendarWeeks(year.value, month.value)
+  if (mode.value === 'month') return getFilledCalendarWeeks(year.value, month.value)
+  return []
 })
 
 function isOutsideMonth(date: Date) {
@@ -126,6 +152,12 @@ function taskColors(task: Task) {
 }
 
 const laneRowSize = computed(() => (mode.value === 'week' ? 28 : 22))
+const subtitleText = computed(() => {
+  if (isOverview.value) {
+    return '點月份可切到月檢視；點日期可選取，連點可新增任務'
+  }
+  return '拖曳任務中間可平移整段（天數不變）；懸停左右邊緣出現雙向箭頭，可單獨調整開始或結束日期'
+})
 
 function weekMinHeight(index: number) {
   const lanes = layouts.value[index]?.laneCount ?? 1
@@ -137,6 +169,14 @@ function shouldShowWeekMonth(date: Date, days: Date[]) {
 }
 
 function goPrev() {
+  if (mode.value === 'year') {
+    viewDate.value = new Date(year.value - 1, month.value, 1)
+    return
+  }
+  if (mode.value === 'quarter') {
+    viewDate.value = new Date(year.value, month.value - 3, 1)
+    return
+  }
   if (mode.value === 'month') {
     viewDate.value = new Date(year.value, month.value - 1, 1)
     return
@@ -145,11 +185,24 @@ function goPrev() {
 }
 
 function goNext() {
+  if (mode.value === 'year') {
+    viewDate.value = new Date(year.value + 1, month.value, 1)
+    return
+  }
+  if (mode.value === 'quarter') {
+    viewDate.value = new Date(year.value, month.value + 3, 1)
+    return
+  }
   if (mode.value === 'month') {
     viewDate.value = new Date(year.value, month.value + 1, 1)
     return
   }
   viewDate.value = parseDateString(addDays(formatDate(viewDate.value), 7))
+}
+
+function openMonth(nextYear: number, nextMonth: number) {
+  viewDate.value = new Date(nextYear, nextMonth, 1)
+  mode.value = 'month'
 }
 
 function goToday() {
@@ -240,17 +293,25 @@ const hintStyle = computed(() => {
       dragging: Boolean(draggingTaskId),
       resizing: dragMode === 'resize-start' || dragMode === 'resize-end',
       'week-mode': mode === 'week',
+      'overview-mode': isOverview,
     }"
   >
     <header class="page-header">
       <div>
         <h1>日曆</h1>
         <p class="subtitle">
-          拖曳任務中間可平移整段（天數不變）；懸停左右邊緣出現雙向箭頭，可單獨調整開始或結束日期
+          {{ subtitleText }}
         </p>
       </div>
       <div class="header-actions">
         <div class="mode-toggle" role="tablist" aria-label="檢視模式">
+          <button
+            type="button"
+            :class="{ active: mode === 'week' }"
+            @click="mode = 'week'"
+          >
+            週
+          </button>
           <button
             type="button"
             :class="{ active: mode === 'month' }"
@@ -260,10 +321,17 @@ const hintStyle = computed(() => {
           </button>
           <button
             type="button"
-            :class="{ active: mode === 'week' }"
-            @click="mode = 'week'"
+            :class="{ active: mode === 'quarter' }"
+            @click="mode = 'quarter'"
           >
-            週
+            季
+          </button>
+          <button
+            type="button"
+            :class="{ active: mode === 'year' }"
+            @click="mode = 'year'"
+          >
+            年
           </button>
         </div>
         <div class="period-nav">
@@ -290,82 +358,99 @@ const hintStyle = computed(() => {
     </Teleport>
 
     <div class="board" :class="mode">
-      <div v-if="mode === 'month'" class="weekday-row">
-        <span v-for="day in weekdays" :key="day">{{ day }}</span>
+      <div v-if="isOverview" class="overview-grid">
+        <CalendarMonthCard
+          v-for="item in overviewMonths"
+          :key="`${item.year}-${item.month}`"
+          :year="item.year"
+          :month="item.month"
+          :today="today"
+          :selected-date="store.selectedDate"
+          :task-dates="taskDates"
+          @select="selectDay"
+          @create="openCreate"
+          @open-month="openMonth"
+        />
       </div>
 
-      <div
-        v-for="(days, weekIndex) in weekRows"
-        :key="weekIndex"
-        :ref="(el) => setWeekEl(weekIndex, el)"
-        class="week"
-        :style="mode === 'month' ? { minHeight: `${weekMinHeight(weekIndex)}px` } : undefined"
-      >
-        <div class="week-days">
-          <div
-            v-for="date in days"
-            :key="formatDate(date)"
-            class="day-cell"
-            :data-date="formatDate(date)"
-            :class="{
-              today: formatDate(date) === today,
-              selected: formatDate(date) === store.selectedDate,
-              outside: mode === 'month' && isOutsideMonth(date),
-            }"
-            @click="selectDay(date)"
-            @dblclick="openCreate(date)"
-          >
-            <div class="day-head">
-              <div class="day-label">
-                <span v-if="mode === 'week'" class="day-weekday">{{ weekdays[date.getDay()] }}</span>
-                <span class="day-num">{{ date.getDate() }}</span>
-                <span
-                  v-if="mode === 'week' && shouldShowWeekMonth(date, days)"
-                  class="day-month"
-                >
-                  {{ date.getMonth() + 1 }}月
-                </span>
-              </div>
-              <button
-                type="button"
-                class="add-day"
-                :aria-label="`在 ${formatDate(date)} 新增任務`"
-                @click.stop="openCreate(date)"
-              >
-                +
-              </button>
-            </div>
-          </div>
+      <template v-else>
+        <div v-if="mode === 'month'" class="weekday-row">
+          <span v-for="day in weekdays" :key="day">{{ day }}</span>
         </div>
 
         <div
-          class="week-lanes"
-          :style="{
-            gridTemplateRows: `repeat(${layouts[weekIndex].laneCount}, ${laneRowSize}px)`,
-          }"
+          v-for="(days, weekIndex) in weekRows"
+          :key="weekIndex"
+          :ref="(el) => setWeekEl(weekIndex, el)"
+          class="week"
+          :style="mode === 'month' ? { minHeight: `${weekMinHeight(weekIndex)}px` } : undefined"
         >
-          <CalendarTaskBlock
-            v-for="segment in layouts[weekIndex].segments"
-            v-show="displayedTask(segment.taskId)"
-            :key="segment.taskId + '-' + segment.startCol"
+          <div class="week-days">
+            <div
+              v-for="date in days"
+              :key="formatDate(date)"
+              class="day-cell"
+              :data-date="formatDate(date)"
+              :class="{
+                today: formatDate(date) === today,
+                selected: formatDate(date) === store.selectedDate,
+                outside: mode === 'month' && isOutsideMonth(date),
+              }"
+              @click="selectDay(date)"
+              @dblclick="openCreate(date)"
+            >
+              <div class="day-head">
+                <div class="day-label">
+                  <span v-if="mode === 'week'" class="day-weekday">{{ weekdays[date.getDay()] }}</span>
+                  <span class="day-num">{{ date.getDate() }}</span>
+                  <span
+                    v-if="mode === 'week' && shouldShowWeekMonth(date, days)"
+                    class="day-month"
+                  >
+                    {{ date.getMonth() + 1 }}月
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  class="add-day"
+                  :aria-label="`在 ${formatDate(date)} 新增任務`"
+                  @click.stop="openCreate(date)"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="week-lanes"
             :style="{
-              gridColumn: `${segment.startCol + 1} / span ${segment.span}`,
-              gridRow: segment.lane + 1,
+              gridTemplateRows: `repeat(${layouts[weekIndex].laneCount}, ${laneRowSize}px)`,
             }"
-            :task="displayedTask(segment.taskId)!"
-            :color="taskColors(displayedTask(segment.taskId)!).color"
-            :bg-color="taskColors(displayedTask(segment.taskId)!).bgColor"
-            :continues-before="segment.continuesBefore"
-            :continues-after="segment.continuesAfter"
-            :dragging="draggingTaskId === segment.taskId"
-            :drag-mode="draggingTaskId === segment.taskId ? dragMode : null"
-            @move-start="beginDrag($event, segment.taskId, 'move')"
-            @resize-start="beginDrag($event, segment.taskId, 'resize-start')"
-            @resize-end="beginDrag($event, segment.taskId, 'resize-end')"
-            @select="onSelectTask(segment.taskId)"
-          />
+          >
+            <CalendarTaskBlock
+              v-for="segment in layouts[weekIndex].segments"
+              v-show="displayedTask(segment.taskId)"
+              :key="segment.taskId + '-' + segment.startCol"
+              :style="{
+                gridColumn: `${segment.startCol + 1} / span ${segment.span}`,
+                gridRow: segment.lane + 1,
+              }"
+              :task="displayedTask(segment.taskId)!"
+              :color="taskColors(displayedTask(segment.taskId)!).color"
+              :bg-color="taskColors(displayedTask(segment.taskId)!).bgColor"
+              :continues-before="segment.continuesBefore"
+              :continues-after="segment.continuesAfter"
+              :dragging="draggingTaskId === segment.taskId"
+              :drag-mode="draggingTaskId === segment.taskId ? dragMode : null"
+              @move-start="beginDrag($event, segment.taskId, 'move')"
+              @resize-start="beginDrag($event, segment.taskId, 'resize-start')"
+              @resize-end="beginDrag($event, segment.taskId, 'resize-end')"
+              @select="onSelectTask(segment.taskId)"
+            />
+          </div>
         </div>
-      </div>
+      </template>
     </div>
 
     <TaskFormModal
@@ -385,7 +470,8 @@ const hintStyle = computed(() => {
   flex-direction: column;
   min-height: 100%;
 
-  &.week-mode {
+  &.week-mode,
+  &.overview-mode {
     flex: 1;
     min-height: 0;
     overflow: hidden;
@@ -473,7 +559,7 @@ const hintStyle = computed(() => {
 }
 
 .period-label {
-  min-width: 200px;
+  min-width: 220px;
   text-align: center;
   font-weight: 700;
   font-size: 15px;
@@ -540,6 +626,34 @@ const hintStyle = computed(() => {
 .board.week {
   overflow-x: auto;
   overflow-y: hidden;
+}
+
+.board.quarter,
+.board.year {
+  overflow: auto;
+}
+
+.overview-grid {
+  display: grid;
+  gap: 8px 12px;
+  padding: 12px 16px 16px;
+  flex: 1;
+  min-height: 0;
+  align-content: start;
+}
+
+.board.quarter .overview-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.board.year .overview-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1100px) {
+  .board.year .overview-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .board.week .week {
@@ -696,6 +810,14 @@ const hintStyle = computed(() => {
   .period-label {
     min-width: 120px;
     font-size: 13px;
+  }
+
+  .board.year .overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .board.quarter .overview-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .week {

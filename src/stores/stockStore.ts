@@ -7,23 +7,29 @@ import type {
 } from "@/types";
 import {
   loadFromStorage,
+  removeFromStorage,
   saveToStorage,
   STOCK_FAVORITES_KEY,
+  STOCK_EX_ANNOUNCE_KEY,
+  STOCK_DIVIDEND_CACHE_KEY,
 } from "@/utils/storage";
 import {
   attachFillDates,
+  fetchDividendSnapshot,
   fetchLiveQuotes,
-  fetchStockExHistory,
-  fetchTwStockSnapshot,
+  fetchMarketQuotes,
   keepFillDates,
   normalizeFavoriteStocks,
-  overlayDividendHistory,
+  resetDividendMemory,
   searchTwStocks,
 } from "@/utils/twStock";
 
-const REFRESH_MS = 60_000;
+const PRICE_POLL_MS = 10_000;
 
 export const useStockStore = defineStore("stock", () => {
+  removeFromStorage(STOCK_EX_ANNOUNCE_KEY);
+  removeFromStorage(STOCK_DIVIDEND_CACHE_KEY);
+
   const favorites = ref<FavoriteStock[]>(
     normalizeFavoriteStocks(loadFromStorage(STOCK_FAVORITES_KEY, [])),
   );
@@ -36,6 +42,7 @@ export const useStockStore = defineStore("stock", () => {
   const lastUpdatedAt = ref<string | null>(null);
   const fillLoading = ref<Record<string, boolean>>({});
   let pollTimer: number | null = null;
+  let liveRefreshing = false;
 
   const favoriteCards = computed(() => {
     const pinned = favorites.value.filter((stock) => stock.pinned);
@@ -51,7 +58,7 @@ export const useStockStore = defineStore("stock", () => {
     saveToStorage(STOCK_FAVORITES_KEY, favorites.value);
   }
 
-  function applySnapshot(quotes: TwStockQuote[], dividends: TwStockDividend[]) {
+  function applyQuotes(quotes: TwStockQuote[]) {
     const nextQuotes: Record<string, TwStockQuote> = {};
     for (const quote of quotes) {
       nextQuotes[quote.code] = quote;
@@ -59,7 +66,22 @@ export const useStockStore = defineStore("stock", () => {
     quotesByCode.value = nextQuotes;
     catalog.value = quotes;
 
-    const nextDividends: Record<string, TwStockDividend> = {};
+    let favoritesChanged = false;
+    favorites.value = favorites.value.map((stock) => {
+      const quote = nextQuotes[stock.code];
+      if (!quote) return stock;
+      if (quote.name === stock.name && quote.market === stock.market) {
+        return stock;
+      }
+      favoritesChanged = true;
+      return { ...stock, name: quote.name, market: quote.market };
+    });
+    if (favoritesChanged) persistFavorites();
+  }
+
+  function applyDividends(dividends: TwStockDividend[]) {
+    if (!dividends.length) return;
+    const nextDividends = { ...dividendsByCode.value };
     for (const item of dividends) {
       nextDividends[item.code] = {
         ...item,
@@ -70,21 +92,6 @@ export const useStockStore = defineStore("stock", () => {
       };
     }
     dividendsByCode.value = nextDividends;
-
-    let favoritesChanged = false;
-    favorites.value = favorites.value.map((stock) => {
-      const quote = nextQuotes[stock.code];
-      if (!quote) return stock;
-      if (
-        quote.name === stock.name &&
-        quote.market === stock.market
-      ) {
-        return stock;
-      }
-      favoritesChanged = true;
-      return { ...stock, name: quote.name, market: quote.market };
-    });
-    if (favoritesChanged) persistFavorites();
   }
 
   function applyLiveQuotes(
@@ -111,15 +118,22 @@ export const useStockStore = defineStore("stock", () => {
     quotesByCode.value = next;
   }
 
-  async function refresh() {
+  async function refresh(options?: { withDividends?: boolean }) {
     if (loading.value || refreshing.value) return;
     const hasData = Object.keys(quotesByCode.value).length > 0;
     if (hasData) refreshing.value = true;
     else loading.value = true;
     error.value = "";
+    const withDividends = options?.withDividends === true;
+    const dividendPromise = withDividends
+      ? fetchDividendSnapshot(favorites.value.map((stock) => stock.code))
+      : null;
     try {
-      const snapshot = await fetchTwStockSnapshot();
-      applySnapshot(snapshot.quotes, snapshot.dividends);
+      const quotes = await fetchMarketQuotes();
+      if (!quotes.length) {
+        throw new Error("目前無法取得台股行情，請稍後再試");
+      }
+      applyQuotes(quotes);
       try {
         const live = await fetchLiveQuotes(favorites.value);
         applyLiveQuotes(live);
@@ -136,6 +150,10 @@ export const useStockStore = defineStore("stock", () => {
       loading.value = false;
       refreshing.value = false;
     }
+    if (!dividendPromise) return;
+    void dividendPromise.then(applyDividends).catch(() => {
+      // 配息來源較慢或失敗時保留已顯示的行情
+    });
   }
 
   function search(query: string) {
@@ -203,15 +221,22 @@ export const useStockStore = defineStore("stock", () => {
 
   async function enrichFavoriteDividends(code: string) {
     const current = dividendsByCode.value[code];
-    if (current && current.frequency !== "none") return;
+    if (current && (current.frequency !== "none" || current.history.length)) {
+      return;
+    }
     try {
-      const history = await fetchStockExHistory();
-      dividendsByCode.value = overlayDividendHistory(
-        dividendsByCode.value,
-        history,
-      );
+      const items = await fetchDividendSnapshot([code]);
+      const item = items.find((row) => row.code === code);
+      if (!item) return;
+      dividendsByCode.value = {
+        ...dividendsByCode.value,
+        [code]: {
+          ...item,
+          history: keepFillDates(current?.history, item.history),
+        },
+      };
     } catch {
-      // 除權息歷史查無資料時維持現況，不擋行情
+      // 新加入自選時補配息失敗可等下次整頁更新
     }
   }
 
@@ -231,12 +256,36 @@ export const useStockStore = defineStore("stock", () => {
   }
 
   async function refreshLiveForFavorites() {
+    if (liveRefreshing || !favorites.value.length) return;
+    liveRefreshing = true;
     try {
       const live = await fetchLiveQuotes(favorites.value);
       applyLiveQuotes(live);
+      if (live.length) lastUpdatedAt.value = new Date().toISOString();
     } catch {
       // ignore
+    } finally {
+      liveRefreshing = false;
     }
+  }
+
+  function startPolling() {
+    stopPolling();
+    pollTimer = window.setInterval(() => {
+      void refreshLiveForFavorites();
+    }, PRICE_POLL_MS);
+  }
+
+  function stopPolling() {
+    if (pollTimer != null) {
+      window.clearInterval(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  function leavePage() {
+    stopPolling();
+    resetDividendMemory();
   }
 
   function removeFavorite(code: string) {
@@ -249,20 +298,6 @@ export const useStockStore = defineStore("stock", () => {
     else addFavorite(stock);
   }
 
-  function startPolling() {
-    stopPolling();
-    pollTimer = window.setInterval(() => {
-      void refresh();
-    }, REFRESH_MS);
-  }
-
-  function stopPolling() {
-    if (pollTimer != null) {
-      window.clearInterval(pollTimer);
-      pollTimer = null;
-    }
-  }
-
   function clearAll() {
     favorites.value = [];
     quotesByCode.value = {};
@@ -271,6 +306,9 @@ export const useStockStore = defineStore("stock", () => {
     error.value = "";
     lastUpdatedAt.value = null;
     persistFavorites();
+    removeFromStorage(STOCK_EX_ANNOUNCE_KEY);
+    removeFromStorage(STOCK_DIVIDEND_CACHE_KEY);
+    resetDividendMemory();
   }
 
   return {
@@ -292,6 +330,8 @@ export const useStockStore = defineStore("stock", () => {
     ensureFillDates,
     startPolling,
     stopPolling,
+    leavePage,
+    refreshLiveForFavorites,
     clearAll,
   };
 });

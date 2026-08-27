@@ -22,6 +22,8 @@ const NAV_FEATURE_ORDER_KEY = "bullet-journal-nav-feature-order";
 const TASK_AVATARS_KEY = "bullet-journal-task-avatars";
 const SIDEBAR_CAROUSEL_KEY = "bullet-journal-sidebar-carousel";
 const STOCK_FAVORITES_KEY = "bullet-journal-stock-favorites";
+const STOCK_EX_ANNOUNCE_KEY = "bullet-journal-stock-ex-announce";
+const STOCK_DIVIDEND_CACHE_KEY = "bullet-journal-stock-dividends";
 
 const defaultMigrationReviewState: MigrationReviewState = {
   snoozedUntil: null,
@@ -54,6 +56,14 @@ export function saveToStorage<T>(key: string, value: T): void {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+export function removeFromStorage(key: string): void {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
 export function hasStorageKey(key: string): boolean {
   try {
     return localStorage.getItem(key) !== null;
@@ -81,6 +91,8 @@ export {
   TASK_AVATARS_KEY,
   SIDEBAR_CAROUSEL_KEY,
   STOCK_FAVORITES_KEY,
+  STOCK_EX_ANNOUNCE_KEY,
+  STOCK_DIVIDEND_CACHE_KEY,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
   defaultGeminiUsageState,

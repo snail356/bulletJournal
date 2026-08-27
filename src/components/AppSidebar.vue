@@ -1,36 +1,37 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
-import MiniCalendar from './MiniCalendar.vue'
-import SidebarCarousel from './SidebarCarousel.vue'
-import TodayProgress from './TodayProgress.vue'
-import AppIcon from './AppIcon.vue'
-import { useTaskStore } from '@/stores/taskStore'
-import { todayString } from '@/utils/date'
+import { computed } from "vue";
+import { useRoute } from "vue-router";
+import MiniCalendar from "./MiniCalendar.vue";
+import SidebarCarousel from "./SidebarCarousel.vue";
+import TodayProgress from "./TodayProgress.vue";
+import AppIcon from "./AppIcon.vue";
+import { useTaskStore } from "@/stores/taskStore";
+import { todayString } from "@/utils/date";
 
-const route = useRoute()
-const store = useTaskStore()
+const route = useRoute();
+const store = useTaskStore();
 
 const navItems = computed(() =>
   store.orderedNavFeatures.filter(
-    (item) => item.showInSidebar !== false && store.isNavFeatureEnabled(item.id),
+    (item) =>
+      item.showInSidebar !== false && store.isNavFeatureEnabled(item.id),
   ),
-)
+);
 
-const progress = computed(() => store.todayProgress)
+const progress = computed(() => store.todayProgress);
 
 function isActive(path: string) {
-  return route.path === path || route.path.startsWith(path + '/')
+  return route.path === path || route.path.startsWith(path + "/");
 }
 
 function onNavClick(path: string) {
-  if (path === '/today') {
-    store.setSelectedDate(todayString())
+  if (path === "/today") {
+    store.setSelectedDate(todayString());
   }
 }
 
 function openMigrationReview() {
-  store.openMigrationReview()
+  store.openMigrationReview();
 }
 </script>
 
@@ -78,7 +79,7 @@ function openMigrationReview() {
       <SidebarCarousel v-if="store.sidebarCarousel.enabled" />
       <MiniCalendar />
       <TodayProgress
-        v-if="store.isNavFeatureEnabled('today')"
+        v-if="false"
         :completed="progress.completed"
         :total="progress.total"
         :percentage="progress.percentage"
@@ -88,7 +89,7 @@ function openMigrationReview() {
 </template>
 
 <style scoped lang="scss">
-@use '@/styles/variables' as *;
+@use "@/styles/variables" as *;
 
 .sidebar {
   width: $sidebar-width;

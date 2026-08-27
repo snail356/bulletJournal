@@ -169,3 +169,16 @@ export function getFilledCalendarWeeks(year: number, month: number): Date[][] {
   }
   return weeks
 }
+
+/** 1–4，對應 1–3 月、4–6 月、7–9 月、10–12 月 */
+export function getQuarter(date: Date): number {
+  return Math.floor(date.getMonth() / 3) + 1
+}
+
+export function getQuarterMonths(year: number, quarter: number): Array<{
+  year: number
+  month: number
+}> {
+  const startMonth = (quarter - 1) * 3
+  return [0, 1, 2].map((offset) => ({ year, month: startMonth + offset }))
+}

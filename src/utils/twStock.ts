@@ -43,11 +43,6 @@ const TPEX_POLICY_URL = stockApi("tpex", "/openapi/v1/mopsfin_t187ap45_O");
 
 type JsonRecord = Record<string, unknown>;
 
-export interface TwStockSnapshot {
-  quotes: TwStockQuote[];
-  dividends: TwStockDividend[];
-}
-
 export interface TwStockLiveQuote {
   code: string;
   price: number | null;
@@ -137,12 +132,21 @@ function changePercent(price: number | null, change: number | null): number | nu
   return (change / prev) * 100;
 }
 
-async function fetchJson(url: string): Promise<unknown> {
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`無法讀取資料（${response.status}）`);
+async function fetchJson(url: string, timeoutMs = 20_000): Promise<unknown> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      throw new Error(`無法讀取資料（${response.status}）`);
+    }
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
   }
-  return response.json();
 }
 
 function asRows(payload: unknown): JsonRecord[] {
@@ -434,7 +438,7 @@ export async function fetchStockExHistory(): Promise<Map<string, ExHistorySummar
 
   for (const url of twt49uHistoryUrls(start, end)) {
     try {
-      const parsed = parseExHistory([await fetchJson(url)]);
+      const parsed = parseExHistory([await fetchJson(url, 45_000)]);
       if (parsed.size > 0) return parsed;
     } catch {
       continue;
@@ -671,6 +675,8 @@ function mergeDividends(
     const trailingCash = history?.trailingCash ?? item.trailingCash;
     return {
       ...item,
+      exDate: item.exDate && item.exDate >= todayIso ? item.exDate : null,
+      exType: item.exDate && item.exDate >= todayIso ? item.exType : "",
       lastExDate,
       lastCashDividend,
       trailingCash,
@@ -725,37 +731,63 @@ export function overlayDividendHistory(
   return next;
 }
 
-export async function fetchTwStockSnapshot(): Promise<TwStockSnapshot> {
+let memoryByCode = new Map<string, TwStockDividend>();
+let memoryHistoryReady = false;
+let dividendInflight: Promise<Map<string, TwStockDividend>> | null = null;
+
+export function resetDividendMemory() {
+  memoryByCode = new Map();
+  memoryHistoryReady = false;
+  dividendInflight = null;
+}
+
+async function fetchUpcomingExAnnouncements(): Promise<TwStockDividend[]> {
+  const [twseEx, tpexEx] = await Promise.allSettled([
+    fetchJson(TWSE_EX_URL).catch(() => fetchJson(TWSE_EX_RWD_URL)),
+    fetchJson(TPEX_EX_URL),
+  ]);
+  return [
+    ...(twseEx.status === "fulfilled"
+      ? parseExRows(twseEx.value, ["股票代號", "Code", "證券代號"])
+      : []),
+    ...(tpexEx.status === "fulfilled"
+      ? parseExRows(tpexEx.value, [
+          "SecuritiesCompanyCode",
+          "股票代號",
+          "Code",
+          "證券代號",
+        ])
+      : []),
+  ];
+}
+
+export async function fetchMarketQuotes(): Promise<TwStockQuote[]> {
+  const [twseQuotes, tpexQuotes] = await Promise.allSettled([
+    fetchJson(TWSE_QUOTES_URL),
+    fetchJson(TPEX_QUOTES_URL),
+  ]);
+  return [
+    ...(twseQuotes.status === "fulfilled" ? parseTwseQuotes(twseQuotes.value) : []),
+    ...(tpexQuotes.status === "fulfilled" ? parseTpexQuotes(tpexQuotes.value) : []),
+  ];
+}
+
+async function loadDividendMarket(): Promise<Map<string, TwStockDividend>> {
   const [
-    twseQuotes,
-    tpexQuotes,
     twseYield,
     tpexYield,
-    twseEx,
-    tpexEx,
+    upcomingResult,
     twsePolicy,
     tpexPolicy,
     historyResult,
   ] = await Promise.allSettled([
-    fetchJson(TWSE_QUOTES_URL),
-    fetchJson(TPEX_QUOTES_URL),
     fetchJson(TWSE_YIELD_URL),
     fetchJson(TPEX_YIELD_URL),
-    fetchJson(TWSE_EX_URL).catch(() => fetchJson(TWSE_EX_RWD_URL)),
-    fetchJson(TPEX_EX_URL),
+    fetchUpcomingExAnnouncements(),
     fetchJson(TWSE_POLICY_URL),
     fetchJson(TPEX_POLICY_URL),
     fetchStockExHistory(),
   ]);
-
-  const quotes = [
-    ...(twseQuotes.status === "fulfilled" ? parseTwseQuotes(twseQuotes.value) : []),
-    ...(tpexQuotes.status === "fulfilled" ? parseTpexQuotes(tpexQuotes.value) : []),
-  ];
-
-  if (!quotes.length) {
-    throw new Error("目前無法取得台股行情，請稍後再試");
-  }
 
   const yields = new Map<string, number>();
   if (twseYield.status === "fulfilled") {
@@ -777,19 +809,8 @@ export async function fetchTwStockSnapshot(): Promise<TwStockSnapshot> {
     }
   }
 
-  const upcoming = [
-    ...(twseEx.status === "fulfilled"
-      ? parseExRows(twseEx.value, ["股票代號", "Code", "證券代號"])
-      : []),
-    ...(tpexEx.status === "fulfilled"
-      ? parseExRows(tpexEx.value, [
-          "SecuritiesCompanyCode",
-          "股票代號",
-          "Code",
-          "證券代號",
-        ])
-      : []),
-  ];
+  const upcoming =
+    upcomingResult.status === "fulfilled" ? upcomingResult.value : [];
 
   const periodsByCode = new Map<string, string[]>();
   if (twsePolicy.status === "fulfilled") {
@@ -809,10 +830,35 @@ export async function fetchTwStockSnapshot(): Promise<TwStockSnapshot> {
       ? historyResult.value
       : new Map<string, ExHistorySummary>();
 
-  return {
-    quotes,
-    dividends: mergeDividends(upcoming, yields, periodsByCode, historyByCode),
-  };
+  const merged = mergeDividends(upcoming, yields, periodsByCode, historyByCode);
+  const byCode = new Map(merged.map((item) => [item.code, item]));
+  memoryByCode = byCode;
+  memoryHistoryReady = historyByCode.size > 0;
+  return byCode;
+}
+
+function sliceDividends(
+  byCode: Map<string, TwStockDividend>,
+  codes: string[],
+): TwStockDividend[] {
+  return codes.map((code) => byCode.get(code) ?? emptyDividend(code));
+}
+
+export async function fetchDividendSnapshot(
+  focusCodes: string[],
+): Promise<TwStockDividend[]> {
+  const codes = [...new Set(focusCodes.map((code) => code.trim()).filter(Boolean))];
+  if (!codes.length) return [];
+  if (memoryHistoryReady) return sliceDividends(memoryByCode, codes);
+  if (!dividendInflight) {
+    const pending = loadDividendMarket().finally(() => {
+      if (dividendInflight === pending && !memoryHistoryReady) {
+        dividendInflight = null;
+      }
+    });
+    dividendInflight = pending;
+  }
+  return sliceDividends(await dividendInflight, codes);
 }
 
 function misBaseUrl(): string {
@@ -965,11 +1011,14 @@ export function formatStockDividend(item: TwStockDividend | undefined): string {
 }
 
 export function formatExDate(item: TwStockDividend | undefined): string {
-  if (item?.exDate) {
-    return item.exType ? `${item.exDate}（${item.exType}）` : item.exDate;
-  }
-  if (item?.lastExDate) return `最近 ${item.lastExDate}`;
-  return "近期無預告";
+  if (!item?.exDate) return "";
+  return item.exType ? `${item.exDate}（${item.exType}）` : item.exDate;
+}
+
+export function hasAnnouncedExDate(
+  item: TwStockDividend | null | undefined,
+): boolean {
+  return Boolean(item?.exDate);
 }
 
 export function formatDividendYield(

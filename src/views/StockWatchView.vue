@@ -15,6 +15,7 @@ import {
   formatHistoryStock,
   formatStockDividend,
   formatVolume,
+  hasAnnouncedExDate,
   isExDateSoon,
   marketLabel,
 } from '@/utils/twStock'
@@ -109,7 +110,7 @@ function onDocumentClick(event: MouseEvent) {
 
 function onVisibilityChange() {
   if (document.visibilityState === 'visible') {
-    void store.refresh()
+    void store.refreshLiveForFavorites()
     store.startPolling()
   } else {
     store.stopPolling()
@@ -119,13 +120,13 @@ function onVisibilityChange() {
 onMounted(() => {
   document.addEventListener('click', onDocumentClick)
   document.addEventListener('visibilitychange', onVisibilityChange)
-  void store.refresh().then(() => store.startPolling())
+  void store.refresh({ withDividends: true }).then(() => store.startPolling())
 })
 
 onUnmounted(() => {
   document.removeEventListener('click', onDocumentClick)
   document.removeEventListener('visibilitychange', onVisibilityChange)
-  store.stopPolling()
+  store.leavePage()
 })
 </script>
 
@@ -303,6 +304,7 @@ onUnmounted(() => {
                 <dd>{{ formatStockDividend(card.dividend ?? undefined) }}</dd>
               </div>
               <div
+                v-if="hasAnnouncedExDate(card.dividend)"
                 class="ex-date"
                 :class="{
                   soon: isExDateSoon(card.dividend?.exDate ?? null),
