@@ -1,19 +1,28 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import type { Task } from '@/types'
-import AppIcon from '@/components/AppIcon.vue'
-import CalendarMonthCard from '@/components/CalendarMonthCard.vue'
-import CalendarTaskBlock from '@/components/CalendarTaskBlock.vue'
-import TaskFormModal from '@/components/TaskFormModal.vue'
-import { useCalendarDrag, type CalendarDragMode } from '@/composables/useCalendarDrag'
-import { useTaskStore } from '@/stores/taskStore'
-import { getLabelBgForColor } from '@/utils/labelColors'
+import { computed, ref, watch } from "vue";
+import { useRouter } from "vue-router";
+import type { Task } from "@/types";
+import AppIcon from "@/components/AppIcon.vue";
+import CalendarMonthCard from "@/components/CalendarMonthCard.vue";
+import CalendarTaskBlock from "@/components/CalendarTaskBlock.vue";
+import TaskFormModal from "@/components/TaskFormModal.vue";
+import {
+  useCalendarDrag,
+  type CalendarDragMode,
+} from "@/composables/useCalendarDrag";
+import { useTaskStore } from "@/stores/taskStore";
+import {
+  CALENDAR_COLOR_BY_KEY,
+  getCalendarTaskColors,
+  parseCalendarColorBy,
+  type CalendarColorBy,
+} from "@/utils/calendarColors";
 import {
   layoutWeekSegments,
   weekDateStrings,
   type WeekLayout,
-} from '@/utils/calendarLayout'
+} from "@/utils/calendarLayout";
+import { loadFromStorage, saveToStorage } from "@/utils/storage";
 import {
   addDays,
   formatDate,
@@ -25,85 +34,94 @@ import {
   getWeekDates,
   parseDateString,
   todayString,
-} from '@/utils/date'
+} from "@/utils/date";
 
-type CalendarMode = 'week' | 'month' | 'quarter' | 'year'
+type CalendarMode = "week" | "month" | "quarter" | "year";
 
-const store = useTaskStore()
-const router = useRouter()
-const mode = ref<CalendarMode>('month')
-const viewDate = ref(parseDateString(store.selectedDate))
-const showCreateModal = ref(false)
-const createDate = ref(todayString())
-const weekEls = ref<(HTMLElement | null)[]>([])
+const store = useTaskStore();
+const router = useRouter();
+const mode = ref<CalendarMode>("month");
+const colorBy = ref<CalendarColorBy>(
+  parseCalendarColorBy(loadFromStorage<string>(CALENDAR_COLOR_BY_KEY, "label")),
+);
 
-const weekdays = ['日', '一', '二', '三', '四', '五', '六']
-const today = todayString()
+watch(colorBy, (value) => saveToStorage(CALENDAR_COLOR_BY_KEY, value));
 
-const year = computed(() => viewDate.value.getFullYear())
-const month = computed(() => viewDate.value.getMonth())
+const viewDate = ref(parseDateString(store.selectedDate));
+const showCreateModal = ref(false);
+const createDate = ref(todayString());
+const weekEls = ref<(HTMLElement | null)[]>([]);
+
+const weekdays = ["日", "一", "二", "三", "四", "五", "六"];
+const today = todayString();
+
+const year = computed(() => viewDate.value.getFullYear());
+const month = computed(() => viewDate.value.getMonth());
 
 const periodLabel = computed(() => {
-  if (mode.value === 'year') return `${year.value} 年`
-  if (mode.value === 'quarter') {
-    const quarter = getQuarter(viewDate.value)
-    const startMonth = (quarter - 1) * 3 + 1
-    return `${year.value} 年第 ${quarter} 季（${startMonth}–${startMonth + 2} 月）`
+  if (mode.value === "year") return `${year.value} 年`;
+  if (mode.value === "quarter") {
+    const quarter = getQuarter(viewDate.value);
+    const startMonth = (quarter - 1) * 3 + 1;
+    return `${year.value} 年第 ${quarter} 季（${startMonth}–${startMonth + 2} 月）`;
   }
-  if (mode.value === 'month') {
-    return `${year.value} 年 ${month.value + 1} 月`
+  if (mode.value === "month") {
+    return `${year.value} 年 ${month.value + 1} 月`;
   }
-  const days = getWeekDates(viewDate.value)
-  const start = days[0]
-  const end = days[6]
-  const sameMonth = start.getMonth() === end.getMonth()
+  const days = getWeekDates(viewDate.value);
+  const start = days[0];
+  const end = days[6];
+  const sameMonth = start.getMonth() === end.getMonth();
   if (sameMonth) {
-    return `${start.getFullYear()} 年 ${start.getMonth() + 1} 月 ${start.getDate()}–${end.getDate()} 日`
+    return `${start.getFullYear()} 年 ${start.getMonth() + 1} 月 ${start.getDate()}–${end.getDate()} 日`;
   }
-  return `${start.getMonth() + 1}月${start.getDate()}日 – ${end.getMonth() + 1}月${end.getDate()}日`
-})
+  return `${start.getMonth() + 1}月${start.getDate()}日 – ${end.getMonth() + 1}月${end.getDate()}日`;
+});
 
 const overviewMonths = computed(() => {
-  if (mode.value === 'year') {
+  if (mode.value === "year") {
     return Array.from({ length: 12 }, (_, index) => ({
       year: year.value,
       month: index,
-    }))
+    }));
   }
-  if (mode.value === 'quarter') {
-    return getQuarterMonths(year.value, getQuarter(viewDate.value))
+  if (mode.value === "quarter") {
+    return getQuarterMonths(year.value, getQuarter(viewDate.value));
   }
-  return []
-})
+  return [];
+});
 
-const taskDates = computed(() => store.getTaskDatesWithActivity())
-const isOverview = computed(() => mode.value === 'quarter' || mode.value === 'year')
+const isOverview = computed(
+  () => mode.value === "quarter" || mode.value === "year",
+);
 
 const weekRows = computed(() => {
-  if (mode.value === 'week') return [getWeekDates(viewDate.value)]
-  if (mode.value === 'month') return getFilledCalendarWeeks(year.value, month.value)
-  return []
-})
+  if (mode.value === "week") return [getWeekDates(viewDate.value)];
+  if (mode.value === "month")
+    return getFilledCalendarWeeks(year.value, month.value);
+  return [];
+});
 
 function isOutsideMonth(date: Date) {
-  return date.getMonth() !== month.value
+  return date.getMonth() !== month.value;
 }
 
 function hitTestDate(x: number, y: number): string | null {
-  const count = weekRows.value.length
+  const count = weekRows.value.length;
   for (let i = 0; i < count; i++) {
-    const el = weekEls.value[i]
-    const row = weekRows.value[i]
-    if (!el || !row) continue
-    const rect = el.getBoundingClientRect()
-    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) continue
+    const el = weekEls.value[i];
+    const row = weekRows.value[i];
+    if (!el || !row) continue;
+    const rect = el.getBoundingClientRect();
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
+      continue;
     const col = Math.min(
       6,
       Math.max(0, Math.floor((x - rect.left) / (rect.width / 7))),
-    )
-    return formatDate(row[col])
+    );
+    return formatDate(row[col]);
   }
-  return null
+  return null;
 }
 
 const {
@@ -117,111 +135,110 @@ const {
 } = useCalendarDrag({
   hitTestDate,
   onCommit(taskId, next) {
-    store.setTaskDateRange(taskId, next.date, next.endDate)
+    store.setTaskDateRange(taskId, next.date, next.endDate);
   },
-})
+});
 
 const layouts = computed<WeekLayout[]>(() =>
   weekRows.value.map((days) =>
     layoutWeekSegments(store.tasks, weekDateStrings(days), previewByTask.value),
   ),
-)
+);
 
 const tasksById = computed(() => {
-  const map = new Map<string, Task>()
-  for (const task of store.tasks) map.set(task.id, task)
-  return map
-})
+  const map = new Map<string, Task>();
+  for (const task of store.tasks) map.set(task.id, task);
+  return map;
+});
 
 function displayedTask(taskId: string): Task | undefined {
-  const task = tasksById.value.get(taskId)
-  if (!task) return undefined
-  const next = previewByTask.value[taskId]
-  if (!next) return task
-  return { ...task, date: next.date, endDate: next.endDate }
+  const task = tasksById.value.get(taskId);
+  if (!task) return undefined;
+  const next = previewByTask.value[taskId];
+  if (!next) return task;
+  return { ...task, date: next.date, endDate: next.endDate };
 }
 
 function taskColors(task: Task) {
-  const labelId = task.labels[0]
-  const label = labelId ? store.labels.find((item) => item.id === labelId) : undefined
-  if (label) {
-    return { color: label.color, bgColor: getLabelBgForColor(label.color) }
-  }
-  const status = store.getStatusItem(task.status)
-  return { color: status.color, bgColor: status.bgColor }
+  return getCalendarTaskColors(
+    task,
+    colorBy.value,
+    store.labels,
+    store.getStatusItem,
+  );
 }
 
-const laneRowSize = computed(() => (mode.value === 'week' ? 28 : 22))
+const laneRowSize = computed(() => (mode.value === "week" ? 28 : 22));
 const subtitleText = computed(() => {
   if (isOverview.value) {
-    return '點月份可切到月檢視；點日期可選取，連點可新增任務'
+    return "單天任務為色球、跨天為色串；懸停可看名稱。點月份切到月檢視，點日期可選取，連點可新增";
   }
-  return '拖曳任務中間可平移整段（天數不變）；懸停左右邊緣出現雙向箭頭，可單獨調整開始或結束日期'
-})
+  return "拖曳任務中間可平移整段（天數不變）；懸停左右邊緣出現雙向箭頭，可單獨調整開始或結束日期";
+});
 
 function weekMinHeight(index: number) {
-  const lanes = layouts.value[index]?.laneCount ?? 1
-  return Math.max(112, 36 + lanes * 25)
+  const lanes = layouts.value[index]?.laneCount ?? 1;
+  return Math.max(112, 36 + lanes * 25);
 }
 
 function shouldShowWeekMonth(date: Date, days: Date[]) {
-  return date.getDate() === 1 || formatDate(date) === formatDate(days[0])
+  return date.getDate() === 1 || formatDate(date) === formatDate(days[0]);
 }
 
 function goPrev() {
-  if (mode.value === 'year') {
-    viewDate.value = new Date(year.value - 1, month.value, 1)
-    return
+  if (mode.value === "year") {
+    viewDate.value = new Date(year.value - 1, month.value, 1);
+    return;
   }
-  if (mode.value === 'quarter') {
-    viewDate.value = new Date(year.value, month.value - 3, 1)
-    return
+  if (mode.value === "quarter") {
+    viewDate.value = new Date(year.value, month.value - 3, 1);
+    return;
   }
-  if (mode.value === 'month') {
-    viewDate.value = new Date(year.value, month.value - 1, 1)
-    return
+  if (mode.value === "month") {
+    viewDate.value = new Date(year.value, month.value - 1, 1);
+    return;
   }
-  viewDate.value = parseDateString(addDays(formatDate(viewDate.value), -7))
+  viewDate.value = parseDateString(addDays(formatDate(viewDate.value), -7));
 }
 
 function goNext() {
-  if (mode.value === 'year') {
-    viewDate.value = new Date(year.value + 1, month.value, 1)
-    return
+  if (mode.value === "year") {
+    viewDate.value = new Date(year.value + 1, month.value, 1);
+    return;
   }
-  if (mode.value === 'quarter') {
-    viewDate.value = new Date(year.value, month.value + 3, 1)
-    return
+  if (mode.value === "quarter") {
+    viewDate.value = new Date(year.value, month.value + 3, 1);
+    return;
   }
-  if (mode.value === 'month') {
-    viewDate.value = new Date(year.value, month.value + 1, 1)
-    return
+  if (mode.value === "month") {
+    viewDate.value = new Date(year.value, month.value + 1, 1);
+    return;
   }
-  viewDate.value = parseDateString(addDays(formatDate(viewDate.value), 7))
+  viewDate.value = parseDateString(addDays(formatDate(viewDate.value), 7));
 }
 
 function openMonth(nextYear: number, nextMonth: number) {
-  viewDate.value = new Date(nextYear, nextMonth, 1)
-  mode.value = 'month'
+  viewDate.value = new Date(nextYear, nextMonth, 1);
+  mode.value = "month";
 }
 
 function goToday() {
-  viewDate.value = parseDateString(todayString())
-  store.setSelectedDate(todayString())
+  viewDate.value = parseDateString(todayString());
+  store.setSelectedDate(todayString());
 }
 
 function selectDay(date: Date) {
-  if (consumeClickSuppression()) return
-  store.setSelectedDate(formatDate(date))
+  if (consumeClickSuppression()) return;
+  store.setSelectedDate(formatDate(date));
 }
 
 function openCreate(date: Date) {
-  createDate.value = formatDate(date)
-  showCreateModal.value = true
+  createDate.value = formatDate(date);
+  showCreateModal.value = true;
 }
 
 function setWeekEl(index: number, el: unknown) {
-  weekEls.value[index] = el instanceof HTMLElement ? el : null
+  weekEls.value[index] = el instanceof HTMLElement ? el : null;
 }
 
 function beginDrag(
@@ -229,9 +246,9 @@ function beginDrag(
   taskId: string,
   mode: CalendarDragMode,
 ) {
-  const task = tasksById.value.get(taskId)
-  if (!task) return
-  const anchorDate = hitTestDate(event.clientX, event.clientY) ?? task.date
+  const task = tasksById.value.get(taskId);
+  if (!task) return;
+  const anchorDate = hitTestDate(event.clientX, event.clientY) ?? task.date;
   startCalendarDrag(event, {
     taskId: task.id,
     mode,
@@ -239,51 +256,51 @@ function beginDrag(
     originEndStored: task.endDate,
     originEffectiveEnd: getTaskEndDate(task),
     anchorDate,
-  })
+  });
 }
 
 function onSelectTask(taskId: string) {
-  if (consumeClickSuppression()) return
-  router.push(`/tasks/${taskId}`)
+  if (consumeClickSuppression()) return;
+  router.push(`/tasks/${taskId}`);
 }
 
 const previewHint = computed(() => {
-  if (!preview.value || !draggingTaskId.value) return ''
-  const duration = getTaskDuration(preview.value)
+  if (!preview.value || !draggingTaskId.value) return "";
+  const duration = getTaskDuration(preview.value);
   const modeLabel =
-    dragMode.value === 'move'
-      ? '平移整段'
-      : dragMode.value === 'resize-start'
-        ? '調整開始日期'
-        : '調整結束日期'
-  const end = preview.value.endDate ?? preview.value.date
+    dragMode.value === "move"
+      ? "平移整段"
+      : dragMode.value === "resize-start"
+        ? "調整開始日期"
+        : "調整結束日期";
+  const end = preview.value.endDate ?? preview.value.date;
   const range = preview.value.endDate
     ? `${preview.value.date} ～ ${end}`
-    : preview.value.date
-  return `${modeLabel} · ${range} · ${duration} 天`
-})
+    : preview.value.date;
+  return `${modeLabel} · ${range} · ${duration} 天`;
+});
 
-const HINT_GAP = 8
-const HINT_MAX_WIDTH = 320
-const HINT_HEIGHT = 36
+const HINT_GAP = 8;
+const HINT_MAX_WIDTH = 320;
+const HINT_HEIGHT = 36;
 
 const hintStyle = computed(() => {
-  const pos = pointerPos.value
-  if (!pos) return undefined
+  const pos = pointerPos.value;
+  if (!pos) return undefined;
   const x = Math.min(
     window.innerWidth - 8,
     Math.max(HINT_MAX_WIDTH + 8, pos.x - HINT_GAP),
-  )
+  );
   const y = Math.min(
     window.innerHeight - 8,
     Math.max(HINT_HEIGHT + 8, pos.y - HINT_GAP),
-  )
+  );
   return {
     left: `${x}px`,
     top: `${y}px`,
-    transform: 'translate(-100%, -100%)',
-  }
-})
+    transform: "translate(-100%, -100%)",
+  };
+});
 </script>
 
 <template>
@@ -304,6 +321,24 @@ const hintStyle = computed(() => {
         </p>
       </div>
       <div class="header-actions">
+        <div class="mode-toggle" role="tablist" aria-label="顏色依據">
+          <button
+            type="button"
+            title="依標籤顏色顯示"
+            :class="{ active: colorBy === 'label' }"
+            @click="colorBy = 'label'"
+          >
+            標籤
+          </button>
+          <button
+            type="button"
+            title="依狀態顏色顯示"
+            :class="{ active: colorBy === 'status' }"
+            @click="colorBy = 'status'"
+          >
+            狀態
+          </button>
+        </div>
         <div class="mode-toggle" role="tablist" aria-label="檢視模式">
           <button
             type="button"
@@ -335,11 +370,21 @@ const hintStyle = computed(() => {
           </button>
         </div>
         <div class="period-nav">
-          <button type="button" class="nav-btn" aria-label="上一段" @click="goPrev">
+          <button
+            type="button"
+            class="nav-btn"
+            aria-label="上一段"
+            @click="goPrev"
+          >
             <AppIcon name="chevron-left" size="xs" />
           </button>
           <span class="period-label">{{ periodLabel }}</span>
-          <button type="button" class="nav-btn" aria-label="下一段" @click="goNext">
+          <button
+            type="button"
+            class="nav-btn"
+            aria-label="下一段"
+            @click="goNext"
+          >
             <AppIcon name="chevron-right" size="xs" />
           </button>
         </div>
@@ -366,10 +411,13 @@ const hintStyle = computed(() => {
           :month="item.month"
           :today="today"
           :selected-date="store.selectedDate"
-          :task-dates="taskDates"
+          :tasks="store.tasks"
+          :compact="mode === 'year'"
+          :color-by="colorBy"
           @select="selectDay"
           @create="openCreate"
           @open-month="openMonth"
+          @select-task="onSelectTask"
         />
       </div>
 
@@ -383,7 +431,11 @@ const hintStyle = computed(() => {
           :key="weekIndex"
           :ref="(el) => setWeekEl(weekIndex, el)"
           class="week"
-          :style="mode === 'month' ? { minHeight: `${weekMinHeight(weekIndex)}px` } : undefined"
+          :style="
+            mode === 'month'
+              ? { minHeight: `${weekMinHeight(weekIndex)}px` }
+              : undefined
+          "
         >
           <div class="week-days">
             <div
@@ -401,7 +453,9 @@ const hintStyle = computed(() => {
             >
               <div class="day-head">
                 <div class="day-label">
-                  <span v-if="mode === 'week'" class="day-weekday">{{ weekdays[date.getDay()] }}</span>
+                  <span v-if="mode === 'week'" class="day-weekday">{{
+                    weekdays[date.getDay()]
+                  }}</span>
                   <span class="day-num">{{ date.getDate() }}</span>
                   <span
                     v-if="mode === 'week' && shouldShowWeekMonth(date, days)"
@@ -463,7 +517,7 @@ const hintStyle = computed(() => {
 </template>
 
 <style scoped lang="scss">
-@use '@/styles/variables' as *;
+@use "@/styles/variables" as *;
 
 .calendar-view {
   display: flex;
@@ -635,8 +689,8 @@ const hintStyle = computed(() => {
 
 .overview-grid {
   display: grid;
-  gap: 8px 12px;
-  padding: 12px 16px 16px;
+  gap: 12px 28px;
+  padding: 16px 20px 20px;
   flex: 1;
   min-height: 0;
   align-content: start;
@@ -835,7 +889,7 @@ const hintStyle = computed(() => {
 </style>
 
 <style lang="scss">
-@use '@/styles/variables' as *;
+@use "@/styles/variables" as *;
 
 .calendar-drag-hint {
   position: fixed;

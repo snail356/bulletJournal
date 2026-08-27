@@ -83,6 +83,47 @@ export function layoutWeekSegments(
   }
 }
 
+/** 將週排程裁切到當月格子，並壓實因跨月被裁掉而空出的 lane */
+export function clipLayoutToMonth(
+  layout: WeekLayout,
+  days: Date[],
+  month: number,
+): WeekLayout {
+  const inMonth = days.map((day) => day.getMonth() === month)
+  const clipped: CalendarLaneSegment[] = []
+
+  for (const segment of layout.segments) {
+    let start = segment.startCol
+    let end = segment.startCol + segment.span - 1
+    while (start <= end && !inMonth[start]) start += 1
+    while (end >= start && !inMonth[end]) end -= 1
+    if (start > end) continue
+    clipped.push({
+      ...segment,
+      startCol: start,
+      span: end - start + 1,
+      continuesBefore: segment.continuesBefore || start > segment.startCol,
+      continuesAfter:
+        segment.continuesAfter || end < segment.startCol + segment.span - 1,
+    })
+  }
+
+  const usedLanes = [...new Set(clipped.map((item) => item.lane))].sort(
+    (a, b) => a - b,
+  )
+  const laneMap = new Map(usedLanes.map((lane, index) => [lane, index]))
+  const segments = clipped.map((item) => ({
+    ...item,
+    lane: laneMap.get(item.lane)!,
+  }))
+
+  return {
+    dates: layout.dates,
+    segments,
+    laneCount: usedLanes.length,
+  }
+}
+
 export function weekDateStrings(days: Date[]): string[] {
   return days.map(formatDate)
 }
