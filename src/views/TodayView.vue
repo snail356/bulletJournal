@@ -7,6 +7,7 @@ import AttachmentPreview from '@/components/AttachmentPreview.vue'
 import ConfirmOrUndoToast from '@/components/ConfirmOrUndoToast.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
+import BackToTopButton from '@/components/BackToTopButton.vue'
 import { TASK_DRAG_KEY } from '@/composables/taskDrag'
 import { useReorderDrag } from '@/composables/useReorderDrag'
 import { useTaskStore } from '@/stores/taskStore'
@@ -135,6 +136,8 @@ function undoDelete() {
       @undo="undoDelete"
       @close="toastVisible = false"
     />
+
+    <BackToTopButton fixed />
   </div>
 </template>
 
