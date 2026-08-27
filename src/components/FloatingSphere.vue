@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, useId } from 'vue'
 
 const SIZE = 36
-const GRID = 12
+const GRID = 8
 const MARGIN = 24
 const SHADOW_ROOM = 14
 
-const SHADES = ['#4c1d95', '#5b21b6', '#7c3aed', '#a78bfa', '#ddd6fe', '#f5f3ff']
+const uid = useId().replace(/[^a-zA-Z0-9_-]/g, '')
+const glowId = `led-glow-${uid}`
 
-const pixels = buildPixelSphere(GRID, SHADES)
+const pixels = buildLedDots(GRID)
 
 const rootRef = ref<HTMLElement | null>(null)
 const x = ref(typeof window !== 'undefined' ? Math.max(8, window.innerWidth - SIZE - MARGIN) : 0)
@@ -23,22 +24,69 @@ let startX = 0
 let startY = 0
 let pointerId: number | null = null
 
-function buildPixelSphere(grid: number, shades: string[]) {
-  const cells: { x: number; y: number; fill: string; opacity: number }[] = []
+function mixLedColor(t: number, light: number): string {
+  const palette = [
+    [196, 181, 253],
+    [125, 211, 252],
+    [34, 211, 238],
+    [103, 232, 249],
+    [165, 243, 252],
+    [236, 254, 255],
+  ]
+  const u = Math.min(0.999, Math.max(0, t * 0.45 + light * 0.55))
+  const scaled = u * (palette.length - 1)
+  const i = Math.floor(scaled)
+  const f = scaled - i
+  const a = palette[i]
+  const b = palette[i + 1] ?? a
+  const r = Math.round(a[0] + (b[0] - a[0]) * f)
+  const g = Math.round(a[1] + (b[1] - a[1]) * f)
+  const bl = Math.round(a[2] + (b[2] - a[2]) * f)
+  return `rgb(${r}, ${g}, ${bl})`
+}
+
+function hash01(x: number, y: number) {
+  const n = Math.sin(x * 12.9898 + y * 78.233) * 43758.5453
+  return n - Math.floor(n)
+}
+
+function buildLedDots(grid: number) {
+  const cells: {
+    x: number
+    y: number
+    r: number
+    fillDim: string
+    fillLit: string
+    opDim: number
+    opLit: number
+    delay: number
+  }[] = []
   const cx = (grid - 1) / 2
-  const r = grid / 2 - 0.3
+  const radius = grid / 2 - 0.05
   for (let py = 0; py < grid; py++) {
     for (let px = 0; px < grid; px++) {
+      const h = hash01(px, py)
       const dx = px - cx
       const dy = py - cx
       const dist = Math.sqrt(dx * dx + dy * dy)
-      if (dist > r) continue
-      const light = (-dx - dy) / (r * Math.SQRT2)
-      const shade = Math.min(1, Math.max(0, 0.42 + light * 0.42 + (1 - dist / r) * 0.18))
-      const idx = Math.min(shades.length - 1, Math.floor(shade * shades.length))
-      const rim = Math.max(0, dist - (r - 1.35))
-      const opacity = 1 - rim * 0.42
-      cells.push({ x: px, y: py, fill: shades[idx], opacity })
+      if (dist > radius + 0.55) continue
+      if (dist > radius * 0.72 && h > 0.7) continue
+      if (dist > radius * 0.88 && h > 0.45) continue
+      const nx = px / (grid - 1)
+      const ny = py / (grid - 1)
+      const light = nx * 0.42 + (1 - ny) * 0.28 + Math.max(0, 1 - dist / radius) * 0.4
+      const falloff = Math.max(0, 1 - dist / (radius + 0.35))
+      const baseOp = (0.34 + light * 0.52) * (0.38 + falloff * 0.62)
+      cells.push({
+        x: px + (h - 0.5) * 0.28,
+        y: py + (hash01(py, px) - 0.5) * 0.28,
+        r: 0.24 + light * 0.1,
+        fillDim: mixLedColor(nx, light * 0.42),
+        fillLit: mixLedColor(nx, Math.min(1, light * 0.9 + 0.35)),
+        opDim: baseOp * 0.55,
+        opLit: Math.min(1, baseOp * 1.15),
+        delay: dist * 0.32 + h * 0.12,
+      })
     }
   }
   return cells
@@ -136,22 +184,63 @@ onUnmounted(() => {
       @pointercancel="onPointerUp"
     >
       <span class="orb-glow" />
-      <svg
-        class="orb"
-        :viewBox="`0 0 ${GRID} ${GRID}`"
-        shape-rendering="crispEdges"
-        aria-hidden="true"
-      >
-        <rect
-          v-for="p in pixels"
-          :key="`${p.x}-${p.y}`"
-          :x="p.x"
-          :y="p.y"
-          width="1"
-          height="1"
-          :fill="p.fill"
-          :opacity="p.opacity"
+      <svg class="orb" :viewBox="`0 0 ${GRID} ${GRID}`" aria-hidden="true">
+        <defs>
+          <radialGradient :id="`${glowId}-wash`" cx="52%" cy="40%" r="62%">
+            <stop class="wash-in" offset="0%" />
+            <stop class="wash-out" offset="100%" />
+          </radialGradient>
+          <filter
+            :id="glowId"
+            x="-80%"
+            y="-80%"
+            width="260%"
+            height="260%"
+          >
+            <feGaussianBlur in="SourceGraphic" stdDeviation="0.32" result="blur" />
+            <feColorMatrix
+              in="blur"
+              type="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 1.2 0"
+              result="bloom"
+            />
+            <feMerge>
+              <feMergeNode in="bloom" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        <circle
+          class="orb-core"
+          :cx="GRID / 2"
+          :cy="GRID / 2"
+          :r="GRID * 0.42"
+          :fill="`url(#${glowId}-wash)`"
         />
+        <g :filter="`url(#${glowId})`">
+          <g v-for="p in pixels" :key="`${p.x}-${p.y}`">
+            <circle
+              class="led-dot"
+              :cx="p.x + 0.5"
+              :cy="p.y + 0.5"
+              :r="p.r"
+              :style="{
+                '--c-dim': p.fillDim,
+                '--c-lit': p.fillLit,
+                '--op-dim': p.opDim,
+                '--op-lit': p.opLit,
+                '--delay': `${p.delay}s`,
+              }"
+            />
+            <circle
+              class="led-spec"
+              :cx="p.x + 0.42"
+              :cy="p.y + 0.42"
+              :r="p.r * 0.32"
+              :style="{ '--delay': `${p.delay}s`, '--op-lit': p.opLit }"
+            />
+          </g>
+        </g>
       </svg>
     </div>
   </Teleport>
@@ -188,25 +277,19 @@ onUnmounted(() => {
     border-radius: 50%;
     background: radial-gradient(
       ellipse,
-      rgba(17, 12, 28, 0.38) 0%,
-      rgba(17, 12, 28, 0.14) 48%,
+      rgba(34, 211, 238, 0.16) 0%,
+      rgba(125, 211, 252, 0.06) 48%,
       transparent 72%
     );
     transform: translateX(-50%);
     pointer-events: none;
     filter: blur(1.5px);
-    animation: shadow-breathe 3.2s ease-in-out infinite;
+    animation: shadow-breathe 3.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
   }
 
   &.is-dragging {
     cursor: grabbing;
     z-index: 45;
-
-    .orb,
-    .orb-glow {
-      animation: none;
-      transform: translateY(-5px) scale(1.04);
-    }
 
     &::after {
       animation: none;
@@ -224,56 +307,127 @@ onUnmounted(() => {
   inset: 0;
   display: block;
   pointer-events: none;
-  animation: sphere-float 3.2s ease-in-out infinite;
 }
 
 .orb-glow {
-  inset: -6px;
+  inset: -8px;
   border-radius: 50%;
   background: radial-gradient(
-    circle at 34% 32%,
-    rgba(237, 233, 254, 0.95) 0%,
-    rgba(167, 139, 250, 0.7) 32%,
-    rgba(124, 58, 237, 0.45) 58%,
-    transparent 78%
+    circle at 58% 40%,
+    rgba(165, 243, 252, 0.36) 0%,
+    rgba(103, 232, 249, 0.18) 36%,
+    rgba(196, 181, 253, 0.1) 58%,
+    transparent 74%
   );
-  filter: blur(5px);
+  filter: blur(6px);
+  animation: glow-breathe 3.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 
 .orb {
   width: 100%;
   height: 100%;
   overflow: visible;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
 }
 
-@keyframes sphere-float {
+.wash-in {
+  stop-color: #c4b5fd;
+  stop-opacity: 0.08;
+  animation: wash-in 3.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+.wash-out {
+  stop-color: #67e8f9;
+  stop-opacity: 0;
+  animation: wash-out 3.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+.led-dot {
+  fill: var(--c-dim);
+  opacity: var(--op-dim);
+  animation: led-tint 3.4s cubic-bezier(0.45, 0, 0.55, 1) var(--delay, 0s) infinite;
+}
+
+.led-spec {
+  fill: #ffffff;
+  opacity: 0.2;
+  animation: led-spec 3.4s cubic-bezier(0.45, 0, 0.55, 1) var(--delay, 0s) infinite;
+}
+
+@keyframes led-tint {
   0%,
   100% {
-    transform: translateY(0);
+    fill: var(--c-dim);
+    opacity: var(--op-dim);
   }
   50% {
-    transform: translateY(-4px);
+    fill: var(--c-lit);
+    opacity: var(--op-lit);
+  }
+}
+
+@keyframes led-spec {
+  0%,
+  100% {
+    opacity: 0.18;
+  }
+  50% {
+    opacity: calc(var(--op-lit) * 0.85);
+  }
+}
+
+@keyframes wash-in {
+  0%,
+  100% {
+    stop-color: #c4b5fd;
+    stop-opacity: 0.07;
+  }
+  50% {
+    stop-color: #ecfeff;
+    stop-opacity: 0.26;
+  }
+}
+
+@keyframes wash-out {
+  0%,
+  100% {
+    stop-color: #a5f3fc;
+    stop-opacity: 0;
+  }
+  50% {
+    stop-color: #67e8f9;
+    stop-opacity: 0.04;
+  }
+}
+
+@keyframes glow-breathe {
+  0%,
+  100% {
+    opacity: 0.52;
+    filter: blur(6px) hue-rotate(8deg);
+  }
+  50% {
+    opacity: 1;
+    filter: blur(6px) hue-rotate(-12deg);
   }
 }
 
 @keyframes shadow-breathe {
   0%,
   100% {
-    transform: translateX(-50%) scale(1);
-    opacity: 0.9;
+    opacity: 0.7;
   }
   50% {
-    transform: translateX(-50%) scale(1.16);
-    opacity: 0.45;
+    opacity: 0.35;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .floating-sphere::after,
-  .orb,
-  .orb-glow {
+  .orb-glow,
+  .wash-in,
+  .wash-out,
+  .led-dot,
+  .led-spec {
     animation: none;
   }
 }
