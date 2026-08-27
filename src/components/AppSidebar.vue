@@ -111,6 +111,25 @@ function onResize() {
         class="nav"
         :class="{ open: menuOpen }"
       >
+        <div class="drawer-header">
+          <div class="brand" aria-hidden="true">
+            <span class="brand-icon">
+              <AppIcon name="book" size="lg" />
+            </span>
+            <div>
+              <p class="drawer-title">Bullet Journal</p>
+              <p>工作狀態紀錄</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="drawer-close"
+            aria-label="關閉選單"
+            @click="closeMenu"
+          >
+            <AppIcon name="xmark" />
+          </button>
+        </div>
         <RouterLink
           v-for="item in navItems"
           :key="item.path"
@@ -287,6 +306,11 @@ function onResize() {
   justify-content: center;
 }
 
+.drawer-header,
+.drawer-close {
+  display: none;
+}
+
 .menu-calendar {
   display: none;
 }
@@ -332,13 +356,13 @@ function onResize() {
 
   .nav {
     position: fixed;
-    z-index: 1200;
+    z-index: 1220;
     top: 0;
     left: 0;
     bottom: 0;
     width: min(280px, 86vw);
     margin: 0;
-    padding: 64px 12px 24px;
+    padding: 0 12px 24px;
     background: $surface;
     border-right: 1px solid $border;
     box-shadow: $shadow-lg;
@@ -357,6 +381,52 @@ function onResize() {
       transform: translateX(0);
       visibility: visible;
       pointer-events: auto;
+    }
+  }
+
+  .drawer-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+    flex-shrink: 0;
+    margin: 0 -12px 8px;
+    padding: 16px 16px 14px;
+    background: $primary-light;
+    border-bottom: 1px solid $border;
+
+    .brand {
+      margin-bottom: 0;
+      padding: 0;
+      min-width: 0;
+
+      p {
+        display: block;
+      }
+    }
+  }
+
+  .drawer-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: $primary;
+    line-height: 1.3;
+  }
+
+  .drawer-close {
+    display: flex;
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    margin-right: -4px;
+    border-radius: 8px;
+    color: $text;
+    align-items: center;
+    justify-content: center;
+
+    &:hover {
+      background: rgba($primary, 0.12);
+      color: $primary;
     }
   }
 
