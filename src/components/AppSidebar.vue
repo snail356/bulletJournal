@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useRoute } from "vue-router";
 import MiniCalendar from "./MiniCalendar.vue";
 import SidebarCarousel from "./SidebarCarousel.vue";
@@ -10,6 +10,7 @@ import { todayString } from "@/utils/date";
 
 const route = useRoute();
 const store = useTaskStore();
+const menuOpen = ref(false);
 
 const navItems = computed(() =>
   store.orderedNavFeatures.filter(
@@ -24,56 +25,122 @@ function isActive(path: string) {
   return route.path === path || route.path.startsWith(path + "/");
 }
 
+function closeMenu() {
+  menuOpen.value = false;
+}
+
+function toggleMenu() {
+  menuOpen.value = !menuOpen.value;
+}
+
 function onNavClick(path: string) {
+  closeMenu();
   if (path === "/today") {
     store.setSelectedDate(todayString());
   }
 }
 
 function openMigrationReview() {
+  closeMenu();
   store.openMigrationReview();
+}
+
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") closeMenu();
+}
+
+watch(
+  () => route.fullPath,
+  () => closeMenu(),
+);
+
+watch(menuOpen, (open) => {
+  document.body.classList.toggle("nav-menu-open", open);
+});
+
+watch(
+  () => store.selectedDate,
+  () => {
+    if (window.innerWidth <= 768) closeMenu();
+  },
+);
+
+onMounted(() => {
+  document.addEventListener("keydown", onKeydown);
+  window.addEventListener("resize", onResize);
+});
+
+onUnmounted(() => {
+  document.removeEventListener("keydown", onKeydown);
+  window.removeEventListener("resize", onResize);
+  document.body.classList.remove("nav-menu-open");
+});
+
+function onResize() {
+  if (window.innerWidth > 768) closeMenu();
 }
 </script>
 
 <template>
   <aside class="sidebar">
-    <div class="brand">
-      <span class="brand-icon">
-        <AppIcon name="book" size="lg" />
-      </span>
-      <div>
-        <h1>Bullet Journal</h1>
-        <p>工作狀態紀錄</p>
+    <div class="sidebar-head">
+      <div class="brand-row">
+        <button
+          type="button"
+          class="menu-toggle"
+          :aria-expanded="menuOpen"
+          aria-controls="app-sidebar-nav"
+          :aria-label="menuOpen ? '關閉選單' : '開啟選單'"
+          @click="toggleMenu"
+        >
+          <AppIcon :name="menuOpen ? 'xmark' : 'bars'" />
+        </button>
+        <div class="brand">
+          <span class="brand-icon">
+            <AppIcon name="book" size="lg" />
+          </span>
+          <div>
+            <h1>Bullet Journal</h1>
+            <p>工作狀態紀錄</p>
+          </div>
+        </div>
       </div>
-    </div>
 
-    <nav class="nav">
-      <RouterLink
-        v-for="item in navItems"
-        :key="item.path"
-        :to="item.path"
-        class="nav-item"
-        :class="{ active: isActive(item.path) }"
-        @click="onNavClick(item.path)"
+      <nav
+        id="app-sidebar-nav"
+        class="nav"
+        :class="{ open: menuOpen }"
       >
-        <span class="nav-icon">
-          <AppIcon :name="item.icon" />
-        </span>
-        {{ item.label }}
-      </RouterLink>
-      <button
-        v-if="store.overdueTaskCount > 0"
-        type="button"
-        class="nav-item migration-btn"
-        @click="openMigrationReview"
-      >
-        <span class="nav-icon">
-          <AppIcon name="arrow-right" />
-        </span>
-        處理延期任務
-        <span class="badge">{{ store.overdueTaskCount }}</span>
-      </button>
-    </nav>
+        <RouterLink
+          v-for="item in navItems"
+          :key="item.path"
+          :to="item.path"
+          class="nav-item"
+          :class="{ active: isActive(item.path) }"
+          @click="onNavClick(item.path)"
+        >
+          <span class="nav-icon">
+            <AppIcon :name="item.icon" />
+          </span>
+          {{ item.label }}
+        </RouterLink>
+        <button
+          v-if="store.overdueTaskCount > 0"
+          type="button"
+          class="nav-item migration-btn"
+          @click="openMigrationReview"
+        >
+          <span class="nav-icon">
+            <AppIcon name="arrow-right" />
+          </span>
+          處理延期任務
+          <span class="badge">{{ store.overdueTaskCount }}</span>
+        </button>
+        <div class="menu-calendar">
+          <MiniCalendar />
+        </div>
+      </nav>
+    </div>
 
     <div class="sidebar-widgets">
       <SidebarCarousel v-if="store.sidebarCarousel.enabled" />
@@ -86,6 +153,14 @@ function openMigrationReview() {
       />
     </div>
   </aside>
+
+  <Teleport to="body">
+    <div
+      v-if="menuOpen"
+      class="nav-backdrop"
+      @click="closeMenu"
+    />
+  </Teleport>
 </template>
 
 <style scoped lang="scss">
@@ -103,6 +178,28 @@ function openMigrationReview() {
   position: sticky;
   top: 0;
   overflow-y: auto;
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.menu-toggle {
+  display: none;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  color: $text;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: $primary-light;
+    color: $primary;
+  }
 }
 
 .brand {
@@ -190,6 +287,10 @@ function openMigrationReview() {
   justify-content: center;
 }
 
+.menu-calendar {
+  display: none;
+}
+
 .sidebar-widgets {
   margin-top: auto;
   display: flex;
@@ -201,70 +302,108 @@ function openMigrationReview() {
 
 @media (max-width: $breakpoint-md) {
   .sidebar {
+    display: contents;
+  }
+
+  .sidebar-head {
+    order: 1;
+    position: sticky;
+    top: 0;
+    z-index: 1210;
     width: 100%;
-    min-width: 0;
-    height: auto;
-    position: static;
-    border-right: none;
+    padding: 10px 12px;
+    background: $surface;
     border-bottom: 1px solid $border;
-    padding: 16px;
+  }
+
+  .menu-toggle {
+    display: flex;
   }
 
   .brand {
-    margin-bottom: 12px;
+    margin-bottom: 0;
+    padding: 0;
+    min-width: 0;
+
+    p {
+      display: none;
+    }
   }
 
   .nav {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 6px;
+    position: fixed;
+    z-index: 1200;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: min(280px, 86vw);
+    margin: 0;
+    padding: 64px 12px 24px;
+    background: $surface;
+    border-right: 1px solid $border;
+    box-shadow: $shadow-lg;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 4px;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform 0.2s ease,
+      visibility 0.2s;
+
+    &.open {
+      transform: translateX(0);
+      visibility: visible;
+      pointer-events: auto;
+    }
   }
 
   .nav-item {
-    flex: 1 1 auto;
-    min-width: fit-content;
-    padding: 8px 10px;
-    font-size: 13px;
+    flex: none;
+    width: 100%;
+    min-width: 0;
+    padding: 10px 12px;
+    font-size: 14px;
     white-space: nowrap;
+    justify-content: flex-start;
   }
 
   .migration-btn {
-    flex: 1 1 100%;
-    margin-top: 0;
+    flex: none;
+    margin-top: 8px;
+  }
+
+  .menu-calendar {
+    display: block;
+    margin-top: auto;
+    padding-top: 16px;
   }
 
   .sidebar-widgets {
-    margin-top: 16px;
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: stretch;
-    gap: 12px;
-    padding-top: 0;
-
-    > * {
-      flex: 1 1 220px;
-      min-width: 0;
-    }
+    display: none;
   }
 }
 
 @media (max-width: $breakpoint-xs) {
-  .sidebar {
-    padding: 12px;
+  .sidebar-head {
+    padding: 8px 10px;
   }
+}
+</style>
 
-  .nav-item {
-    flex: 1 1 calc(50% - 6px);
-    justify-content: center;
-  }
+<style lang="scss">
+@use "@/styles/variables" as *;
 
-  .sidebar-widgets {
-    flex-direction: column;
+.nav-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1190;
+  background: rgba(17, 24, 39, 0.4);
+}
 
-    > * {
-      flex: 1 1 auto;
-      width: 100%;
-    }
-  }
+body.nav-menu-open {
+  overflow: hidden;
 }
 </style>
