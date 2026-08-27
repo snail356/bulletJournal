@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import DeleteIconButton from '@/components/DeleteIconButton.vue'
+import IconPopselect from '@/components/IconPopselect.vue'
 import TaskAvatarFace from '@/components/TaskAvatarFace.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { isDefaultTaskAvatar, TASK_AVATAR_ICON_OPTIONS } from '@/utils/taskAvatars'
@@ -77,6 +78,12 @@ async function onUploadNew(event: Event) {
             <input type="file" accept="image/*" hidden @change="onUpload(avatar, $event)" />
             {{ uploadingId === avatar.id ? '上傳中…' : avatar.imageUrl ? '更換圖片' : '上傳圖片' }}
           </label>
+          <IconPopselect
+            :model-value="avatar.icon"
+            :options="TASK_AVATAR_ICON_OPTIONS"
+            :title="avatar.imageUrl ? '選擇圖示（無圖片時顯示）' : '選擇圖示'"
+            @update:model-value="store.updateTaskAvatar(avatar.id, { icon: $event })"
+          />
           <button
             v-if="avatar.imageUrl"
             type="button"
@@ -94,22 +101,6 @@ async function onUploadNew(event: Event) {
             label="刪除頭像"
             @confirm="store.deleteCustomTaskAvatar(avatar.id)"
           />
-        </div>
-        <div class="icon-field">
-          <span class="field-label">圖示{{ avatar.imageUrl ? '（無圖片時顯示）' : '' }}</span>
-          <div class="icon-grid">
-            <button
-              v-for="icon in TASK_AVATAR_ICON_OPTIONS"
-              :key="icon"
-              type="button"
-              class="icon-btn"
-              :class="{ active: avatar.icon === icon }"
-              :aria-label="icon"
-              @click="store.updateTaskAvatar(avatar.id, { icon })"
-            >
-              <AppIcon :name="icon" size="xs" />
-            </button>
-          </div>
         </div>
       </article>
     </div>
@@ -263,41 +254,6 @@ input[type='text'] {
   &:hover::after,
   &:focus-visible::after {
     opacity: 1;
-  }
-}
-
-.field-label {
-  font-size: 12px;
-  font-weight: 500;
-  color: $text-muted;
-  margin-bottom: 6px;
-  display: block;
-}
-
-.icon-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
-}
-
-.icon-btn {
-  height: 32px;
-  border: 1px solid $border;
-  border-radius: $radius-sm;
-  color: $text-muted;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:hover {
-    border-color: $primary;
-    color: $primary;
-  }
-
-  &.active {
-    border-color: $primary;
-    background: $primary-light;
-    color: $primary;
   }
 }
 </style>
