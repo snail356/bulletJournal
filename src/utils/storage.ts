@@ -24,6 +24,7 @@ const SIDEBAR_CAROUSEL_KEY = "bullet-journal-sidebar-carousel";
 const STOCK_FAVORITES_KEY = "bullet-journal-stock-favorites";
 const STOCK_EX_ANNOUNCE_KEY = "bullet-journal-stock-ex-announce";
 const STOCK_DIVIDEND_CACHE_KEY = "bullet-journal-stock-dividends";
+const AURORA_MODE_KEY = "bullet-journal-aurora-mode";
 
 const defaultMigrationReviewState: MigrationReviewState = {
   snoozedUntil: null,
@@ -93,6 +94,7 @@ export {
   STOCK_FAVORITES_KEY,
   STOCK_EX_ANNOUNCE_KEY,
   STOCK_DIVIDEND_CACHE_KEY,
+  AURORA_MODE_KEY,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
   defaultGeminiUsageState,
