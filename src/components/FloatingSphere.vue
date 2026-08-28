@@ -47,7 +47,6 @@ const modeMenuOpen = ref(false);
 const modeMenuStyle = ref<Record<string, string>>({});
 const modeMenuRef = ref<HTMLElement | null>(null);
 
-let hasDragged = false;
 let pointerMoved = false;
 let startPointerX = 0;
 let startPointerY = 0;
@@ -56,6 +55,14 @@ let startY = 0;
 let pointerId: number | null = null;
 let chimeTimer: ReturnType<typeof setTimeout> | null = null;
 let chimeHideTimer: ReturnType<typeof setTimeout> | null = null;
+let wanderRaf: number | null = null;
+let wanderDelayTimer: ReturnType<typeof setTimeout> | null = null;
+let wanderFromX = 0;
+let wanderFromY = 0;
+let wanderToX = 0;
+let wanderToY = 0;
+let wanderStartedAt = 0;
+let wanderDuration = 0;
 
 function mixLedColor(t: number, light: number): string {
   const palette = [
@@ -151,6 +158,88 @@ function placeAtBottomRight() {
   y.value = next.y;
 }
 
+function prefersReducedMotion() {
+  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+}
+
+function canWander() {
+  return (
+    !dragging.value &&
+    !popKind.value &&
+    !modeMenuOpen.value &&
+    document.visibilityState === "visible" &&
+    !prefersReducedMotion()
+  );
+}
+
+function pickWanderTarget() {
+  const s = size();
+  const pad = 20;
+  const maxX = Math.max(pad, window.innerWidth - s - pad);
+  const maxY = Math.max(pad, window.innerHeight - s - SHADOW_ROOM);
+  return {
+    x: pad + Math.random() * (maxX - pad),
+    y: pad + Math.random() * (maxY - pad),
+  };
+}
+
+function easeInOutCubic(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
+}
+
+function stopWander() {
+  if (wanderRaf != null) {
+    cancelAnimationFrame(wanderRaf);
+    wanderRaf = null;
+  }
+  if (wanderDelayTimer) {
+    clearTimeout(wanderDelayTimer);
+    wanderDelayTimer = null;
+  }
+}
+
+function scheduleWander(delayMs = 700) {
+  stopWander();
+  if (prefersReducedMotion()) return;
+  wanderDelayTimer = setTimeout(startWanderLeg, delayMs);
+}
+
+function startWanderLeg() {
+  if (!canWander()) {
+    scheduleWander(1400);
+    return;
+  }
+  const target = pickWanderTarget();
+  wanderFromX = x.value;
+  wanderFromY = y.value;
+  wanderToX = target.x;
+  wanderToY = target.y;
+  const dist = Math.hypot(wanderToX - wanderFromX, wanderToY - wanderFromY);
+  const speed = 16 + Math.random() * 22;
+  wanderDuration = Math.max(4500, (dist / speed) * 1000);
+  wanderStartedAt = performance.now();
+  wanderRaf = requestAnimationFrame(tickWander);
+}
+
+function tickWander(now: number) {
+  if (!canWander()) {
+    wanderRaf = null;
+    scheduleWander(1200);
+    return;
+  }
+  const t = Math.min(1, (now - wanderStartedAt) / wanderDuration);
+  const e = easeInOutCubic(t);
+  x.value = wanderFromX + (wanderToX - wanderFromX) * e;
+  y.value = wanderFromY + (wanderToY - wanderFromY) * e;
+  if (popKind.value) updatePopPosition();
+  if (t < 1) {
+    wanderRaf = requestAnimationFrame(tickWander);
+    return;
+  }
+  wanderRaf = null;
+  scheduleWander(500 + Math.random() * 1800);
+}
+
 function onPointerDown(e: PointerEvent) {
   if (e.button !== undefined && e.button !== 0) return;
   e.preventDefault();
@@ -162,6 +251,7 @@ function onPointerDown(e: PointerEvent) {
   startPointerY = e.clientY;
   startX = x.value;
   startY = y.value;
+  stopWander();
   rootRef.value?.setPointerCapture(e.pointerId);
 }
 
@@ -172,7 +262,6 @@ function onPointerMove(e: PointerEvent) {
   if (!pointerMoved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
   pointerMoved = true;
   dragging.value = true;
-  hasDragged = true;
   const next = clamp(startX + dx, startY + dy);
   x.value = next.x;
   y.value = next.y;
@@ -185,6 +274,7 @@ function onPointerUp(e: PointerEvent) {
   dragging.value = false;
   pointerId = null;
   if (wasClick) onSphereClick();
+  else scheduleWander(900);
 }
 
 function onSphereClick() {
@@ -236,12 +326,14 @@ function hidePop() {
   popKind.value = null;
   activeQuote.value = null;
   chimeText.value = "";
+  scheduleWander(600);
 }
 
 function setMode(next: AuroraMode) {
   mode.value = next;
   saveToStorage(AURORA_MODE_KEY, next);
   modeMenuOpen.value = false;
+  if (!popKind.value) scheduleWander(400);
 }
 
 function openModeMenu(e: MouseEvent) {
@@ -303,14 +395,17 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 function onResize() {
-  if (hasDragged) {
-    const next = clamp(x.value, y.value);
-    x.value = next.x;
-    y.value = next.y;
-  } else {
-    placeAtBottomRight();
-  }
+  const next = clamp(x.value, y.value);
+  x.value = next.x;
+  y.value = next.y;
   if (popKind.value) updatePopPosition();
+  stopWander();
+  scheduleWander(400);
+}
+
+function onVisibilityChange() {
+  if (document.visibilityState === "visible") scheduleWander(800);
+  else stopWander();
 }
 
 onMounted(async () => {
@@ -318,16 +413,20 @@ onMounted(async () => {
   placeAtBottomRight();
   ready.value = true;
   scheduleHourChime();
+  scheduleWander(1600);
   window.addEventListener("resize", onResize);
   document.addEventListener("pointerdown", onDocumentPointerDown);
+  document.addEventListener("visibilitychange", onVisibilityChange);
   window.addEventListener("keydown", onKeydown);
 });
 
 onUnmounted(() => {
   clearHourChime();
   clearChimeHide();
+  stopWander();
   window.removeEventListener("resize", onResize);
   document.removeEventListener("pointerdown", onDocumentPointerDown);
+  document.removeEventListener("visibilitychange", onVisibilityChange);
   window.removeEventListener("keydown", onKeydown);
 });
 </script>
@@ -412,7 +511,11 @@ onUnmounted(() => {
     <Transition name="quote-pop">
       <aside
         v-if="popKind"
-        :key="popKind === 'quote' ? `quote-${activeQuote?.id}` : `chime-${chimeText}`"
+        :key="
+          popKind === 'quote'
+            ? `quote-${activeQuote?.id}`
+            : `chime-${chimeText}`
+        "
         ref="popoverRef"
         class="quote-pop"
         :style="popoverStyle"
@@ -664,7 +767,6 @@ onUnmounted(() => {
 }
 
 .quote-author {
-  margin: 12px 0 0;
   text-align: right;
   font-size: 12px;
   color: $text-muted;

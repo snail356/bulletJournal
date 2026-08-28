@@ -8,7 +8,6 @@ import ConfirmOrUndoToast from '@/components/ConfirmOrUndoToast.vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
 import BackToTopButton from '@/components/BackToTopButton.vue'
-import FloatingSphere from '@/components/FloatingSphere.vue'
 import { TASK_DRAG_KEY } from '@/composables/taskDrag'
 import { useReorderDrag } from '@/composables/useReorderDrag'
 import { useTaskStore } from '@/stores/taskStore'
@@ -139,7 +138,6 @@ function undoDelete() {
     />
 
     <BackToTopButton fixed />
-    <FloatingSphere />
   </div>
 </template>
 

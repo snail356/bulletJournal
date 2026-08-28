@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
+import FloatingSphere from '@/components/FloatingSphere.vue'
 import MigrationReviewModal from '@/components/MigrationReviewModal.vue'
 import ReflectionModal from '@/components/ReflectionModal.vue'
 import { useTaskStore } from '@/stores/taskStore'
@@ -41,6 +42,8 @@ onUnmounted(() => {
     <main class="main">
       <RouterView />
     </main>
+
+    <FloatingSphere />
 
     <MigrationReviewModal
       :visible="store.migrationReviewVisible"
