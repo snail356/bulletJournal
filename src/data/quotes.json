@@ -71,282 +71,1332 @@
   },
   {
     "id": 11,
+    "author": "Albert Camus",
+    "author_zh": "阿爾貝·卡繆",
+    "quote": "自由不是別的，正是自我改進的機會。",
+    "category": "自我成長"
+  },
+  {
+    "id": 12,
+    "author": "Albert Camus",
+    "author_zh": "阿爾貝·卡繆",
+    "quote": "人在荒謬的世界中尋找意義，這種矛盾本身就是人生的本質。",
+    "category": "荒謬哲學"
+  },
+  {
+    "id": 13,
+    "author": "Albert Camus",
+    "author_zh": "阿爾貝·卡繆",
+    "quote": "沒有意志就沒有希望；沒有絕望就沒有對生活的熱情。",
+    "category": "生命意志"
+  },
+  {
+    "id": 14,
+    "author": "Albert Camus",
+    "author_zh": "阿爾貝·卡繆",
+    "quote": "虛無並不可怕，可怕的是在虛無中喪失了擁抱當下的勇氣。",
+    "category": "當下覺察"
+  },
+  {
+    "id": 15,
+    "author": "Albert Camus",
+    "author_zh": "阿爾貝·卡繆",
+    "quote": "哪怕世界再冷漠，我也要用清醒的意識去對抗荒謬。",
+    "category": "清醒生存"
+  },
+  {
+    "id": 16,
     "author": "Friedrich Nietzsche",
     "author_zh": "弗里德里希·尼采",
     "quote": "那些殺不死我的，終將使我更強大。",
     "category": "堅韌與成長"
   },
   {
-    "id": 12,
+    "id": 17,
     "author": "Friedrich Nietzsche",
     "author_zh": "弗里德里希·尼采",
     "quote": "與怪物戰鬥的人，應當小心自己不要成為怪物。當你凝視深淵時，深淵也在凝視著你。",
     "category": "自我覺察"
   },
   {
-    "id": 13,
+    "id": 18,
     "author": "Friedrich Nietzsche",
     "author_zh": "弗里德里希·尼采",
     "quote": "知道自己為什麼而活的人，幾乎能承受任何一種生存方式。",
     "category": "人生信念"
   },
   {
-    "id": 14,
+    "id": 19,
     "author": "Friedrich Nietzsche",
     "author_zh": "弗里德里希·尼采",
     "quote": "每一個不曾起舞的日子，都是對生命的辜負。",
     "category": "熱愛生活"
   },
   {
-    "id": 15,
+    "id": 20,
     "author": "Friedrich Nietzsche",
     "author_zh": "弗里德里希·尼采",
     "quote": "那些聽不見音樂的人，以為跳舞的人都瘋了。",
     "category": "理解與獨立"
   },
   {
-    "id": 16,
+    "id": 21,
+    "author": "Friedrich Nietzsche",
+    "author_zh": "弗里德里希·尼采",
+    "quote": "一個人知道自己為什麼而活，就能忍受任何活法。",
+    "category": "生命意義"
+  },
+  {
+    "id": 22,
+    "author": "Friedrich Nietzsche",
+    "author_zh": "弗里德里希·尼采",
+    "quote": "思想的深度決定了生命的寬度，超人就是克服了自我的人。",
+    "category": "自我超越"
+  },
+  {
+    "id": 23,
+    "author": "Friedrich Nietzsche",
+    "author_zh": "弗里德里希·尼采",
+    "quote": "受苦的勇氣，是最高貴的品質。",
+    "category": "意志力量"
+  },
+  {
+    "id": 24,
+    "author": "Friedrich Nietzsche",
+    "author_zh": "弗里德里希·尼采",
+    "quote": "你要搞清楚自己是誰，然後勇敢地去成為你自己。",
+    "category": "真實自我"
+  },
+  {
+    "id": 25,
+    "author": "Friedrich Nietzsche",
+    "author_zh": "弗里德里希·尼采",
+    "quote": "人是一根繩索，架在野獸與超人之間。",
+    "category": "人性探索"
+  },
+  {
+    "id": 26,
+    "author": "Friedrich Nietzsche",
+    "author_zh": "弗里德里希·尼采",
+    "quote": "執著於過去的人，無法奔向未來。",
+    "category": "放下過往"
+  },
+  {
+    "id": 27,
+    "author": "Friedrich Nietzsche",
+    "author_zh": "弗里德里希·尼采",
+    "quote": "強大不是不感到痛苦，而是帶著痛苦繼續前行。",
+    "category": "精神堅韌"
+  },
+  {
+    "id": 28,
+    "author": "Friedrich Nietzsche",
+    "author_zh": "弗里德里希·尼采",
+    "quote": "平庸是靈魂的麻木，而創造是生命最響亮的聲音。",
+    "category": "創造力"
+  },
+  {
+    "id": 29,
+    "author": "Friedrich Nietzsche",
+    "author_zh": "弗里德里希·尼采",
+    "quote": "熱愛命運（Amor Fati）：不只是承受必然，而是熱愛必然。",
+    "category": "命運哲學"
+  },
+  {
+    "id": 30,
+    "author": "Friedrich Nietzsche",
+    "author_zh": "弗里德里希·尼采",
+    "quote": "沒有孤獨的洗禮，就沒有靈魂的高貴。",
+    "category": "獨處沉澱"
+  },
+  {
+    "id": 31,
     "author": "Jean-Paul Sartre",
     "author_zh": "讓-保羅·沙特",
     "quote": "存在先於本質。",
     "category": "存在主義"
   },
   {
-    "id": 17,
+    "id": 32,
     "author": "Jean-Paul Sartre",
     "author_zh": "讓-保羅·沙特",
     "quote": "他人即地獄。",
     "category": "人際關係"
   },
   {
-    "id": 18,
+    "id": 33,
     "author": "Jean-Paul Sartre",
     "author_zh": "讓-保羅·沙特",
     "quote": "自由是人類必須承擔的負擔；我們被迫選擇，而我們的選擇決定了我們是誰。",
     "category": "選擇與責任"
   },
   {
-    "id": 19,
-    "author": "Marcus Aurelius",
-    "author_zh": "馬庫斯·奧列里烏斯",
-    "quote": "你有權控制自己的心靈，而不是外界的事件。意識到這一點，你就會找到力量。",
-    "category": "斯多葛心法"
-  },
-  {
-    "id": 20,
-    "author": "Marcus Aurelius",
-    "author_zh": "馬庫斯·奧列里烏斯",
-    "quote": "我們生活的品質，取決於我們思想的品質。",
-    "category": "心靈修養"
-  },
-  {
-    "id": 21,
-    "author": "Marcus Aurelius",
-    "author_zh": "馬庫斯·奧列里烏斯",
-    "quote": "最佳的報復方式，就是不要變得像傷害你的人一樣。",
-    "category": "處世智慧"
-  },
-  {
-    "id": 22,
-    "author": "Seneca",
-    "author_zh": "塞內卡",
-    "quote": "我們在想像中遭受的痛苦，往往比在現實中遭受的還要多。",
-    "category": "心靈平靜"
-  },
-  {
-    "id": 23,
-    "author": "Seneca",
-    "author_zh": "塞內卡",
-    "quote": "如果不清楚船要駛向哪個港口，那麼任何方向的風都不是順風。",
-    "category": "目標與方向"
-  },
-  {
-    "id": 24,
-    "author": "Epictetus",
-    "author_zh": "愛比克泰德",
-    "quote": "困擾人們的不是事物本身，而是人們對事物的看法。",
-    "category": "認知轉念"
-  },
-  {
-    "id": 25,
-    "author": "Epictetus",
-    "author_zh": "愛比克泰德",
-    "quote": "自由是唯一值得追求的目標，唯有放下我們無法控制的事物，才能獲得自由。",
-    "category": "臣服與放下"
-  },
-  {
-    "id": 26,
-    "author": "Socrates",
-    "author_zh": "蘇格拉底",
-    "quote": "未經審視的人生是不值得過的。",
-    "category": "自我探索"
-  },
-  {
-    "id": 27,
-    "author": "Socrates",
-    "author_zh": "蘇格拉底",
-    "quote": "我唯一知道的事，就是我什麼也不知道。",
-    "category": "謙遜與求知"
-  },
-  {
-    "id": 28,
-    "author": "Plato",
-    "author_zh": "柏拉圖",
-    "quote": "善待你遇到的每一個人，因為每個人都在面對一場艱難的戰鬥。",
-    "category": "同理與慈悲"
-  },
-  {
-    "id": 29,
-    "author": "Plato",
-    "author_zh": "柏拉圖",
-    "quote": "智者說話是因為有話要說；愚者說話是因為不得不說。",
-    "category": "言語智慧"
-  },
-  {
-    "id": 30,
-    "author": "Aristotle",
-    "author_zh": "亞里斯多德",
-    "quote": "我們重複做的事情決定了我們。因此，卓越不是一種行為，而是一種習慣。",
-    "category": "習慣與卓越"
-  },
-  {
-    "id": 31,
-    "author": "Aristotle",
-    "author_zh": "亞里斯多德",
-    "quote": "能在不接受某種思想的前提下思考它，是受過良好教育的心靈的標誌。",
-    "category": "批判思考"
-  },
-  {
-    "id": 32,
-    "author": "René Descartes",
-    "author_zh": "勒內·笛卡兒",
-    "quote": "我思，故我在。",
-    "category": "存在與理智"
-  },
-  {
-    "id": 33,
-    "author": "Baruch Spinoza",
-    "author_zh": "史賓諾沙",
-    "quote": "不要哭，不要憤怒，要理解。",
-    "category": "理智與情緒"
-  },
-  {
     "id": 34,
-    "author": "Immanuel Kant",
-    "author_zh": "伊曼努爾·康德",
-    "quote": "有兩樣東西，我越是經常和持久地對它們進行思考，心中就越充滿永恆的新奇與敬畏：頭頂的星空和心中的道德律。",
-    "category": "敬畏與道德"
+    "author": "Jean-Paul Sartre",
+    "author_zh": "讓-保羅·沙特",
+    "quote": "人是自我設計的產物，你選擇成為什麼，你就是什麼。",
+    "category": "自我定義"
   },
   {
     "id": 35,
-    "author": "Immanuel Kant",
-    "author_zh": "伊曼努爾·康德",
-    "quote": "人不是工具，而是目的本身。",
-    "category": "人的尊嚴"
+    "author": "Jean-Paul Sartre",
+    "author_zh": "讓-保羅·沙特",
+    "quote": "不做出選擇，本身也是一種選擇。",
+    "category": "主動人生"
   },
   {
     "id": 36,
-    "author": "Arthur Schopenhauer",
-    "author_zh": "阿圖爾·叔本華",
-    "quote": "人生就像擺擺，在痛苦與無聊之間往復擺動。",
-    "category": "生命本質"
+    "author": "Jean-Paul Sartre",
+    "author_zh": "讓-保羅·沙特",
+    "quote": "我們在選擇中創造自己，在責任中展現自由。",
+    "category": "責任與自由"
   },
   {
     "id": 37,
-    "author": "Arthur Schopenhauer",
-    "author_zh": "阿圖爾·叔本華",
-    "quote": "孤獨是所有卓越心靈的命運。",
-    "category": "獨處與沉澱"
+    "author": "Jean-Paul Sartre",
+    "author_zh": "讓-保羅·沙特",
+    "quote": "承擔後果的勇氣，是自由的最高表現形式。",
+    "category": "行為責任"
   },
   {
     "id": 38,
-    "author": "Søren Kierkegaard",
-    "author_zh": "索倫·齊克果",
-    "quote": "生命只能向後理解，但必須向前生活。",
-    "category": "時間與行動"
-  },
-  {
-    "id": 39,
-    "author": "Søren Kierkegaard",
-    "author_zh": "索倫·齊克果",
-    "quote": "焦慮是自由引起的眩暈。",
-    "category": "自由與焦慮"
-  },
-  {
-    "id": 40,
-    "author": "Karl Jaspers",
-    "author_zh": "卡爾·雅斯培",
-    "quote": "教育就是一棵樹搖動一棵樹，一朵雲推動一朵雲，一個靈魂喚醒另一個靈魂。",
-    "category": "教育與靈魂"
-  },
-  {
-    "id": 41,
     "author": "Simone de Beauvoir",
     "author_zh": "西蒙·波娃",
     "quote": "女人不是生下來的，而是後天變成的。",
     "category": "自我塑造"
   },
   {
-    "id": 42,
+    "id": 39,
     "author": "Simone de Beauvoir",
     "author_zh": "西蒙·波娃",
     "quote": "改變生活的唯一方式，就是無條件地投入當下。",
     "category": "專注當下"
   },
   {
+    "id": 40,
+    "author": "Simone de Beauvoir",
+    "author_zh": "西蒙·波娃",
+    "quote": "人生的意義在於不斷超越自我，延伸生命的可能性。",
+    "category": "超越自我"
+  },
+  {
+    "id": 41,
+    "author": "Simone de Beauvoir",
+    "author_zh": "西蒙·波娃",
+    "quote": "自由不只是打破枷鎖，更是建立自我主體性。",
+    "category": "獨立主體"
+  },
+  {
+    "id": 42,
+    "author": "Simone de Beauvoir",
+    "author_zh": "西蒙·波娃",
+    "quote": "我們不是為了解答生活而活，而是為了體驗生活而活。",
+    "category": "生活體驗"
+  },
+  {
     "id": 43,
-    "author": "Michel Foucault",
-    "author_zh": "米歇爾·傅柯",
-    "quote": "知識即力量，但知識也是權力運作的場域。",
-    "category": "知識與思考"
+    "author": "Simone de Beauvoir",
+    "author_zh": "西蒙·波娃",
+    "quote": "真正的愛不是彼此佔有，而是共同向外探索世界。",
+    "category": "愛與成長"
   },
   {
     "id": 44,
-    "author": "Laozi",
-    "author_zh": "老子",
-    "quote": "千里之行，始於足下。",
-    "category": "實踐與積累"
+    "author": "Simone de Beauvoir",
+    "author_zh": "西蒙·波娃",
+    "quote": "別讓過去的習慣定義你未來的可能性。",
+    "category": "突破限制"
   },
   {
     "id": 45,
-    "author": "Zhuangzi",
-    "author_zh": "莊子",
-    "quote": "吾生也有涯，而知也無涯。以有涯隨無涯，殆已！",
-    "category": "認知境界"
+    "author": "Simone de Beauvoir",
+    "author_zh": "西蒙·波娃",
+    "quote": "能在混亂中保持內心平靜的人，才擁有真正的自由。",
+    "category": "心靈定力"
   },
   {
     "id": 46,
+    "author": "Marcus Aurelius",
+    "author_zh": "馬庫斯·奧列里烏斯",
+    "quote": "你有權控制自己的心靈，而不是外界的事件。意識到這一點，你就會找到力量。",
+    "category": "斯多葛心法"
+  },
+  {
+    "id": 47,
+    "author": "Marcus Aurelius",
+    "author_zh": "馬庫斯·奧列里烏斯",
+    "quote": "我們生活的品質，取決於我們思想的品質。",
+    "category": "心靈修養"
+  },
+  {
+    "id": 48,
+    "author": "Marcus Aurelius",
+    "author_zh": "馬庫斯·奧列里烏斯",
+    "quote": "最佳的報復方式，就是不要變得像傷害你的人一樣。",
+    "category": "處世智慧"
+  },
+  {
+    "id": 49,
+    "author": "Marcus Aurelius",
+    "author_zh": "馬庫斯·奧列里烏斯",
+    "quote": "阻礙行動的障礙，終將成為促進行動的階梯。",
+    "category": "逆境轉機"
+  },
+  {
+    "id": 50,
+    "author": "Marcus Aurelius",
+    "author_zh": "馬庫斯·奧列里烏斯",
+    "quote": "專注於當下一刻，因為你唯一能擁有的就是現在。",
+    "category": "當下覺察"
+  },
+  {
+    "id": 51,
+    "author": "Marcus Aurelius",
+    "author_zh": "馬庫斯·奧列里烏斯",
+    "quote": "不要浪費時間爭論什麼是好人，直接做一個好人。",
+    "category": "實踐道德"
+  },
+  {
+    "id": 52,
+    "author": "Marcus Aurelius",
+    "author_zh": "馬庫斯·奧列里烏斯",
+    "quote": "心靈如同一座要塞，內心的安寧全憑自己掌控。",
+    "category": "內心強大"
+  },
+  {
+    "id": 53,
+    "author": "Marcus Aurelius",
+    "author_zh": "馬庫斯·奧列里烏斯",
+    "quote": "清晨醒來時想想：能活著、能思考、能享受、能去愛，是多麼珍貴的特權。",
+    "category": "感恩生活"
+  },
+  {
+    "id": 54,
+    "author": "Seneca",
+    "author_zh": "塞內卡",
+    "quote": "我們在想像中遭受的痛苦，往往比在現實中遭受的還要多。",
+    "category": "心靈平靜"
+  },
+  {
+    "id": 55,
+    "author": "Seneca",
+    "author_zh": "塞內卡",
+    "quote": "如果不清楚船要駛向哪個港口，那麼任何方向的風都不是順風。",
+    "category": "目標與方向"
+  },
+  {
+    "id": 56,
+    "author": "Seneca",
+    "author_zh": "塞內卡",
+    "quote": "生命並非短暫，而是我們浪費了太多時間。",
+    "category": "時間管理"
+  },
+  {
+    "id": 57,
+    "author": "Seneca",
+    "author_zh": "塞內卡",
+    "quote": "真正的偉大，是在脆弱的人性中展現神聖的堅韌。",
+    "category": "堅忍不拔"
+  },
+  {
+    "id": 58,
+    "author": "Seneca",
+    "author_zh": "塞內卡",
+    "quote": "命運引導順從的人，拖拽抗拒的人。",
+    "category": "順應自然"
+  },
+  {
+    "id": 59,
+    "author": "Seneca",
+    "author_zh": "塞內卡",
+    "quote": "患難是展現美德的舞台。",
+    "category": "逆境成長"
+  },
+  {
+    "id": 60,
+    "author": "Seneca",
+    "author_zh": "塞內卡",
+    "quote": "學會獨處的人，永遠不會感到貧乏。",
+    "category": "充實自我"
+  },
+  {
+    "id": 61,
+    "author": "Epictetus",
+    "author_zh": "愛比克泰德",
+    "quote": "困擾人們的不是事物本身，而是人們對事物的看法。",
+    "category": "認知轉念"
+  },
+  {
+    "id": 62,
+    "author": "Epictetus",
+    "author_zh": "愛比克泰德",
+    "quote": "自由是唯一值得追求的目標，唯有放下我們無法控制的事物，才能獲得自由。",
+    "category": "臣服與放下"
+  },
+  {
+    "id": 63,
+    "author": "Epictetus",
+    "author_zh": "愛比克泰德",
+    "quote": "控制你能控制的，接受你無法控制的。",
+    "category": "界限智慧"
+  },
+  {
+    "id": 64,
+    "author": "Epictetus",
+    "author_zh": "愛比克泰德",
+    "quote": "先告訴自己想成為怎樣的人，然後腳踏實地去實踐。",
+    "category": "目標執行"
+  },
+  {
+    "id": 65,
+    "author": "Epictetus",
+    "author_zh": "愛比克泰德",
+    "quote": "沒有人能傷害你，除非你自己同意讓傷害發生。",
+    "category": "心理韌性"
+  },
+  {
+    "id": 66,
+    "author": "Epictetus",
+    "author_zh": "愛比克泰德",
+    "quote": "財富不在於擁有許多財產，而在於需求很少。",
+    "category": "簡約生活"
+  },
+  {
+    "id": 67,
+    "author": "Epictetus",
+    "author_zh": "愛比克泰德",
+    "quote": "智慧的起點是承認自己的無知。",
+    "category": "謙遜求知"
+  },
+  {
+    "id": 68,
+    "author": "Epictetus",
+    "author_zh": "愛比克泰德",
+    "quote": "平靜來自於不再對無法改變的事物徒勞爭執。",
+    "category": "情緒管理"
+  },
+  {
+    "id": 69,
+    "author": "Epictetus",
+    "author_zh": "愛比克泰德",
+    "quote": "環境不能造就人，它只是揭示了人本身。",
+    "category": "環境與自我"
+  },
+  {
+    "id": 70,
+    "author": "Epictetus",
+    "author_zh": "愛比克泰德",
+    "quote": "真正的自由不是隨心所欲，而是隨遇而安。",
+    "category": "心靈自由"
+  },
+  {
+    "id": 71,
+    "author": "Socrates",
+    "author_zh": "蘇格拉底",
+    "quote": "未經審視的人生是不值得過的。",
+    "category": "自我探索"
+  },
+  {
+    "id": 72,
+    "author": "Socrates",
+    "author_zh": "蘇格拉底",
+    "quote": "我唯一知道的事，就是我什麼也不知道。",
+    "category": "謙遜與求知"
+  },
+  {
+    "id": 73,
+    "author": "Socrates",
+    "author_zh": "蘇格拉底",
+    "quote": "知足是自然的財富，奢侈是人為的貧窮。",
+    "category": "簡樸智慧"
+  },
+  {
+    "id": 74,
+    "author": "Socrates",
+    "author_zh": "蘇格拉底",
+    "quote": "認識你自己。",
+    "category": "自我覺察"
+  },
+  {
+    "id": 75,
+    "author": "Socrates",
+    "author_zh": "蘇格拉底",
+    "quote": "世上只有一種善，那就是知識；世上只有一種惡，那就是無知。",
+    "category": "智慧與修養"
+  },
+  {
+    "id": 76,
+    "author": "Plato",
+    "author_zh": "柏拉圖",
+    "quote": "善待你遇到的每一個人，因為每個人都在面對一場艱難的戰鬥。",
+    "category": "同理與慈悲"
+  },
+  {
+    "id": 77,
+    "author": "Plato",
+    "author_zh": "柏拉圖",
+    "quote": "智者說話是因為有話要說；愚者說話是因為不得不說。",
+    "category": "言語智慧"
+  },
+  {
+    "id": 78,
+    "author": "Plato",
+    "author_zh": "柏拉圖",
+    "quote": "戰勝自己是最大、最光榮的勝利。",
+    "category": "自律與勝己"
+  },
+  {
+    "id": 79,
+    "author": "Plato",
+    "author_zh": "柏拉圖",
+    "quote": "衡量一個人的標準，看他在擁有權力時做些什麼。",
+    "category": "品格考驗"
+  },
+  {
+    "id": 80,
+    "author": "Plato",
+    "author_zh": "柏拉圖",
+    "quote": "思維是靈魂與自己的無聲對話。",
+    "category": "獨立思考"
+  },
+  {
+    "id": 81,
+    "author": "Plato",
+    "author_zh": "柏拉圖",
+    "quote": "良好的開端是成功的一半。",
+    "category": "行動與開始"
+  },
+  {
+    "id": 82,
+    "author": "Aristotle",
+    "author_zh": "亞里斯多德",
+    "quote": "我們重複做的事情決定了我們。因此，卓越不是一種行為，而是一種習慣。",
+    "category": "習慣與卓越"
+  },
+  {
+    "id": 83,
+    "author": "Aristotle",
+    "author_zh": "亞里斯多德",
+    "quote": "能在不接受某種思想的前提下思考它，是受過良好教育的心靈的標誌。",
+    "category": "批判思考"
+  },
+  {
+    "id": 84,
+    "author": "Aristotle",
+    "author_zh": "亞里斯多德",
+    "quote": "幸福取決於我們自己。",
+    "category": "自主幸福"
+  },
+  {
+    "id": 85,
+    "author": "Aristotle",
+    "author_zh": "亞里斯多德",
+    "quote": "認識自己是一切智慧的開端。",
+    "category": "智慧起點"
+  },
+  {
+    "id": 86,
+    "author": "Aristotle",
+    "author_zh": "亞里斯多德",
+    "quote": "卓越永遠不是偶然，而是高尚意圖與明智執行的結晶。",
+    "category": "追求卓越"
+  },
+  {
+    "id": 87,
+    "author": "Aristotle",
+    "author_zh": "亞里斯多德",
+    "quote": "城邦的目的是為了美好生活，而不僅僅是為了生存。",
+    "category": "社會價值"
+  },
+  {
+    "id": 88,
+    "author": "Aristotle",
+    "author_zh": "亞里斯多德",
+    "quote": "朋友是寄託在兩個身體裡的同一個靈魂。",
+    "category": "真摯友誼"
+  },
+  {
+    "id": 89,
+    "author": "Aristotle",
+    "author_zh": "亞里斯多德",
+    "quote": "希望是清醒者的夢想。",
+    "category": "希望與信念"
+  },
+  {
+    "id": 90,
+    "author": "Aristotle",
+    "author_zh": "亞里斯多德",
+    "quote": "中庸之道，是通往德行與幸福的最佳路徑。",
+    "category": "平衡與節制"
+  },
+  {
+    "id": 91,
+    "author": "René Descartes",
+    "author_zh": "勒內·笛卡兒",
+    "quote": "我思，故我在。",
+    "category": "存在與理智"
+  },
+  {
+    "id": 92,
+    "author": "René Descartes",
+    "author_zh": "勒內·笛卡兒",
+    "quote": "懷疑是一切智慧的起點。",
+    "category": "理性質疑"
+  },
+  {
+    "id": 93,
+    "author": "René Descartes",
+    "author_zh": "勒內·笛卡兒",
+    "quote": "閱讀好書如同與過去最傑出的人交談。",
+    "category": "閱讀成長"
+  },
+  {
+    "id": 94,
+    "author": "Baruch Spinoza",
+    "author_zh": "史賓諾沙",
+    "quote": "不要哭，不要憤怒，要理解。",
+    "category": "理智與情緒"
+  },
+  {
+    "id": 95,
+    "author": "Baruch Spinoza",
+    "author_zh": "史賓諾沙",
+    "quote": "自由是對必然性的理解。",
+    "category": "理性自由"
+  },
+  {
+    "id": 96,
+    "author": "Baruch Spinoza",
+    "author_zh": "史賓諾沙",
+    "quote": "最高的善是認識心靈與自然的同一性。",
+    "category": "心靈合一"
+  },
+  {
+    "id": 97,
+    "author": "Immanuel Kant",
+    "author_zh": "伊曼努爾·康德",
+    "quote": "有兩樣東西，我越是經常和持久地對它們進行思考，心中就越充滿永恆的新奇與敬畏：頭頂的星空和心中的道德律。",
+    "category": "敬畏與道德"
+  },
+  {
+    "id": 98,
+    "author": "Immanuel Kant",
+    "author_zh": "伊曼努爾·康德",
+    "quote": "人不是工具，而是目的本身。",
+    "category": "人的尊嚴"
+  },
+  {
+    "id": 99,
+    "author": "Immanuel Kant",
+    "author_zh": "伊曼努爾·康德",
+    "quote": "敢於思考！要有勇氣使用你自己的理智！",
+    "category": "啟蒙精神"
+  },
+  {
+    "id": 100,
+    "author": "Immanuel Kant",
+    "author_zh": "伊曼努爾·康德",
+    "quote": "自律使我們獲得真正的自由。",
+    "category": "自律與自由"
+  },
+  {
+    "id": 101,
+    "author": "Immanuel Kant",
+    "author_zh": "伊曼努爾·康德",
+    "quote": "沒有感性的直觀是盲目的，沒有概念的思維是空洞的。",
+    "category": "知識結構"
+  },
+  {
+    "id": 102,
+    "author": "Arthur Schopenhauer",
+    "author_zh": "阿圖爾·叔本華",
+    "quote": "人生就像擺擺，在痛苦與無聊之間往復擺動。",
+    "category": "生命本質"
+  },
+  {
+    "id": 103,
+    "author": "Arthur Schopenhauer",
+    "author_zh": "阿圖爾·叔本華",
+    "quote": "孤獨是所有卓越心靈的命運。",
+    "category": "獨處與沉澱"
+  },
+  {
+    "id": 104,
+    "author": "Arthur Schopenhauer",
+    "author_zh": "阿圖爾·叔本華",
+    "quote": "人能夠做他所想做的，但不能想他所想要的。",
+    "category": "意志與慾望"
+  },
+  {
+    "id": 105,
+    "author": "Arthur Schopenhauer",
+    "author_zh": "阿圖爾·叔本華",
+    "quote": "健康的身體是所有幸福的基礎。",
+    "category": "身心健康"
+  },
+  {
+    "id": 106,
+    "author": "Arthur Schopenhauer",
+    "author_zh": "阿圖爾·叔本華",
+    "quote": "平庸的人關心如何耗費時間，有天分的人關心如何利用時間。",
+    "category": "時間價值"
+  },
+  {
+    "id": 107,
+    "author": "Arthur Schopenhauer",
+    "author_zh": "阿圖爾·叔本華",
+    "quote": "欲望滿足了就無聊，未滿足就痛苦。",
+    "category": "人性覺察"
+  },
+  {
+    "id": 108,
+    "author": "Arthur Schopenhauer",
+    "author_zh": "阿圖爾·叔本華",
+    "quote": "靈魂的平靜，來自於放下對外界評語的執念。",
+    "category": "內心寧靜"
+  },
+  {
+    "id": 109,
+    "author": "Søren Kierkegaard",
+    "author_zh": "索倫·齊克果",
+    "quote": "生命只能向後理解，但必須向前生活。",
+    "category": "時間與行動"
+  },
+  {
+    "id": 110,
+    "author": "Søren Kierkegaard",
+    "author_zh": "索倫·齊克果",
+    "quote": "焦慮是自由引起的眩暈。",
+    "category": "自由與焦慮"
+  },
+  {
+    "id": 111,
+    "author": "Søren Kierkegaard",
+    "author_zh": "索倫·齊克果",
+    "quote": "信仰需要的不是理性證明，而是躍入未知領域的勇氣。",
+    "category": "信仰與勇氣"
+  },
+  {
+    "id": 112,
+    "author": "Søren Kierkegaard",
+    "author_zh": "索倫·齊克果",
+    "quote": "失去自我，是世界上最安靜的悲劇。",
+    "category": "保持真實"
+  },
+  {
+    "id": 113,
+    "author": "Søren Kierkegaard",
+    "author_zh": "索倫·齊克果",
+    "quote": "大膽地冒險會暫時失去腳步，但不冒險則會失去自我。",
+    "category": "冒險精神"
+  },
+  {
+    "id": 114,
+    "author": "David Hume",
+    "author_zh": "大衛·休謨",
+    "quote": "理性是情感的奴隸，且應當只為情感服務。",
+    "category": "理性與感性"
+  },
+  {
+    "id": 115,
+    "author": "David Hume",
+    "author_zh": "大衛·休謨",
+    "quote": "習慣是人生的偉大指南。",
+    "category": "習慣的力量"
+  },
+  {
+    "id": 116,
+    "author": "John Locke",
+    "author_zh": "約翰·洛克",
+    "quote": "心靈最初如同一塊白板，所有的知識都來自經驗。",
+    "category": "經驗與學習"
+  },
+  {
+    "id": 117,
+    "author": "John Locke",
+    "author_zh": "約翰·洛克",
+    "quote": "法律的目的不是廢除或限制自由，而是保護和擴大自由。",
+    "category": "法治與自由"
+  },
+  {
+    "id": 118,
+    "author": "Thomas Hobbes",
+    "author_zh": "托馬斯·霍布斯",
+    "quote": "沒有契約的權力只是虛妄，安全是自由的基石。",
+    "category": "社會秩序"
+  },
+  {
+    "id": 119,
+    "author": "Gottfried Wilhelm Leibniz",
+    "author_zh": "萊布尼茲",
+    "quote": "現在孕育著未來，過去沉澱在現在。",
+    "category": "時間連續性"
+  },
+  {
+    "id": 120,
+    "author": "Montaigne",
+    "author_zh": "蒙田",
+    "quote": "世界上最偉大的事，就是懂得如何屬於自己。",
+    "category": "自我主體"
+  },
+  {
+    "id": 121,
+    "author": "Montaigne",
+    "author_zh": "蒙田",
+    "quote": "哲學研究的本質，是教人如何坦然面對生命。",
+    "category": "生命哲學"
+  },
+  {
+    "id": 122,
+    "author": "Blaise Pascal",
+    "author_zh": "布萊茲·帕斯卡",
+    "quote": "人是一根會思考的蘆葦。",
+    "category": "人的偉大與脆弱"
+  },
+  {
+    "id": 123,
+    "author": "Blaise Pascal",
+    "author_zh": "布萊茲·帕斯卡",
+    "quote": "人類所有的不幸，都源於無法安靜地待在自己的房間裡。",
+    "category": "獨處與平靜"
+  },
+  {
+    "id": 124,
+    "author": "Voltaire",
+    "author_zh": "伏爾泰",
+    "quote": "我不同意你的觀點，但我誓死捍衛你說話的權利。",
+    "category": "言論自由"
+  },
+  {
+    "id": 125,
+    "author": "Jean-Jacques Rousseau",
+    "author_zh": "讓-雅克·盧梭",
+    "quote": "人生而自由，卻無往不在枷鎖之中。",
+    "category": "自由與社會"
+  },
+  {
+    "id": 126,
+    "author": "Karl Jaspers",
+    "author_zh": "卡爾·雅斯培",
+    "quote": "教育就是一棵樹搖動一棵樹，一朵雲推動一朵雲，一個靈魂喚醒另一個靈魂。",
+    "category": "教育與靈魂"
+  },
+  {
+    "id": 127,
     "author": "Hannah Arendt",
     "author_zh": "漢娜·鄂蘭",
     "quote": "平庸之惡在於拒絕思考，喪失了判斷的能力。",
     "category": "獨立思考"
   },
   {
-    "id": 47,
+    "id": 128,
+    "author": "Hannah Arendt",
+    "author_zh": "漢娜·鄂蘭",
+    "quote": "思考意味著在內心與自己進行批判性的對話。",
+    "category": "思辨能力"
+  },
+  {
+    "id": 129,
+    "author": "Hannah Arendt",
+    "author_zh": "漢娜·鄂蘭",
+    "quote": "行動是人類展現獨特性與自由的最佳途徑。",
+    "category": "行動價值"
+  },
+  {
+    "id": 130,
     "author": "Viktor Frankl",
     "author_zh": "維克多·法蘭克",
     "quote": "在刺激與回應之間存在一段距離，這段距離裡有我們選擇回應方式的自由與能力。",
     "category": "選擇的自由"
   },
   {
-    "id": 48,
+    "id": 131,
     "author": "Viktor Frankl",
     "author_zh": "維克多·法蘭克",
     "quote": "當我們無法改變現狀時，我們被挑戰去改變自己。",
     "category": "轉變與自我"
   },
   {
-    "id": 49,
+    "id": 132,
+    "author": "Viktor Frankl",
+    "author_zh": "維克多·法蘭克",
+    "quote": "人可以被剝奪一切，除了最後一種自由：選擇自己態度的自由。",
+    "category": "極致自由"
+  },
+  {
+    "id": 133,
+    "author": "Viktor Frankl",
+    "author_zh": "維克多·法蘭克",
+    "quote": "痛苦在找到意義的那一刻，便不再是痛苦。",
+    "category": "意義療癒"
+  },
+  {
+    "id": 134,
     "author": "Bertrand Russell",
     "author_zh": "伯特蘭·羅素",
     "quote": "這個世界的問題在於，愚蠢的人總是深信不疑，而有智慧的人卻充滿疑問。",
     "category": "智慧與質疑"
   },
   {
-    "id": 50,
+    "id": 135,
     "author": "Bertrand Russell",
     "author_zh": "伯特蘭·羅素",
     "quote": "三種單純卻極其強烈的激情支配了我的一生：對愛的渴望、對知識的追求，以及對人類苦難無可救藥的同情。",
     "category": "人生追求"
+  },
+  {
+    "id": 136,
+    "author": "Bertrand Russell",
+    "author_zh": "伯特蘭·羅素",
+    "quote": "能夠明智地利用閒暇時間，是文明發展的最後境界。",
+    "category": "閒暇與生活"
+  },
+  {
+    "id": 137,
+    "author": "Bertrand Russell",
+    "author_zh": "伯特蘭·羅素",
+    "quote": "切勿害怕持異端邪說，因為現在被接受的所有觀點最初都是異端。",
+    "category": "創新思考"
+  },
+  {
+    "id": 138,
+    "author": "Ludwig Wittgenstein",
+    "author_zh": "路德維希·維根斯坦",
+    "quote": "凡是不可言說的，必須保持沉默。",
+    "category": "語言與邊界"
+  },
+  {
+    "id": 139,
+    "author": "Ludwig Wittgenstein",
+    "author_zh": "路德維希·維根斯坦",
+    "quote": "我語言的邊界，意味著我世界的邊界。",
+    "category": "語言與世界"
+  },
+  {
+    "id": 140,
+    "author": "Michel Foucault",
+    "author_zh": "米歇爾·傅柯",
+    "quote": "知識即力量，但知識也是權力運作的場域。",
+    "category": "知識與思考"
+  },
+  {
+    "id": 141,
+    "author": "Michel Foucault",
+    "author_zh": "米歇爾·傅柯",
+    "quote": "最重要的哲學工作，是批判我們當前的自我。",
+    "category": "自我批判"
+  },
+  {
+    "id": 142,
+    "author": "Jacques Derrida",
+    "author_zh": "雅克·德希達",
+    "quote": "解構不是破壞，而是揭示隱含的多元可能性。",
+    "category": "解構與開放"
+  },
+  {
+    "id": 143,
+    "author": "Martin Heidegger",
+    "author_zh": "馬丁·海德格",
+    "quote": "人是詩意地棲居在大地上。",
+    "category": "生存詩意"
+  },
+  {
+    "id": 144,
+    "author": "Martin Heidegger",
+    "author_zh": "馬丁·海德格",
+    "quote": "向死而生：唯有正視死亡，才能真誠地活出自我。",
+    "category": "向死而生"
+  },
+  {
+    "id": 145,
+    "author": "Erich Fromm",
+    "author_zh": "埃里希·佛洛姆",
+    "quote": "愛不是一種隨機的感受，而是一門需要學習與實踐的藝術。",
+    "category": "愛的藝術"
+  },
+  {
+    "id": 146,
+    "author": "Erich Fromm",
+    "author_zh": "埃里希·佛洛姆",
+    "quote": "尊嚴在於追求獨立，而非附庸於大眾的狂熱中。",
+    "category": "個體獨立"
+  },
+  {
+    "id": 147,
+    "author": "Erich Fromm",
+    "author_zh": "埃里希·佛洛姆",
+    "quote": "擁有的態度關注佔有，存在的態度關注體驗。",
+    "category": "存在與佔有"
+  },
+  {
+    "id": 148,
+    "author": "Karl Popper",
+    "author_zh": "卡爾·波普爾",
+    "quote": "真正的科學精神，在於勇於接受可否證性的檢驗。",
+    "category": "科學哲學"
+  },
+  {
+    "id": 149,
+    "author": "Karl Popper",
+    "author_zh": "卡爾·波普爾",
+    "quote": "無限的包容終將毀滅包容本身，我們必須捍衛開放社會。",
+    "category": "開放社會"
+  },
+  {
+    "id": 150,
+    "author": "Gilles Deleuze",
+    "author_zh": "吉爾·德勒茲",
+    "quote": "思想不是重現既有的世界，而是創造未知的可能。",
+    "category": "思維創造"
+  },
+  {
+    "id": 151,
+    "author": "Byung-Chul Han",
+    "author_zh": "韓炳哲",
+    "quote": "倦怠社會的根源，在於個體對自我過度剝削的過度積極。",
+    "category": "現代反思"
+  },
+  {
+    "id": 152,
+    "author": "Alain de Botton",
+    "author_zh": "艾倫·狄波頓",
+    "quote": "哲學的任務不是給出確定答案，而是提供更有智慧的視角。",
+    "category": "生活哲學"
+  },
+  {
+    "id": 153,
+    "author": "Slavoj Žižek",
+    "author_zh": "齊澤克",
+    "quote": "最危險的意識形態，是那些自以為超脫了意識形態的觀點。",
+    "category": "批判視野"
+  },
+  {
+    "id": 154,
+    "author": "John Rawls",
+    "author_zh": "約翰·羅爾斯",
+    "quote": "正義是社會制度的首要價值，如同真理是思想體系的首要價值。",
+    "category": "正義理論"
+  },
+  {
+    "id": 155,
+    "author": "Noam Chomsky",
+    "author_zh": "諾姆·喬姆斯基",
+    "quote": "保持批判性思考，是自由公民最基本的責任。",
+    "category": "公民思辨"
+  },
+  {
+    "id": 156,
+    "author": "C.S. Lewis",
+    "author_zh": "C.S. 路易斯",
+    "quote": "你沒有一個靈魂，你本身就是一個靈魂；你擁有的是一個身體。",
+    "category": "靈魂覺察"
+  },
+  {
+    "id": 157,
+    "author": "Alan Watts",
+    "author_zh": "艾倫·瓦茲",
+    "quote": "泥水靜置終會清澈；心靈靜止終會明朗。",
+    "category": "心靈沉澱"
+  },
+  {
+    "id": 158,
+    "author": "Jiddu Krishnamurti",
+    "author_zh": "克里希那穆提",
+    "quote": "在無路可走的地方，開始了心靈真正的自由。",
+    "category": "心靈解脫"
+  },
+  {
+    "id": 159,
+    "author": "Jiddu Krishnamurti",
+    "author_zh": "克里希那穆提",
+    "quote": "深刻地適應一個病態的社會，絕非健康的標誌。",
+    "category": "獨立覺知"
+  },
+  {
+    "id": 160,
+    "author": "Jiddu Krishnamurti",
+    "author_zh": "克里希那穆提",
+    "quote": "真正的學習，發生在放下所有預設偏見的瞬間。",
+    "category": "純粹觀察"
+  },
+  {
+    "id": 161,
+    "author": "Laozi",
+    "author_zh": "老子",
+    "quote": "千里之行，始於足下。",
+    "category": "實踐與積累"
+  },
+  {
+    "id": 162,
+    "author": "Laozi",
+    "author_zh": "老子",
+    "quote": "大巧若拙，大辯若訥。",
+    "category": "大智若愚"
+  },
+  {
+    "id": 163,
+    "author": "Laozi",
+    "author_zh": "老子",
+    "quote": "知人者智，自知者明；勝人者有力，自勝者強。",
+    "category": "自強與自知"
+  },
+  {
+    "id": 164,
+    "author": "Laozi",
+    "author_zh": "老子",
+    "quote": "上善若水，水善利萬物而不爭。",
+    "category": "處世智慧"
+  },
+  {
+    "id": 165,
+    "author": "Laozi",
+    "author_zh": "老子",
+    "quote": "禍兮福之所倚，福兮禍之所伏。",
+    "category": "辯證思考"
+  },
+  {
+    "id": 166,
+    "author": "Zhuangzi",
+    "author_zh": "莊子",
+    "quote": "吾生也有涯，而知也無涯。以有涯隨無涯，殆已！",
+    "category": "認知境界"
+  },
+  {
+    "id": 167,
+    "author": "Zhuangzi",
+    "author_zh": "莊子",
+    "quote": "子非魚，安知魚之樂？",
+    "category": "同理與視角"
+  },
+  {
+    "id": 168,
+    "author": "Zhuangzi",
+    "author_zh": "莊子",
+    "quote": "夏蟲不可以語於冰者，篤於時也。",
+    "category": "視野局限"
+  },
+  {
+    "id": 169,
+    "author": "Zhuangzi",
+    "author_zh": "莊子",
+    "quote": "天地有大美而不言，四時有明法而不議。",
+    "category": "自然之美"
+  },
+  {
+    "id": 170,
+    "author": "Zhuangzi",
+    "author_zh": "莊子",
+    "quote": "獨與天地精神往來，而不傲倪於萬物。",
+    "category": "超然胸懷"
+  },
+  {
+    "id": 171,
+    "author": "Confucius",
+    "author_zh": "孔子",
+    "quote": "己所不欲，勿施於人。",
+    "category": "仁愛處世"
+  },
+  {
+    "id": 172,
+    "author": "Confucius",
+    "author_zh": "孔子",
+    "quote": "學而不思則罔，思而不學則殆。",
+    "category": "學習與思考"
+  },
+  {
+    "id": 173,
+    "author": "Confucius",
+    "author_zh": "孔子",
+    "quote": "知之者不如好之者，好之者不如樂之者。",
+    "category": "熱情與興趣"
+  },
+  {
+    "id": 174,
+    "author": "Confucius",
+    "author_zh": "孔子",
+    "quote": "君子坦蕩蕩，小人長戚戚。",
+    "category": "胸懷格局"
+  },
+  {
+    "id": 175,
+    "author": "Confucius",
+    "author_zh": "孔子",
+    "quote": "三軍可奪帥也，匹夫不可奪志也。",
+    "category": "堅定信念"
+  },
+  {
+    "id": 176,
+    "author": "Mencius",
+    "author_zh": "孟子",
+    "quote": "窮則獨善其身，達則兼濟天下。",
+    "category": "人生選擇"
+  },
+  {
+    "id": 177,
+    "author": "Mencius",
+    "author_zh": "孟子",
+    "quote": "天將降大任於斯人也，必先苦其心志，勞其筋骨。",
+    "category": "磨練與成長"
+  },
+  {
+    "id": 178,
+    "author": "Mencius",
+    "author_zh": "孟子",
+    "quote": "生於憂患而死於安樂。",
+    "category": "危機意識"
+  },
+  {
+    "id": 179,
+    "author": "Sun Tzu",
+    "author_zh": "孫子",
+    "quote": "知己知彼，百戰不殆。",
+    "category": "策略與覺察"
+  },
+  {
+    "id": 180,
+    "author": "Sun Tzu",
+    "author_zh": "孫子",
+    "quote": "不戰而屈人之兵，善之善者也。",
+    "category": "高階智慧"
+  },
+  {
+    "id": 181,
+    "author": "Xunzi",
+    "author_zh": "荀子",
+    "quote": "青，取之於藍，而青於藍；冰，水為之，而寒於水。",
+    "category": "持續進步"
+  },
+  {
+    "id": 182,
+    "author": "Xunzi",
+    "author_zh": "荀子",
+    "quote": "不積跬步，無以至千里；不積小流，無以成江海。",
+    "category": "積累的力量"
+  },
+  {
+    "id": 183,
+    "author": "Huainanzi",
+    "author_zh": "淮南子",
+    "quote": "塞翁失馬，焉知非福。",
+    "category": "豁達心態"
+  },
+  {
+    "id": 184,
+    "author": "Liezi",
+    "author_zh": "列子",
+    "quote": "癡人說夢，順其自然。",
+    "category": "順應變化"
+  },
+  {
+    "id": 185,
+    "author": "Zen Proverb",
+    "author_zh": "禪宗名言",
+    "quote": "菩提本無樹，明鏡亦非台；本來無一物，何處惹塵埃。",
+    "category": "空靈心境"
+  },
+  {
+    "id": 186,
+    "author": "Albert Einstein",
+    "author_zh": "阿爾伯特·愛因斯坦",
+    "quote": "想像力比知識更重要，因為知識是有限的，而想像力擁抱整個世界。",
+    "category": "創新與想像"
+  },
+  {
+    "id": 187,
+    "author": "Albert Einstein",
+    "author_zh": "阿爾伯特·愛因斯坦",
+    "quote": "生活就像騎自行車，想保持平衡就必須不斷前進。",
+    "category": "持續前行"
+  },
+  {
+    "id": 188,
+    "author": "Albert Einstein",
+    "author_zh": "阿爾伯特·愛因斯坦",
+    "quote": "不要試圖做一個成功的人，而要努力做一個有價值的人。",
+    "category": "價值人生"
+  },
+  {
+    "id": 189,
+    "author": "Carl Sagan",
+    "author_zh": "卡爾·薩根",
+    "quote": "我們是由星塵構成的，宇宙透過我們來瞭解它自己。",
+    "category": "宇宙視角"
+  },
+  {
+    "id": 190,
+    "author": "Marcus Aurelius",
+    "author_zh": "馬庫斯·奧列里烏斯",
+    "quote": "接受命運給予你的一切，並全心全意地熱愛它。",
+    "category": "接納生活"
+  },
+  {
+    "id": 191,
+    "author": "Seneca",
+    "author_zh": "塞內卡",
+    "quote": "真正的快樂是享受當下，而不是對未來過度擔憂。",
+    "category": "專注當下"
+  },
+  {
+    "id": 192,
+    "author": "Ralph Waldo Emerson",
+    "author_zh": "愛默生",
+    "quote": "做你自己，在一個不斷試圖把你變成別人的世界裡，是最大的成就。",
+    "category": "保持真實"
+  },
+  {
+    "id": 193,
+    "author": "Ralph Waldo Emerson",
+    "author_zh": "愛默生",
+    "quote": "在我們身後的事物和在我們面前的事物，與在我們內部的事物相比，都微不足道。",
+    "category": "內在潛能"
+  },
+  {
+    "id": 194,
+    "author": "Henry David Thoreau",
+    "author_zh": "梭羅",
+    "quote": "多數人都活在平靜的絕望中，唯有簡化生活才能看清本質。",
+    "category": "簡約生活"
+  },
+  {
+    "id": 195,
+    "author": "Henry David Thoreau",
+    "author_zh": "梭羅",
+    "quote": "我入森林，是因為我想從容地生活，只面對生活的本質。",
+    "category": "回歸自然"
+  },
+  {
+    "id": 196,
+    "author": "Johann Wolfgang von Goethe",
+    "author_zh": "歌德",
+    "quote": "無論你能做什麼，或者夢想能做什麼，立刻開始吧！膽識本身就含有天才、力量和魔力。",
+    "category": "立即行動"
+  },
+  {
+    "id": 197,
+    "author": "Johann Wolfgang von Goethe",
+    "author_zh": "歌德",
+    "quote": "人只要堅持追求，就難免會迷茫，但迷茫正是醒悟的前奏。",
+    "category": "探索與成長"
+  },
+  {
+    "id": 198,
+    "author": "Mark Aurel",
+    "author_zh": "奧勒留",
+    "quote": "每天給自己一次沈澱，讓雜念隨風而去。",
+    "category": "心靈清掃"
+  },
+  {
+    "id": 199,
+    "author": "Albert Camus",
+    "author_zh": "阿爾貝·卡繆",
+    "quote": "在絕望的盡頭，我選擇擁抱太陽，因為生活本身就是最美好的禮物。",
+    "category": "生命熱愛"
+  },
+  {
+    "id": 200,
+    "author": "Albert Camus",
+    "author_zh": "阿爾貝·卡繆",
+    "quote": "我們必須承認生命的短暫，並在此基礎上賦予每一刻無限的深度。",
+    "category": "生命深度"
   }
 ]
