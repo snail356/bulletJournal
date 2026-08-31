@@ -131,6 +131,7 @@ function onKeydown(event: KeyboardEvent, index: number) {
   display: flex;
   gap: 4px;
   overflow-x: auto;
+  overflow-y: hidden;
   border-bottom: 1px solid $border;
   margin-bottom: 20px;
 }
