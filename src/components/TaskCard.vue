@@ -639,15 +639,7 @@ async function onContextPaste() {
           </button>
         </div>
 
-        <p
-          v-if="!subtasksExpanded && task.subtasks.length"
-          class="notes-collapsed-preview"
-          @click="subtasksExpanded = true"
-        >
-          已完成 {{ subtaskProgress.done }}/{{ subtaskProgress.total }} 項
-        </p>
-
-        <template v-else>
+        <template v-if="subtasksExpanded">
           <SubTaskItem
             v-for="sub in task.subtasks"
             :key="sub.id"

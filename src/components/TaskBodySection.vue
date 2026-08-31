@@ -47,6 +47,9 @@ const isCode = computed(() => props.contentType === 'code')
 const isMarkdown = computed(() => props.contentType === 'markdown')
 const isFormatted = computed(() => isCode.value || isMarkdown.value)
 const hasContent = computed(() => props.content.trim().length > 0)
+const hasCollapsedPreview = computed(
+  () => hasContent.value || props.attachments.length > 0,
+)
 const showEditor = computed(() => !isFormatted.value || editingFormatted.value)
 
 const preview = computed(() => {
@@ -235,7 +238,7 @@ function formatTag(type: ContentFormat): string | null {
     </div>
 
     <p
-      v-if="!expanded"
+      v-if="!expanded && hasCollapsedPreview"
       class="collapsed-preview"
       @click="expanded = true"
     >
@@ -245,7 +248,7 @@ function formatTag(type: ContentFormat): string | null {
       {{ preview }}
     </p>
 
-    <div v-else class="body-area">
+    <div v-else-if="expanded" class="body-area">
       <div v-if="isCode && !editingFormatted" class="formatted-body">
         <div class="formatted-actions">
           <button type="button" title="編輯" @click="startEditFormatted">
@@ -275,7 +278,7 @@ function formatTag(type: ContentFormat): string | null {
         :class="{ 'is-code': isCode }"
         :value="draft"
         rows="1"
-        placeholder="輸入任務內容…"
+        placeholder="尚無內容"
         @input="onInput"
         @blur="commitDraft"
         @paste="onPaste"
