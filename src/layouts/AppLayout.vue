@@ -6,7 +6,8 @@ import FloatingSphere from '@/components/FloatingSphere.vue'
 import MigrationReviewModal from '@/components/MigrationReviewModal.vue'
 import ReflectionModal from '@/components/ReflectionModal.vue'
 import { useTaskStore } from '@/stores/taskStore'
-import type { DailyReflectionInput } from '@/types'
+import { todayString } from '@/utils/date'
+import type { DailyReflectionInput, MigrationReviewAction } from '@/types'
 
 const store = useTaskStore()
 const router = useRouter()
@@ -14,6 +15,17 @@ const router = useRouter()
 function onVisibilityChange() {
   if (document.visibilityState === 'visible') {
     store.checkDailyPrompts()
+  }
+}
+
+function onMigrationReviewConfirm(actions: MigrationReviewAction[]) {
+  store.applyMigrationReview(actions)
+  store.setSelectedDate(todayString())
+  if (
+    store.isNavFeatureEnabled('today') &&
+    router.currentRoute.value.path !== '/today'
+  ) {
+    router.push('/today')
   }
 }
 
@@ -48,7 +60,7 @@ onUnmounted(() => {
     <MigrationReviewModal
       :visible="store.migrationReviewVisible"
       :candidates="store.migrationCandidates"
-      @confirm="store.applyMigrationReview"
+      @confirm="onMigrationReviewConfirm"
       @snooze="store.snoozeMigrationReview"
       @close="store.snoozeMigrationReview"
     />
