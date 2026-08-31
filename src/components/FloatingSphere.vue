@@ -2,20 +2,10 @@
 import { nextTick, onMounted, onUnmounted, ref, useId } from "vue";
 import { pickRandomQuote, type Quote } from "@/data/quotes";
 import { msUntilNextHour, pickHourChime } from "@/data/hourChimes";
-import {
-  AURORA_MODE_KEY,
-  loadFromStorage,
-  saveToStorage,
-} from "@/utils/storage";
 
-type AuroraMode = "quote" | "hourly";
 type PopKind = "quote" | "chime";
 
-const SIZE = 36;
 const GRID = 8;
-const MARGIN = 24;
-const SHADOW_ROOM = 14;
-const DRAG_THRESHOLD_PX = 5;
 const CHIME_HIDE_MS = 8000;
 
 const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
@@ -24,45 +14,15 @@ const glowId = `led-glow-${uid}`;
 const pixels = buildLedDots(GRID);
 
 const rootRef = ref<HTMLElement | null>(null);
-const x = ref(
-  typeof window !== "undefined"
-    ? Math.max(8, window.innerWidth - SIZE - MARGIN)
-    : 0,
-);
-const y = ref(
-  typeof window !== "undefined"
-    ? Math.max(8, window.innerHeight - SIZE - MARGIN)
-    : 0,
-);
 const ready = ref(false);
-const dragging = ref(false);
-const savedMode = loadFromStorage<AuroraMode>(AURORA_MODE_KEY, "quote");
-const mode = ref<AuroraMode>(savedMode === "hourly" ? "hourly" : "quote");
 const popKind = ref<PopKind | null>(null);
 const activeQuote = ref<Quote | null>(null);
 const chimeText = ref("");
 const popoverRef = ref<HTMLElement | null>(null);
 const popoverStyle = ref<Record<string, string>>({});
-const modeMenuOpen = ref(false);
-const modeMenuStyle = ref<Record<string, string>>({});
-const modeMenuRef = ref<HTMLElement | null>(null);
 
-let pointerMoved = false;
-let startPointerX = 0;
-let startPointerY = 0;
-let startX = 0;
-let startY = 0;
-let pointerId: number | null = null;
 let chimeTimer: ReturnType<typeof setTimeout> | null = null;
 let chimeHideTimer: ReturnType<typeof setTimeout> | null = null;
-let wanderRaf: number | null = null;
-let wanderDelayTimer: ReturnType<typeof setTimeout> | null = null;
-let wanderFromX = 0;
-let wanderFromY = 0;
-let wanderToX = 0;
-let wanderToY = 0;
-let wanderStartedAt = 0;
-let wanderDuration = 0;
 
 function mixLedColor(t: number, light: number): string {
   const palette = [
@@ -133,167 +93,11 @@ function buildLedDots(grid: number) {
   return cells;
 }
 
-function size(): number {
-  const w = rootRef.value?.offsetWidth ?? 0;
-  return w > 0 ? w : SIZE;
-}
-
-function clamp(px: number, py: number) {
-  const s = size();
-  const maxX = Math.max(8, window.innerWidth - s - 8);
-  const maxY = Math.max(8, window.innerHeight - s - SHADOW_ROOM);
-  return {
-    x: Math.min(Math.max(8, px), maxX),
-    y: Math.min(Math.max(8, py), maxY),
-  };
-}
-
-function placeAtBottomRight() {
-  const s = size();
-  const next = clamp(
-    window.innerWidth - s - MARGIN,
-    window.innerHeight - s - MARGIN,
-  );
-  x.value = next.x;
-  y.value = next.y;
-}
-
-function prefersReducedMotion() {
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-}
-
-function canWander() {
-  return (
-    !dragging.value &&
-    !popKind.value &&
-    !modeMenuOpen.value &&
-    document.visibilityState === "visible" &&
-    !prefersReducedMotion()
-  );
-}
-
-function pickWanderTarget() {
-  const s = size();
-  const pad = 20;
-  const maxX = Math.max(pad, window.innerWidth - s - pad);
-  const maxY = Math.max(pad, window.innerHeight - s - SHADOW_ROOM);
-  return {
-    x: pad + Math.random() * (maxX - pad),
-    y: pad + Math.random() * (maxY - pad),
-  };
-}
-
-function easeInOutCubic(t: number) {
-  return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2;
-}
-
-function stopWander() {
-  if (wanderRaf != null) {
-    cancelAnimationFrame(wanderRaf);
-    wanderRaf = null;
-  }
-  if (wanderDelayTimer) {
-    clearTimeout(wanderDelayTimer);
-    wanderDelayTimer = null;
-  }
-}
-
-function scheduleWander(delayMs = 700) {
-  stopWander();
-  if (prefersReducedMotion()) return;
-  wanderDelayTimer = setTimeout(startWanderLeg, delayMs);
-}
-
-function startWanderLeg() {
-  if (!canWander()) {
-    scheduleWander(1400);
-    return;
-  }
-  const target = pickWanderTarget();
-  wanderFromX = x.value;
-  wanderFromY = y.value;
-  wanderToX = target.x;
-  wanderToY = target.y;
-  const dist = Math.hypot(wanderToX - wanderFromX, wanderToY - wanderFromY);
-  const speed = 16 + Math.random() * 22;
-  wanderDuration = Math.max(4500, (dist / speed) * 1000);
-  wanderStartedAt = performance.now();
-  wanderRaf = requestAnimationFrame(tickWander);
-}
-
-function tickWander(now: number) {
-  if (!canWander()) {
-    wanderRaf = null;
-    scheduleWander(1200);
-    return;
-  }
-  const t = Math.min(1, (now - wanderStartedAt) / wanderDuration);
-  const e = easeInOutCubic(t);
-  x.value = wanderFromX + (wanderToX - wanderFromX) * e;
-  y.value = wanderFromY + (wanderToY - wanderFromY) * e;
-  if (popKind.value) updatePopPosition();
-  if (t < 1) {
-    wanderRaf = requestAnimationFrame(tickWander);
-    return;
-  }
-  wanderRaf = null;
-  scheduleWander(500 + Math.random() * 1800);
-}
-
-function onPointerDown(e: PointerEvent) {
-  if (e.button !== undefined && e.button !== 0) return;
-  e.preventDefault();
-  e.stopPropagation();
-  pointerMoved = false;
-  dragging.value = false;
-  pointerId = e.pointerId;
-  startPointerX = e.clientX;
-  startPointerY = e.clientY;
-  startX = x.value;
-  startY = y.value;
-  stopWander();
-  rootRef.value?.setPointerCapture(e.pointerId);
-}
-
-function onPointerMove(e: PointerEvent) {
-  if (pointerId === null || e.pointerId !== pointerId) return;
-  const dx = e.clientX - startPointerX;
-  const dy = e.clientY - startPointerY;
-  if (!pointerMoved && Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
-  pointerMoved = true;
-  dragging.value = true;
-  const next = clamp(startX + dx, startY + dy);
-  x.value = next.x;
-  y.value = next.y;
-  if (activeQuote.value || chimeText.value) updatePopPosition();
-}
-
-function onPointerUp(e: PointerEvent) {
-  if (e.pointerId !== pointerId) return;
-  const wasClick = !pointerMoved;
-  dragging.value = false;
-  pointerId = null;
-  if (wasClick) onSphereClick();
-  else scheduleWander(900);
-}
-
 function onSphereClick() {
-  if (mode.value === "hourly") showHourChime();
-  else showRandomQuote();
-}
-
-function estimatePopStyle() {
-  const width = Math.min(320, window.innerWidth - 24);
-  const left = Math.max(
-    8,
-    Math.min(x.value + SIZE - width, window.innerWidth - width - 8),
-  );
-  const top = Math.max(8, y.value - 12);
-  popoverStyle.value = { left: `${left}px`, top: `${top}px` };
+  void showRandomQuote();
 }
 
 async function openPop() {
-  estimatePopStyle();
   await nextTick();
   updatePopPosition();
 }
@@ -326,28 +130,12 @@ function hidePop() {
   popKind.value = null;
   activeQuote.value = null;
   chimeText.value = "";
-  scheduleWander(600);
-}
-
-function setMode(next: AuroraMode) {
-  mode.value = next;
-  saveToStorage(AURORA_MODE_KEY, next);
-  modeMenuOpen.value = false;
-  if (!popKind.value) scheduleWander(400);
-}
-
-function openModeMenu(e: MouseEvent) {
-  e.preventDefault();
-  modeMenuOpen.value = true;
-  const left = Math.max(8, Math.min(e.clientX, window.innerWidth - 168));
-  const top = Math.max(8, Math.min(e.clientY, window.innerHeight - 96));
-  modeMenuStyle.value = { left: `${left}px`, top: `${top}px` };
 }
 
 function scheduleHourChime() {
   clearHourChime();
   chimeTimer = setTimeout(() => {
-    if (mode.value === "hourly" && document.visibilityState === "visible") {
+    if (document.visibilityState === "visible") {
       void showHourChime();
     }
     scheduleHourChime();
@@ -379,8 +167,6 @@ function updatePopPosition() {
 function onDocumentPointerDown(e: PointerEvent) {
   const target = e.target;
   if (!(target instanceof Node)) return;
-  if (modeMenuRef.value?.contains(target)) return;
-  if (modeMenuOpen.value) modeMenuOpen.value = false;
   if (!popKind.value) return;
   if (rootRef.value?.contains(target) || popoverRef.value?.contains(target))
     return;
@@ -388,45 +174,27 @@ function onDocumentPointerDown(e: PointerEvent) {
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === "Escape") {
-    modeMenuOpen.value = false;
-    hidePop();
-  }
+  if (e.key === "Escape") hidePop();
 }
 
 function onResize() {
-  const next = clamp(x.value, y.value);
-  x.value = next.x;
-  y.value = next.y;
   if (popKind.value) updatePopPosition();
-  stopWander();
-  scheduleWander(400);
-}
-
-function onVisibilityChange() {
-  if (document.visibilityState === "visible") scheduleWander(800);
-  else stopWander();
 }
 
 onMounted(async () => {
   await nextTick();
-  placeAtBottomRight();
   ready.value = true;
   scheduleHourChime();
-  scheduleWander(1600);
   window.addEventListener("resize", onResize);
   document.addEventListener("pointerdown", onDocumentPointerDown);
-  document.addEventListener("visibilitychange", onVisibilityChange);
   window.addEventListener("keydown", onKeydown);
 });
 
 onUnmounted(() => {
   clearHourChime();
   clearChimeHide();
-  stopWander();
   window.removeEventListener("resize", onResize);
   document.removeEventListener("pointerdown", onDocumentPointerDown);
-  document.removeEventListener("visibilitychange", onVisibilityChange);
   window.removeEventListener("keydown", onKeydown);
 });
 </script>
@@ -436,16 +204,11 @@ onUnmounted(() => {
     <div
       ref="rootRef"
       class="floating-sphere"
-      :class="{ 'is-dragging': dragging, 'is-ready': ready }"
-      :style="{ left: `${x}px`, top: `${y}px` }"
+      :class="{ 'is-ready': ready }"
       role="button"
       tabindex="0"
-      :aria-label="mode === 'hourly' ? '整點報時' : '顯示一句引言'"
-      @pointerdown="onPointerDown"
-      @pointermove="onPointerMove"
-      @pointerup="onPointerUp"
-      @pointercancel="onPointerUp"
-      @contextmenu="openModeMenu"
+      aria-label="顯示一句引言"
+      @click="onSphereClick"
       @keydown.enter.prevent="onSphereClick"
       @keydown.space.prevent="onSphereClick"
     >
@@ -529,30 +292,6 @@ onUnmounted(() => {
         <p v-else class="quote-text">{{ chimeText }}</p>
       </aside>
     </Transition>
-
-    <div
-      v-if="modeMenuOpen"
-      ref="modeMenuRef"
-      class="mode-menu"
-      :style="modeMenuStyle"
-      @pointerdown.stop
-    >
-      <p class="mode-menu-label">模式</p>
-      <button
-        type="button"
-        :class="{ active: mode === 'quote' }"
-        @click="setMode('quote')"
-      >
-        引言
-      </button>
-      <button
-        type="button"
-        :class="{ active: mode === 'hourly' }"
-        @click="setMode('hourly')"
-      >
-        整點報時
-      </button>
-    </div>
   </Teleport>
 </template>
 
@@ -561,11 +300,12 @@ onUnmounted(() => {
 
 .floating-sphere {
   position: fixed;
+  right: 24px;
+  bottom: 24px;
   width: 36px;
   height: 36px;
   z-index: 36;
   cursor: pointer;
-  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   opacity: 0;
@@ -595,19 +335,6 @@ onUnmounted(() => {
     pointer-events: none;
     filter: blur(1.5px);
     animation: shadow-breathe 3.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
-  }
-
-  &.is-dragging {
-    cursor: grabbing;
-    z-index: 45;
-
-    &::after {
-      animation: none;
-      width: 30px;
-      height: 9px;
-      bottom: -12px;
-      opacity: 0.5;
-    }
   }
 }
 
@@ -788,44 +515,5 @@ onUnmounted(() => {
 .quote-pop-leave-to {
   opacity: 0;
   transform: translateY(8px) scale(0.94);
-}
-
-.mode-menu {
-  position: fixed;
-  z-index: 60;
-  min-width: 148px;
-  padding: 6px;
-  background: $surface;
-  border: 1px solid $border;
-  border-radius: $radius-sm;
-  box-shadow: $shadow-lg;
-  display: flex;
-  flex-direction: column;
-}
-
-.mode-menu-label {
-  margin: 0;
-  padding: 6px 12px 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: $text-muted;
-}
-
-.mode-menu button {
-  text-align: left;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  color: $text;
-
-  &:hover {
-    background: $bg;
-  }
-
-  &.active {
-    background: $primary-light;
-    color: $primary-dark;
-    font-weight: 600;
-  }
 }
 </style>
