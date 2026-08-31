@@ -6,7 +6,6 @@ import type {
   AttachmentOwnerType,
   DailyReflection,
   DailyReflectionInput,
-  DifficultyNoteRecord,
   GeminiUsageState,
   Label,
   MigrationCandidate,
@@ -45,7 +44,6 @@ import { generateId } from "@/utils/id";
 import {
   AI_MANAGER_PROMPT_KEY,
   DAILY_REFLECTIONS_KEY,
-  DIFFICULTY_NOTES_KEY,
   EXPAND_IMAGES_KEY,
   EXPAND_TASKS_KEY,
   GEMINI_USAGE_KEY,
@@ -63,8 +61,8 @@ import {
   defaultGeminiUsageState,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
-  hasStorageKey,
   loadFromStorage,
+  removeFromStorage,
   saveToStorage,
 } from "@/utils/storage";
 import {
@@ -120,7 +118,7 @@ function normalizeNote(note: Note): Note {
   };
 }
 
-function normalizeTask(task: Task & { carriedFromDate?: string }): Task {
+function normalizeTask(task: Task & { carriedFromDate?: string; difficultyNote?: string }): Task {
   const migrationHistory = task.migrationHistory ?? [];
   if (task.carriedFromDate && !migrationHistory.length) {
     migrationHistory.push({
@@ -129,13 +127,12 @@ function normalizeTask(task: Task & { carriedFromDate?: string }): Task {
       migratedAt: task.updatedAt,
     });
   }
-  const { carriedFromDate: _, ...rest } = task;
+  const { carriedFromDate: _, difficultyNote: __, ...rest } = task;
   return {
     ...rest,
     migrationHistory,
     endDate: normalizeEndDate(rest.date, task.endDate),
     statusHours: task.statusHours ?? null,
-    difficultyNote: task.difficultyNote ?? "",
     bodyContent: task.bodyContent ?? "",
     bodyContentType: task.bodyContentType ?? "text",
     subtasks: task.subtasks.map(normalizeSubTask),
@@ -229,7 +226,6 @@ function migrateLegacyDuplicates(taskList: Task[]): Task[] {
     }));
     source.status = copy.status;
     source.statusHours = copy.statusHours;
-    source.difficultyNote = copy.difficultyNote;
     source.labels = [...copy.labels];
     source.updatedAt = copy.updatedAt;
     idsToRemove.add(copy.id);
@@ -281,9 +277,6 @@ export const useTaskStore = defineStore("task", () => {
     loadFromStorage(MIGRATION_REVIEW_KEY, defaultMigrationReviewState),
   );
   const migrationReviewVisible = ref(false);
-  const difficultyNoteRecords = ref<DifficultyNoteRecord[]>(
-    loadFromStorage(DIFFICULTY_NOTES_KEY, [] as DifficultyNoteRecord[]),
-  );
   const dailyReflections = ref<DailyReflection[]>(
     loadFromStorage(DAILY_REFLECTIONS_KEY, [] as DailyReflection[]).map(
       normalizeDailyReflection,
@@ -337,10 +330,6 @@ export const useTaskStore = defineStore("task", () => {
       loadFromStorage<SidebarCarouselState | null>(SIDEBAR_CAROUSEL_KEY, null),
     ),
   );
-
-  function persistDifficultyNotes() {
-    saveToStorage(DIFFICULTY_NOTES_KEY, difficultyNoteRecords.value);
-  }
 
   function persistStatusItems() {
     saveToStorage(STATUS_ITEMS_KEY, statusItems.value);
@@ -447,13 +436,7 @@ export const useTaskStore = defineStore("task", () => {
     labels.value = storedLabels ?? [...mockLabels];
     selectedDate.value = storedDate ?? todayString();
 
-    // 困難點資料頁為單一資料來源，僅在首次（尚無獨立儲存）時從既有任務匯入一次
-    if (!hasStorageKey(DIFFICULTY_NOTES_KEY)) {
-      syncDifficultyNotesFromTasks();
-    } else {
-      // 校正過去因重複 commit 膨脹的使用次數
-      reconcileDifficultyNoteUsage();
-    }
+    removeFromStorage("bullet-journal-difficulty-notes");
 
     checkDailyPrompts();
 
@@ -847,118 +830,8 @@ export const useTaskStore = defineStore("task", () => {
     touchTask(task);
   }
 
-  function registerDifficultyNote(
-    content: string,
-    options?: { bumpUsage?: boolean },
-  ) {
-    const trimmed = content.trim();
-    if (!trimmed) return;
-    const now = new Date().toISOString();
-    const taskCount = getDifficultyNoteTaskCount(trimmed);
-    const existing = difficultyNoteRecords.value.find(
-      (record) => record.content === trimmed,
-    );
-    if (existing) {
-      // 使用次數以「目前綁定此困難點的任務數」為準
-      existing.usageCount = taskCount;
-      if (options?.bumpUsage !== false) {
-        existing.lastUsedAt = now;
-      }
-      persistDifficultyNotes();
-      return;
-    }
-    difficultyNoteRecords.value.push({
-      id: generateId(),
-      content: trimmed,
-      usageCount: Math.max(taskCount, 1),
-      createdAt: now,
-      lastUsedAt: now,
-    });
-    persistDifficultyNotes();
-  }
-
-  function syncDifficultyNotesFromTasks() {
-    const contents = new Set<string>();
-    for (const task of tasks.value) {
-      const trimmed = task.difficultyNote.trim();
-      if (trimmed) contents.add(trimmed);
-    }
-    for (const content of contents) {
-      registerDifficultyNote(content, { bumpUsage: false });
-    }
-    reconcileDifficultyNoteUsage();
-  }
-
-  function reconcileDifficultyNoteUsage() {
-    for (const record of difficultyNoteRecords.value) {
-      record.usageCount = getDifficultyNoteTaskCount(record.content);
-    }
-    persistDifficultyNotes();
-  }
-
-  function deleteDifficultyNote(id: string) {
-    difficultyNoteRecords.value = difficultyNoteRecords.value.filter(
-      (record) => record.id !== id,
-    );
-    persistDifficultyNotes();
-  }
-
-  const difficultyNoteRecordsSorted = computed(() =>
-    [...difficultyNoteRecords.value].sort((a, b) => {
-      if (b.usageCount !== a.usageCount) return b.usageCount - a.usageCount;
-      return b.lastUsedAt.localeCompare(a.lastUsedAt);
-    }),
-  );
-
-  function getDifficultyNoteTaskCount(content: string): number {
-    const trimmed = content.trim();
-    if (!trimmed) return 0;
-    return tasks.value.filter((task) => task.difficultyNote.trim() === trimmed)
-      .length;
-  }
-
-  function getDifficultyNoteOptions(query = ""): string[] {
-    const normalizedQuery = query.trim().toLowerCase();
-    const sorted = [...difficultyNoteRecords.value].sort((a, b) => {
-      if (b.usageCount !== a.usageCount) {
-        return b.usageCount - a.usageCount;
-      }
-      return b.lastUsedAt.localeCompare(a.lastUsedAt);
-    });
-    const contents = sorted.map((record) => record.content);
-    if (!normalizedQuery) return contents;
-    return contents.filter((content) =>
-      content.toLowerCase().includes(normalizedQuery),
-    );
-  }
-
-  const difficultyNoteOptions = computed(() => getDifficultyNoteOptions());
-
   function setTaskStatusHours(taskId: string, hours: number | null) {
     updateTask(taskId, { statusHours: hours });
-  }
-
-  function setTaskDifficultyNote(taskId: string, content: string) {
-    const task = findTask(taskId);
-    if (!task) return;
-    const trimmed = content.trim();
-    const previous = task.difficultyNote.trim();
-    updateTask(taskId, { difficultyNote: trimmed });
-
-    if (previous && previous !== trimmed) {
-      // 同步舊內容的使用次數（可能變 0）
-      const prevRecord = difficultyNoteRecords.value.find(
-        (record) => record.content === previous,
-      );
-      if (prevRecord) {
-        prevRecord.usageCount = getDifficultyNoteTaskCount(previous);
-        persistDifficultyNotes();
-      }
-    }
-
-    if (trimmed) {
-      registerDifficultyNote(trimmed, { bumpUsage: trimmed !== previous });
-    }
   }
 
   function findTask(taskId: string): Task | undefined {
@@ -986,7 +859,6 @@ export const useTaskStore = defineStore("task", () => {
       title: payload.title,
       status,
       statusHours: null,
-      difficultyNote: "",
       bodyContent: "",
       bodyContentType: "text",
       completed: isCompletedStatus(status),
@@ -1962,7 +1834,6 @@ export const useTaskStore = defineStore("task", () => {
     expandAllTasks.value = true;
     migrationReviewState.value = { ...defaultMigrationReviewState };
     migrationReviewVisible.value = false;
-    difficultyNoteRecords.value = [];
     dailyReflections.value = [];
     reflectionPromptState.value = { ...defaultReflectionPromptState };
     aiManagerPrompt.value = "";
@@ -1974,8 +1845,8 @@ export const useTaskStore = defineStore("task", () => {
     taskAvatars.value = [...DEFAULT_TASK_AVATARS];
     sidebarCarousel.value = { ...defaultSidebarCarouselState, images: [] };
     persist();
+    removeFromStorage("bullet-journal-difficulty-notes");
     persistMigrationReviewState();
-    persistDifficultyNotes();
     persistDailyReflections();
     persistReflectionPromptState();
     saveToStorage(AI_MANAGER_PROMPT_KEY, aiManagerPrompt.value);
@@ -1997,9 +1868,6 @@ export const useTaskStore = defineStore("task", () => {
     migrationReviewVisible,
     migrationCandidates,
     overdueTaskCount,
-    difficultyNoteRecords,
-    difficultyNoteRecordsSorted,
-    difficultyNoteOptions,
     dailyReflections,
     dailyReflectionsSorted,
     todayJournalState,
@@ -2024,12 +1892,7 @@ export const useTaskStore = defineStore("task", () => {
     getTasksByDate,
     getTaskDatesWithActivity,
     getMigrationCandidates,
-    getDifficultyNoteOptions,
-    getDifficultyNoteTaskCount,
-    registerDifficultyNote,
-    deleteDifficultyNote,
     setTaskStatusHours,
-    setTaskDifficultyNote,
     checkMigrationReview,
     checkDailyPrompts,
     openMigrationReview,

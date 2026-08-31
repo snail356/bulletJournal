@@ -19,7 +19,6 @@ import TaskStatusDropdown from './TaskStatusDropdown.vue'
 import TaskAvatarDropdown from './TaskAvatarDropdown.vue'
 import TaskAvatarFace from './TaskAvatarFace.vue'
 import TaskLabelsDropdown from './TaskLabelsDropdown.vue'
-import SearchableCombobox from './SearchableCombobox.vue'
 import QuickInputModal from './QuickInputModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import AppIcon from './AppIcon.vue'
@@ -145,8 +144,6 @@ const datePickerMin = computed(() =>
   datePickerMode.value === 'end' ? props.task.date : undefined,
 )
 
-const difficultyOptions = computed(() => store.getDifficultyNoteOptions())
-
 const hoursDraft = ref(formatHoursDraft(props.task.statusHours))
 
 watch(
@@ -204,10 +201,6 @@ function onHoursClick(e: MouseEvent) {
 function onStatusHoursClick(e: MouseEvent) {
   if ((e.target as HTMLElement).closest('.hours-input')) return
   selectHoursInput()
-}
-
-function onDifficultyNoteCommit(value: string) {
-  store.setTaskDifficultyNote(props.task.id, value)
 }
 
 function goToCurrentDate() {
@@ -715,25 +708,6 @@ async function onContextPaste() {
           />
         </template>
       </div>
-
-      <div
-        v-if="store.isNavFeatureEnabled('difficulty-notes')"
-        class="section difficulty-section"
-        @click.stop
-      >
-        <div class="section-header">
-          <p class="section-title">困難點</p>
-        </div>
-        <SearchableCombobox
-          class="difficulty-note"
-          :model-value="task.difficultyNote"
-          :options="difficultyOptions"
-          placeholder="輸入或選擇歷史紀錄…"
-          empty-text="尚無歷史紀錄"
-          @commit="onDifficultyNoteCommit"
-          @select="onDifficultyNoteCommit"
-        />
-      </div>
     </div>
 
     <TaskContextMenu
@@ -1075,17 +1049,6 @@ async function onContextPaste() {
   font-size: 12px;
   font-weight: 600;
   color: $text-muted;
-}
-
-.difficulty-section {
-  .difficulty-note {
-    width: 100%;
-  }
-}
-
-.difficulty-note {
-  flex: 1;
-  min-width: 0;
 }
 
 .postponed-tag {

@@ -4,7 +4,6 @@ export type NavFeatureId =
   | 'today'
   | 'calendar'
   | 'all-tasks'
-  | 'difficulty-notes'
   | 'toolbox'
   | 'reflections'
   | 'stats'
@@ -48,13 +47,6 @@ export const NAV_FEATURES: NavFeature[] = [
     icon: 'list-check',
   },
   {
-    id: 'difficulty-notes',
-    path: '/difficulty-notes',
-    label: '困難點資料',
-    description: '常用困難點紀錄；關閉後任務上的困難點選單也會隱藏',
-    icon: 'clipboard-list',
-  },
-  {
     id: 'toolbox',
     path: '/toolbox',
     label: '工具箱與思考清單',
@@ -96,7 +88,6 @@ export const defaultNavFeatureVisibility: NavFeatureVisibility = {
   today: true,
   calendar: true,
   'all-tasks': false,
-  'difficulty-notes': false,
   toolbox: true,
   reflections: false,
   stats: false,

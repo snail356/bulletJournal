@@ -45,12 +45,6 @@ const router = createRouter({
       redirect: { path: '/settings', query: { tab: 'labels' } },
     },
     {
-      path: '/difficulty-notes',
-      name: 'difficulty-notes',
-      component: () => import('@/views/DifficultyNotesView.vue'),
-      meta: { title: '困難點資料', navFeature: 'difficulty-notes' },
-    },
-    {
       path: '/toolbox',
       name: 'toolbox',
       component: () => import('@/views/ToolboxView.vue'),

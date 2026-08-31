@@ -47,9 +47,6 @@ function formatDayTasks(tasks: Task[], statusItems: StatusItem[]): string {
         `   狀態：${statusName}` +
           (task.statusHours != null ? `｜時數：${task.statusHours}h` : ''),
       ]
-      if (task.difficultyNote.trim()) {
-        lines.push(`   困難點：${truncate(task.difficultyNote, 120)}`)
-      }
       if (task.bodyContent.trim()) {
         lines.push(`   內容：${truncate(task.bodyContent)}`)
       }

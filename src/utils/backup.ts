@@ -307,7 +307,6 @@ function buildTaskMarkdown(
     `| 狀態時數 | ${escapeTableCell(hours)} |`,
     `| 標籤 | ${escapeTableCell(labelNames.join("、") || "—")} |`,
     `| 頭像 | ${escapeTableCell(task.avatarId ?? "—")} |`,
-    `| 困難點 | ${escapeTableCell(task.difficultyNote.trim() || "—")} |`,
     `| 建立時間 | ${escapeTableCell(formatDateTime(task.createdAt))} |`,
     `| 更新時間 | ${escapeTableCell(formatDateTime(task.updatedAt))} |`,
   ].join("\n");

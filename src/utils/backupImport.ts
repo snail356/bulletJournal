@@ -490,8 +490,6 @@ function parseTaskMarkdown(
     title,
     status: parseStatus(meta["狀態"], statusItems),
     statusHours: parseHours(meta["狀態時數"]),
-    difficultyNote:
-      meta["困難點"] && meta["困難點"] !== "—" ? meta["困難點"] : "",
     bodyContent: body.content,
     bodyContentType: body.type,
     completed: meta["完成"] === "是",

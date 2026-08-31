@@ -169,17 +169,18 @@ function taskColors(task: Task) {
 }
 
 const laneRowSize = computed(() => (mode.value === "week" ? 28 : 22));
+
+function weekMinHeight(index: number) {
+  const lanes = layouts.value[index]?.laneCount ?? 1;
+  return Math.max(112, 36 + lanes * 25);
+}
+
 const subtitleText = computed(() => {
   if (isOverview.value) {
     return "單天任務為色球、跨天為色串；懸停可看名稱。點月份切到月檢視，點日期可選取，連點可新增";
   }
   return "拖曳任務中間可平移整段（天數不變）；懸停左右邊緣出現雙向箭頭，可單獨調整開始或結束日期";
 });
-
-function weekMinHeight(index: number) {
-  const lanes = layouts.value[index]?.laneCount ?? 1;
-  return Math.max(112, 36 + lanes * 25);
-}
 
 function shouldShowWeekMonth(date: Date, days: Date[]) {
   return date.getDate() === 1 || formatDate(date) === formatDate(days[0]);
@@ -309,6 +310,7 @@ const hintStyle = computed(() => {
     :class="{
       dragging: Boolean(draggingTaskId),
       resizing: dragMode === 'resize-start' || dragMode === 'resize-end',
+      'month-mode': mode === 'month',
       'week-mode': mode === 'week',
       'overview-mode': isOverview,
     }"
@@ -524,6 +526,11 @@ const hintStyle = computed(() => {
   flex-direction: column;
   min-height: 100%;
 
+  &.month-mode {
+    min-height: auto;
+    padding-bottom: 32px;
+  }
+
   &.week-mode,
   &.overview-mode {
     flex: 1;
@@ -643,6 +650,11 @@ const hintStyle = computed(() => {
   flex-direction: column;
   flex: 1;
   min-height: 0;
+}
+
+.board.month {
+  flex: none;
+  min-height: auto;
 }
 
 .weekday-row {
@@ -847,12 +859,17 @@ const hintStyle = computed(() => {
 
 .board.week .week-lanes {
   top: 52px;
+  bottom: 4px;
   grid-auto-rows: 28px;
   gap: 4px 0;
   overflow-y: auto;
 }
 
 @media (max-width: $breakpoint-sm) {
+  .calendar-view.month-mode {
+    padding-bottom: 24px;
+  }
+
   .page-header {
     margin-bottom: 12px;
   }

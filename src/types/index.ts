@@ -69,14 +69,6 @@ export interface MigrationReviewState {
   lastReviewedDate: string | null;
 }
 
-export interface DifficultyNoteRecord {
-  id: string;
-  content: string;
-  usageCount: number;
-  createdAt: string;
-  lastUsedAt: string;
-}
-
 /** 每日回顧日誌（一天一份） */
 export interface DailyReflection {
   id: string;
@@ -138,8 +130,6 @@ export interface Task {
   status: TaskStatus;
   /** 此狀態累計／估計時數 */
   statusHours: number | null;
-  /** 困難點備註（可從歷史紀錄選取） */
-  difficultyNote: string;
   /** 主任務內容區（唯一，不可新增刪除） */
   bodyContent: string;
   bodyContentType: ContentFormat;
