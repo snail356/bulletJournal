@@ -1,12 +1,21 @@
 <script setup lang="ts">
-import { nextTick, onMounted, onUnmounted, ref, useId } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, useId } from "vue";
 import { pickRandomQuote, type Quote } from "@/data/quotes";
 import { msUntilNextHour, pickHourChime } from "@/data/hourChimes";
+import {
+  FLOATING_SPHERE_POSITION_KEY,
+  loadFromStorage,
+  saveToStorage,
+} from "@/utils/storage";
 
 type PopKind = "quote" | "chime";
+type Point = { x: number; y: number };
 
 const GRID = 8;
 const CHIME_HIDE_MS = 8000;
+const SPHERE_SIZE = 36;
+const SPHERE_MARGIN = 24;
+const DRAG_THRESHOLD = 4;
 
 const uid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
 const glowId = `led-glow-${uid}`;
@@ -15,14 +24,67 @@ const pixels = buildLedDots(GRID);
 
 const rootRef = ref<HTMLElement | null>(null);
 const ready = ref(false);
+const isDragging = ref(false);
 const popKind = ref<PopKind | null>(null);
 const activeQuote = ref<Quote | null>(null);
 const chimeText = ref("");
 const popoverRef = ref<HTMLElement | null>(null);
 const popoverStyle = ref<Record<string, string>>({});
+const position = ref<Point>({ x: 0, y: 0 });
 
 let chimeTimer: ReturnType<typeof setTimeout> | null = null;
 let chimeHideTimer: ReturnType<typeof setTimeout> | null = null;
+let suppressNextClick = false;
+let dragSession: {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  originX: number;
+  originY: number;
+  moved: boolean;
+} | null = null;
+
+const sphereStyle = computed(() => ({
+  left: `${position.value.x}px`,
+  top: `${position.value.y}px`,
+}));
+
+function clampPosition(x: number, y: number): Point {
+  const width = rootRef.value?.offsetWidth ?? SPHERE_SIZE;
+  const height = rootRef.value?.offsetHeight ?? SPHERE_SIZE;
+  return {
+    x: Math.max(8, Math.min(x, window.innerWidth - width - 8)),
+    y: Math.max(8, Math.min(y, window.innerHeight - height - 8)),
+  };
+}
+
+function defaultPosition(): Point {
+  return clampPosition(
+    window.innerWidth - SPHERE_SIZE - SPHERE_MARGIN,
+    window.innerHeight - SPHERE_SIZE - SPHERE_MARGIN,
+  );
+}
+
+function loadPosition(): Point {
+  const saved = loadFromStorage<Point | null>(
+    FLOATING_SPHERE_POSITION_KEY,
+    null,
+  );
+  if (
+    saved &&
+    typeof saved.x === "number" &&
+    typeof saved.y === "number" &&
+    Number.isFinite(saved.x) &&
+    Number.isFinite(saved.y)
+  ) {
+    return clampPosition(saved.x, saved.y);
+  }
+  return defaultPosition();
+}
+
+function savePosition() {
+  saveToStorage(FLOATING_SPHERE_POSITION_KEY, position.value);
+}
 
 function mixLedColor(t: number, light: number): string {
   const palette = [
@@ -94,7 +156,61 @@ function buildLedDots(grid: number) {
 }
 
 function onSphereClick() {
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    return;
+  }
   void showRandomQuote();
+}
+
+function bindDragListeners() {
+  window.addEventListener("pointermove", onDragPointerMove);
+  window.addEventListener("pointerup", onDragPointerUp);
+  window.addEventListener("pointercancel", onDragPointerUp);
+}
+
+function unbindDragListeners() {
+  window.removeEventListener("pointermove", onDragPointerMove);
+  window.removeEventListener("pointerup", onDragPointerUp);
+  window.removeEventListener("pointercancel", onDragPointerUp);
+}
+
+function onSpherePointerDown(e: PointerEvent) {
+  if (e.button !== 0) return;
+  dragSession = {
+    pointerId: e.pointerId,
+    startX: e.clientX,
+    startY: e.clientY,
+    originX: position.value.x,
+    originY: position.value.y,
+    moved: false,
+  };
+  bindDragListeners();
+}
+
+function onDragPointerMove(e: PointerEvent) {
+  if (!dragSession || e.pointerId !== dragSession.pointerId) return;
+  const dx = e.clientX - dragSession.startX;
+  const dy = e.clientY - dragSession.startY;
+  if (!dragSession.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+  dragSession.moved = true;
+  isDragging.value = true;
+  position.value = clampPosition(
+    dragSession.originX + dx,
+    dragSession.originY + dy,
+  );
+  if (popKind.value) updatePopPosition();
+}
+
+function onDragPointerUp(e: PointerEvent) {
+  if (!dragSession || e.pointerId !== dragSession.pointerId) return;
+  const wasDrag = dragSession.moved;
+  dragSession = null;
+  isDragging.value = false;
+  unbindDragListeners();
+  if (!wasDrag) return;
+  savePosition();
+  suppressNextClick = true;
 }
 
 async function openPop() {
@@ -178,10 +294,12 @@ function onKeydown(e: KeyboardEvent) {
 }
 
 function onResize() {
+  position.value = clampPosition(position.value.x, position.value.y);
   if (popKind.value) updatePopPosition();
 }
 
 onMounted(async () => {
+  position.value = loadPosition();
   await nextTick();
   ready.value = true;
   scheduleHourChime();
@@ -193,6 +311,8 @@ onMounted(async () => {
 onUnmounted(() => {
   clearHourChime();
   clearChimeHide();
+  unbindDragListeners();
+  dragSession = null;
   window.removeEventListener("resize", onResize);
   document.removeEventListener("pointerdown", onDocumentPointerDown);
   window.removeEventListener("keydown", onKeydown);
@@ -204,10 +324,12 @@ onUnmounted(() => {
     <div
       ref="rootRef"
       class="floating-sphere"
-      :class="{ 'is-ready': ready }"
+      :class="{ 'is-ready': ready, 'is-dragging': isDragging }"
+      :style="sphereStyle"
       role="button"
       tabindex="0"
-      aria-label="顯示一句引言"
+      aria-label="顯示一句引言，可拖曳移動"
+      @pointerdown="onSpherePointerDown"
       @click="onSphereClick"
       @keydown.enter.prevent="onSphereClick"
       @keydown.space.prevent="onSphereClick"
@@ -300,12 +422,11 @@ onUnmounted(() => {
 
 .floating-sphere {
   position: fixed;
-  right: 24px;
-  bottom: 24px;
   width: 36px;
   height: 36px;
   z-index: 36;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   opacity: 0;
@@ -315,6 +436,10 @@ onUnmounted(() => {
   &.is-ready {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  &.is-dragging {
+    cursor: grabbing;
   }
 
   &::after {
