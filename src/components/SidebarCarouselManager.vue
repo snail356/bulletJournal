@@ -38,6 +38,10 @@ function setMode(mode: SidebarCarouselMode) {
   store.setSidebarCarouselMode(mode)
 }
 
+function selectImage(id: string) {
+  store.setSidebarCarouselSelectedImage(id)
+}
+
 async function onUpload(event: Event) {
   const input = event.target as HTMLInputElement
   const files = input.files ? Array.from(input.files) : []
@@ -142,6 +146,11 @@ async function onUpload(event: Event) {
           'drag-over': dragOverId === image.id,
           current: currentImage?.id === image.id,
         }"
+        role="button"
+        tabindex="0"
+        @click="selectImage(image.id)"
+        @keydown.enter.prevent="selectImage(image.id)"
+        @keydown.space.prevent="selectImage(image.id)"
         @dragover="onDragOver($event, image.id)"
         @drop="onDrop($event, image.id)"
       >
@@ -149,6 +158,7 @@ async function onUpload(event: Event) {
           class="drag-handle"
           draggable="true"
           aria-label="拖曳排序"
+          @click.stop
           @dragstart="onDragStart($event, image.id)"
           @dragend="onDragEnd"
         >
@@ -338,6 +348,12 @@ async function onUpload(event: Event) {
   border: 1px solid $border;
   border-radius: $radius-sm;
   background: $surface;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px $primary-light;
+  }
 
   &.dragging {
     opacity: 0.45;

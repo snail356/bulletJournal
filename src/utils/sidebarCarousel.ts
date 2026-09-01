@@ -17,6 +17,7 @@ export const defaultSidebarCarouselState: SidebarCarouselState = {
   mode: 'daily',
   intervalHours: 6,
   images: [],
+  selectedImageId: null,
 }
 
 function isCarouselMode(value: unknown): value is SidebarCarouselMode {
@@ -65,11 +66,20 @@ export function normalizeSidebarCarouselState(raw: unknown): SidebarCarouselStat
         .slice(0, SIDEBAR_CAROUSEL_MAX_IMAGES)
     : []
 
+  const selectedImageId =
+    typeof incoming.selectedImageId === 'string' && incoming.selectedImageId
+      ? incoming.selectedImageId
+      : null
+
   return {
     enabled: incoming.enabled === true,
     mode: isCarouselMode(incoming.mode) ? incoming.mode : defaultSidebarCarouselState.mode,
     intervalHours: clampCarouselIntervalHours(incoming.intervalHours),
     images,
+    selectedImageId:
+      selectedImageId && images.some((item) => item.id === selectedImageId)
+        ? selectedImageId
+        : null,
   }
 }
 
@@ -94,6 +104,10 @@ export function getSidebarCarouselCurrentImage(
   nowMs = Date.now(),
 ): SidebarCarouselImage | null {
   if (!state.images.length) return null
+  if (state.selectedImageId) {
+    const selected = state.images.find((item) => item.id === state.selectedImageId)
+    if (selected) return selected
+  }
   return state.images[getSidebarCarouselIndex(state, nowMs)] ?? state.images[0]
 }
 

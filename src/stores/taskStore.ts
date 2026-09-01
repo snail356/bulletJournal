@@ -1688,10 +1688,18 @@ export const useTaskStore = defineStore("task", () => {
     }
   }
 
+  function setSidebarCarouselSelectedImage(id: string) {
+    if (!sidebarCarousel.value.images.some((item) => item.id === id)) return;
+    sidebarCarousel.value = { ...sidebarCarousel.value, selectedImageId: id };
+  }
+
   function deleteSidebarCarouselImage(id: string) {
+    const nextImages = sidebarCarousel.value.images.filter((item) => item.id !== id);
     sidebarCarousel.value = {
       ...sidebarCarousel.value,
-      images: sidebarCarousel.value.images.filter((item) => item.id !== id),
+      images: nextImages,
+      selectedImageId:
+        sidebarCarousel.value.selectedImageId === id ? null : sidebarCarousel.value.selectedImageId,
     };
   }
 
@@ -1968,6 +1976,7 @@ export const useTaskStore = defineStore("task", () => {
     setSidebarCarouselEnabled,
     setSidebarCarouselMode,
     setSidebarCarouselIntervalHours,
+    setSidebarCarouselSelectedImage,
     addSidebarCarouselImages,
     deleteSidebarCarouselImage,
     reorderSidebarCarouselImages,
