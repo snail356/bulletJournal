@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { Task } from '@/types'
 import { useTaskStore } from '@/stores/taskStore'
 import { getTaskDuration, normalizeEndDate } from '@/utils/date'
@@ -83,11 +83,35 @@ function save() {
   emit('saved')
   emit('close')
 }
+
+const backdropPointerDown = ref(false)
+
+function onOverlayPointerDown(e: PointerEvent) {
+  backdropPointerDown.value = e.target === e.currentTarget
+}
+
+function onOverlayPointerUp(e: PointerEvent) {
+  if (backdropPointerDown.value && e.target === e.currentTarget) {
+    emit('close')
+  }
+}
+
+function resetBackdropPointerDown() {
+  backdropPointerDown.value = false
+}
+
+onMounted(() => document.addEventListener('pointerup', resetBackdropPointerDown))
+onUnmounted(() => document.removeEventListener('pointerup', resetBackdropPointerDown))
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="overlay" @click.self="emit('close')">
+    <div
+      v-if="visible"
+      class="overlay"
+      @pointerdown.self="onOverlayPointerDown"
+      @pointerup.self="onOverlayPointerUp"
+    >
       <div class="modal">
         <h2>{{ mode === 'create' ? '新增任務' : '編輯任務' }}</h2>
         <label>
