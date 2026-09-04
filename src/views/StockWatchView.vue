@@ -17,6 +17,7 @@ import {
   formatVolume,
   hasAnnouncedExDate,
   isExDateSoon,
+  isExDateToday,
   marketLabel,
 } from '@/utils/twStock'
 
@@ -208,7 +209,10 @@ onUnmounted(() => {
         v-for="card in store.favoriteCards"
         :key="card.code"
         class="flip-card"
-        :class="{ flipped: flippedCode === card.code }"
+        :class="{
+          flipped: flippedCode === card.code,
+          'ex-date-today': isExDateToday(card.dividend?.exDate ?? null),
+        }"
       >
         <div class="card-actions" @click.stop>
           <button
@@ -534,6 +538,10 @@ onUnmounted(() => {
 .flip-card {
   position: relative;
   perspective: 1200px;
+
+  &.ex-date-today .stock-card {
+    background: #fefce8;
+  }
 }
 
 .flip-inner {

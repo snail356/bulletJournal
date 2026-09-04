@@ -1064,6 +1064,15 @@ export function isExDateSoon(exDate: string | null, withinDays = 7): boolean {
   return diff >= 0 && diff <= withinDays;
 }
 
+export function isExDateToday(exDate: string | null): boolean {
+  if (!exDate) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(`${exDate}T00:00:00`);
+  if (Number.isNaN(target.getTime())) return false;
+  return target.getTime() === today.getTime();
+}
+
 export function normalizeFavoriteStocks(raw: unknown): FavoriteStock[] {
   if (!Array.isArray(raw)) return [];
   const seen = new Set<string>();
