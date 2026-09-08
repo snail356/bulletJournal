@@ -24,6 +24,10 @@ const taskViews = computed(() => store.getTasksByDate(store.selectedDate))
 const activeTasks = computed(() =>
   taskViews.value.filter((v) => !v.migratedAway).map((v) => v.task),
 )
+/** 僅該日開始的任務可拖曳排序；跨日訪客可編輯但不參與排序 */
+const reorderableTasks = computed(() =>
+  activeTasks.value.filter((t) => t.date === store.selectedDate),
+)
 const dateLabel = computed(() => formatDisplayDate(store.selectedDate))
 const progress = computed(() => store.todayProgress)
 
@@ -43,7 +47,7 @@ function onJournalClick() {
 }
 
 const taskDrag = useReorderDrag<Task>(
-  () => activeTasks.value,
+  () => reorderableTasks.value,
   (fromId, toId) => store.reorderTasks(store.selectedDate, fromId, toId),
 )
 provide(TASK_DRAG_KEY, taskDrag)

@@ -37,6 +37,7 @@ import {
   daysBetween,
   getTaskEndDate,
   normalizeEndDate,
+  taskOverlapsDate,
   todayString,
 } from "@/utils/date";
 import { generateAiManagerAdvice as requestAiManagerAdvice } from "@/utils/gemini";
@@ -458,7 +459,7 @@ export const useTaskStore = defineStore("task", () => {
   );
 
   function calcProgress(date: string): TodayProgress {
-    const dayTasks = tasks.value.filter((t) => t.date === date);
+    const dayTasks = tasks.value.filter((t) => taskOverlapsDate(t, date));
     let total = dayTasks.length;
     let completed = dayTasks.filter((t) => t.completed).length;
     for (const task of dayTasks) {
@@ -471,11 +472,34 @@ export const useTaskStore = defineStore("task", () => {
 
   const todayProgress = computed(() => calcProgress(selectedDate.value));
 
+  /** 該日開始的任務維持陣列順序；跨日訪客依開始日排在後面；未完成在前 */
+  function sortActiveTasksForDate(date: string, overlapping: Task[]): Task[] {
+    const natives = overlapping.filter((t) => t.date === date);
+    const visitors = overlapping
+      .filter((t) => t.date !== date)
+      .sort(
+        (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
+      );
+    const pending = [
+      ...natives.filter((t) => !t.completed),
+      ...visitors.filter((t) => !t.completed),
+    ];
+    const done = [
+      ...natives.filter((t) => t.completed),
+      ...visitors.filter((t) => t.completed),
+    ];
+    return [...pending, ...done];
+  }
+
   function getTasksByDate(date: string): TaskDayView[] {
-    const active = tasks.value.filter((t) => t.date === date);
-    const migrated = tasks.value.filter((t) => isMigratedAwayFromDate(t, date));
+    const overlapping = tasks.value.filter((t) => taskOverlapsDate(t, date));
+    const active = sortActiveTasksForDate(date, overlapping);
+    const activeIds = new Set(active.map((t) => t.id));
+    const migrated = tasks.value.filter(
+      (t) => !activeIds.has(t.id) && isMigratedAwayFromDate(t, date),
+    );
     const views: TaskDayView[] = [
-      ...sortByCompleted([...active]).map((task) => ({
+      ...active.map((task) => ({
         task,
         migratedAway: false,
       })),
@@ -783,7 +807,7 @@ export const useTaskStore = defineStore("task", () => {
 
     try {
       const dayTasks = tasks.value
-        .filter((task) => task.date === date)
+        .filter((task) => taskOverlapsDate(task, date))
         .sort((a, b) => {
           if (a.completed !== b.completed) return a.completed ? 1 : -1;
           return a.title.localeCompare(b.title, "zh-Hant");
@@ -1329,6 +1353,12 @@ export const useTaskStore = defineStore("task", () => {
 
   function reorderTasks(date: string, fromId: string, toId: string) {
     const dayTasks = tasks.value.filter((t) => t.date === date);
+    if (
+      !dayTasks.some((t) => t.id === fromId) ||
+      !dayTasks.some((t) => t.id === toId)
+    ) {
+      return;
+    }
     const reordered = reorderInGroup(dayTasks, fromId, toId);
     if (!reordered) return;
     const others = tasks.value.filter((t) => t.date !== date);

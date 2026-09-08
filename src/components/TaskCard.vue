@@ -457,7 +457,7 @@ async function onContextPaste() {
   >
     <header class="header" :class="{ 'has-actions': !isMigrated }">
       <span
-        v-if="taskDrag && !isMigrated"
+        v-if="taskDrag && !isMigrated && task.date === store.selectedDate"
         class="drag-handle"
         draggable="true"
         aria-label="拖曳排序"
