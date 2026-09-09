@@ -5,12 +5,14 @@ import AppSidebar from '@/components/AppSidebar.vue'
 import FloatingSphere from '@/components/FloatingSphere.vue'
 import MigrationReviewModal from '@/components/MigrationReviewModal.vue'
 import ReflectionModal from '@/components/ReflectionModal.vue'
+import { useStockStore } from '@/stores/stockStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { todayString } from '@/utils/date'
 import { maybeRunAutoBackup } from '@/utils/runBackup'
 import type { DailyReflectionInput, MigrationReviewAction } from '@/types'
 
 const store = useTaskStore()
+const stockStore = useStockStore()
 const router = useRouter()
 const autoBackupToast = ref('')
 let autoBackupToastTimer: ReturnType<typeof setTimeout> | null = null
@@ -34,11 +36,21 @@ function checkAutoBackup() {
     })
 }
 
+function flushPersistedData() {
+  void Promise.all([store.flushAppData(), stockStore.flushFavorites()])
+}
+
 function onVisibilityChange() {
   if (document.visibilityState === 'visible') {
     store.checkDailyPrompts()
     checkAutoBackup()
+    return
   }
+  flushPersistedData()
+}
+
+function onPageHide() {
+  flushPersistedData()
 }
 
 function onMigrationReviewConfirm(actions: MigrationReviewAction[]) {
@@ -64,11 +76,13 @@ function onReflectionSubmit(input: DailyReflectionInput) {
 
 onMounted(() => {
   document.addEventListener('visibilitychange', onVisibilityChange)
+  window.addEventListener('pagehide', onPageHide)
   checkAutoBackup()
 })
 
 onUnmounted(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  window.removeEventListener('pagehide', onPageHide)
   if (autoBackupToastTimer) clearTimeout(autoBackupToastTimer)
 })
 </script>

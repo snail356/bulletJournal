@@ -25,7 +25,10 @@ function isCarouselMode(value: unknown): value is SidebarCarouselMode {
 }
 
 function normalizeImageUrl(value: unknown): string | null {
-  return typeof value === 'string' && value.startsWith('data:image/') ? value : null
+  return typeof value === 'string' &&
+    (value.startsWith('data:image/') || value.startsWith('blob:'))
+    ? value
+    : null
 }
 
 export function clampCarouselIntervalHours(value: unknown): number {

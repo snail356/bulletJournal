@@ -30,7 +30,6 @@ import {
   type BackupFrequency,
   type BackupPrefs,
 } from '@/utils/backupPrefs'
-import { TASKS_KEY, LABELS_KEY, SELECTED_DATE_KEY, saveToStorage } from '@/utils/storage'
 import { todayString } from '@/utils/date'
 import { getGeminiModel, hasGeminiApiKey } from '@/utils/gemini'
 import { useSimpleReorderDrag } from '@/composables/useReorderDrag'
@@ -104,9 +103,7 @@ function resetMockData() {
       store.tasks = [...mockTasks]
       store.labels = [...mockLabels]
       store.setSelectedDate(todayString())
-      saveToStorage(TASKS_KEY, store.tasks)
-      saveToStorage(LABELS_KEY, store.labels)
-      saveToStorage(SELECTED_DATE_KEY, store.selectedDate)
+      void store.flushAppData()
       showFeedback('已重置為 mock 資料')
     },
   )
@@ -117,9 +114,11 @@ function clearAllData() {
     '清除所有資料',
     '確定要清除所有任務、標籤與偏好設定？此操作無法復原，且不會還原為示範資料。',
     () => {
-      store.clearAllData()
-      stockStore.clearAll()
-      showFeedback('已清除所有資料')
+      void (async () => {
+        await store.clearAllData()
+        await stockStore.clearAll()
+        showFeedback('已清除所有資料')
+      })()
     },
     { danger: true, confirmLabel: '全部清除' },
   )
@@ -242,8 +241,8 @@ async function runImport(file: File) {
   messageError.value = false
   try {
     const source = await importBackupZip(file)
-    const summary = store.mergeImportedBackup(source)
-    const stocks = stockStore.mergeFavorites(source.stockFavorites ?? [])
+    const summary = await store.mergeImportedBackup(source)
+    const stocks = await stockStore.mergeFavorites(source.stockFavorites ?? [])
     const added =
       summary.tasksAdded +
       summary.labelsAdded +
@@ -411,7 +410,7 @@ onUnmounted(() => {
         <div class="settings-card">
           <h2>資料管理</h2>
           <p class="desc">
-            所有資料儲存於瀏覽器 localStorage，無需後端。可備份或匯入任務、標籤管理（任務標籤與狀態標籤）、工具箱、回顧日誌、任務頭像、側邊圖片與自選股。
+            任務、標籤、日誌與圖片儲存在瀏覽器 IndexedDB，偏好設定仍在本機。無需後端。可備份或匯入任務、標籤管理（任務標籤與狀態標籤）、工具箱、回顧日誌、任務頭像、側邊圖片與自選股。
           </p>
           <div class="actions">
             <button

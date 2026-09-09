@@ -6,13 +6,10 @@ import type {
   TwStockQuote,
 } from "@/types";
 import {
-  loadFromStorage,
-  removeFromStorage,
-  saveToStorage,
-  STOCK_FAVORITES_KEY,
-  STOCK_EX_ANNOUNCE_KEY,
-  STOCK_DIVIDEND_CACHE_KEY,
-} from "@/utils/storage";
+  createDebouncedSaver,
+  loadStockFavorites,
+  saveStockFavorites,
+} from "@/utils/appData";
 import {
   attachFillDates,
   fetchDividendSnapshot,
@@ -27,12 +24,7 @@ import {
 const PRICE_POLL_MS = 10_000;
 
 export const useStockStore = defineStore("stock", () => {
-  removeFromStorage(STOCK_EX_ANNOUNCE_KEY);
-  removeFromStorage(STOCK_DIVIDEND_CACHE_KEY);
-
-  const favorites = ref<FavoriteStock[]>(
-    normalizeFavoriteStocks(loadFromStorage(STOCK_FAVORITES_KEY, [])),
-  );
+  const favorites = ref<FavoriteStock[]>([]);
   const quotesByCode = ref<Record<string, TwStockQuote>>({});
   const dividendsByCode = ref<Record<string, TwStockDividend>>({});
   const catalog = ref<TwStockQuote[]>([]);
@@ -43,6 +35,12 @@ export const useStockStore = defineStore("stock", () => {
   const fillLoading = ref<Record<string, boolean>>({});
   let pollTimer: number | null = null;
   let liveRefreshing = false;
+  let initialized = false;
+  let initPromise: Promise<void> | null = null;
+
+  const favoritesSaver = createDebouncedSaver(() =>
+    saveStockFavorites(favorites.value),
+  );
 
   const favoriteCards = computed(() => {
     const pinned = favorites.value.filter((stock) => stock.pinned);
@@ -55,7 +53,23 @@ export const useStockStore = defineStore("stock", () => {
   });
 
   function persistFavorites() {
-    saveToStorage(STOCK_FAVORITES_KEY, favorites.value);
+    favoritesSaver.schedule();
+  }
+
+  async function init() {
+    if (initialized) return;
+    if (initPromise) return initPromise;
+    initPromise = (async () => {
+      const stored = await loadStockFavorites();
+      favorites.value = normalizeFavoriteStocks(stored ?? []);
+      initialized = true;
+      favoritesSaver.enable();
+    })();
+    return initPromise;
+  }
+
+  async function flushFavorites() {
+    await favoritesSaver.flush();
   }
 
   function applyQuotes(quotes: TwStockQuote[]) {
@@ -298,7 +312,7 @@ export const useStockStore = defineStore("stock", () => {
     else addFavorite(stock);
   }
 
-  function mergeFavorites(incoming: FavoriteStock[]) {
+  async function mergeFavorites(incoming: FavoriteStock[]) {
     const normalized = normalizeFavoriteStocks(incoming);
     let added = 0;
     let skipped = 0;
@@ -316,20 +330,19 @@ export const useStockStore = defineStore("stock", () => {
     if (added) {
       favorites.value = next;
       persistFavorites();
+      await flushFavorites();
     }
     return { added, skipped };
   }
 
-  function clearAll() {
+  async function clearAll() {
     favorites.value = [];
     quotesByCode.value = {};
     dividendsByCode.value = {};
     catalog.value = [];
     error.value = "";
     lastUpdatedAt.value = null;
-    persistFavorites();
-    removeFromStorage(STOCK_EX_ANNOUNCE_KEY);
-    removeFromStorage(STOCK_DIVIDEND_CACHE_KEY);
+    await favoritesSaver.flush();
     resetDividendMemory();
   }
 
@@ -342,6 +355,8 @@ export const useStockStore = defineStore("stock", () => {
     error,
     lastUpdatedAt,
     fillLoading,
+    init,
+    flushFavorites,
     refresh,
     search,
     isFavorite,

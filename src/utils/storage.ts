@@ -4,28 +4,33 @@ import type {
   ReflectionPromptState,
 } from "@/types";
 
-const TASKS_KEY = "bullet-journal-tasks";
-const LABELS_KEY = "bullet-journal-labels";
 const SELECTED_DATE_KEY = "bullet-journal-selected-date";
 const EXPAND_IMAGES_KEY = "bullet-journal-expand-images";
 const EXPAND_TASKS_KEY = "bullet-journal-expand-tasks";
 const MIGRATION_REVIEW_KEY = "bullet-journal-migration-review";
-const STATUS_ITEMS_KEY = "bullet-journal-status-items";
-const DAILY_REFLECTIONS_KEY = "bullet-journal-daily-reflections";
 const REFLECTION_PROMPT_KEY = "bullet-journal-reflection-prompt";
 const GEMINI_USAGE_KEY = "bullet-journal-gemini-usage";
-const AI_MANAGER_PROMPT_KEY = "bullet-journal-ai-manager-prompt";
-const TOOLBOX_LISTS_KEY = "bullet-journal-toolbox-lists";
 const NAV_FEATURES_KEY = "bullet-journal-nav-features";
 const NAV_FEATURE_ORDER_KEY = "bullet-journal-nav-feature-order";
-const TASK_AVATARS_KEY = "bullet-journal-task-avatars";
-const SIDEBAR_CAROUSEL_KEY = "bullet-journal-sidebar-carousel";
-const STOCK_FAVORITES_KEY = "bullet-journal-stock-favorites";
-const STOCK_EX_ANNOUNCE_KEY = "bullet-journal-stock-ex-announce";
-const STOCK_DIVIDEND_CACHE_KEY = "bullet-journal-stock-dividends";
 const AURORA_MODE_KEY = "bullet-journal-aurora-mode";
 const FLOATING_SPHERE_POSITION_KEY = "bullet-journal-floating-sphere-position";
 const BACKUP_PREFS_KEY = "bullet-journal-backup-prefs";
+const STORAGE_BACKEND_KEY = "bullet-journal-storage-backend";
+
+const LEGACY_LOCAL_DATA_KEYS = [
+  "bullet-journal-tasks",
+  "bullet-journal-labels",
+  "bullet-journal-status-items",
+  "bullet-journal-daily-reflections",
+  "bullet-journal-toolbox-lists",
+  "bullet-journal-task-avatars",
+  "bullet-journal-sidebar-carousel",
+  "bullet-journal-stock-favorites",
+  "bullet-journal-ai-manager-prompt",
+  "bullet-journal-difficulty-notes",
+  "bullet-journal-stock-ex-announce",
+  "bullet-journal-stock-dividends",
+] as const;
 
 const defaultMigrationReviewState: MigrationReviewState = {
   snoozedUntil: null,
@@ -74,29 +79,27 @@ export function hasStorageKey(key: string): boolean {
   }
 }
 
+export function clearLegacyLocalData(): void {
+  if (loadFromStorage<string>(STORAGE_BACKEND_KEY, "") === "idb") return;
+  for (const key of LEGACY_LOCAL_DATA_KEYS) {
+    removeFromStorage(key);
+  }
+  saveToStorage(STORAGE_BACKEND_KEY, "idb");
+}
+
 export {
-  TASKS_KEY,
-  LABELS_KEY,
   SELECTED_DATE_KEY,
   EXPAND_IMAGES_KEY,
   EXPAND_TASKS_KEY,
   MIGRATION_REVIEW_KEY,
-  STATUS_ITEMS_KEY,
-  DAILY_REFLECTIONS_KEY,
   REFLECTION_PROMPT_KEY,
   GEMINI_USAGE_KEY,
-  AI_MANAGER_PROMPT_KEY,
-  TOOLBOX_LISTS_KEY,
   NAV_FEATURES_KEY,
   NAV_FEATURE_ORDER_KEY,
-  TASK_AVATARS_KEY,
-  SIDEBAR_CAROUSEL_KEY,
-  STOCK_FAVORITES_KEY,
-  STOCK_EX_ANNOUNCE_KEY,
-  STOCK_DIVIDEND_CACHE_KEY,
   AURORA_MODE_KEY,
   FLOATING_SPHERE_POSITION_KEY,
   BACKUP_PREFS_KEY,
+  STORAGE_BACKEND_KEY,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
   defaultGeminiUsageState,

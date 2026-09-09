@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 import { computed, ref, watch } from "vue";
-import { mockLabels, mockTasks } from "@/mock/data";
 import type {
   Attachment,
   AttachmentOwnerType,
@@ -43,27 +42,39 @@ import {
 import { generateAiManagerAdvice as requestAiManagerAdvice } from "@/utils/gemini";
 import { generateId } from "@/utils/id";
 import {
-  AI_MANAGER_PROMPT_KEY,
-  DAILY_REFLECTIONS_KEY,
+  clearAppData,
+  createDebouncedSaver,
+  loadAiManagerPrompt,
+  loadDailyReflections,
+  loadLabels,
+  loadSidebarCarousel,
+  loadStatusItems,
+  loadTaskAvatars,
+  loadTasks,
+  loadToolboxLists,
+  saveAiManagerPrompt,
+  saveDailyReflections,
+  saveLabels,
+  saveSidebarCarousel,
+  saveStatusItems,
+  saveTaskAvatars,
+  saveTasks,
+  saveToolboxLists,
+} from "@/utils/appData";
+import {
   EXPAND_IMAGES_KEY,
   EXPAND_TASKS_KEY,
   GEMINI_USAGE_KEY,
-  LABELS_KEY,
   MIGRATION_REVIEW_KEY,
   NAV_FEATURES_KEY,
   NAV_FEATURE_ORDER_KEY,
   REFLECTION_PROMPT_KEY,
   SELECTED_DATE_KEY,
-  SIDEBAR_CAROUSEL_KEY,
-  STATUS_ITEMS_KEY,
-  TASK_AVATARS_KEY,
-  TASKS_KEY,
-  TOOLBOX_LISTS_KEY,
+  clearLegacyLocalData,
   defaultGeminiUsageState,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
   loadFromStorage,
-  removeFromStorage,
   saveToStorage,
 } from "@/utils/storage";
 import {
@@ -280,33 +291,21 @@ export const useTaskStore = defineStore("task", () => {
     loadFromStorage(MIGRATION_REVIEW_KEY, defaultMigrationReviewState),
   );
   const migrationReviewVisible = ref(false);
-  const dailyReflections = ref<DailyReflection[]>(
-    loadFromStorage(DAILY_REFLECTIONS_KEY, [] as DailyReflection[]).map(
-      normalizeDailyReflection,
-    ),
-  );
+  const dailyReflections = ref<DailyReflection[]>([]);
   const reflectionPromptState = ref<ReflectionPromptState>(
     loadFromStorage(REFLECTION_PROMPT_KEY, defaultReflectionPromptState),
   );
   const geminiUsage = ref<GeminiUsageState>(
     loadFromStorage(GEMINI_USAGE_KEY, defaultGeminiUsageState),
   );
-  const aiManagerPrompt = ref(loadFromStorage(AI_MANAGER_PROMPT_KEY, ""));
+  const aiManagerPrompt = ref("");
   const aiAdviceLoading = ref(false);
   const reflectionModalVisible = ref(false);
   /** 彈窗正在編輯的日誌日期（prompt 為昨日；手動新增為當日） */
   const reflectionModalDate = ref(addDays(todayString(), -1));
   const reflectionModalMode = ref<"prompt" | "manual">("prompt");
-  const statusItems = ref<StatusItem[]>(
-    normalizeStatusItems(
-      loadFromStorage<StatusItem[] | null>(STATUS_ITEMS_KEY, null),
-    ),
-  );
-  const toolboxLists = ref<ToolboxList[]>(
-    loadFromStorage(TOOLBOX_LISTS_KEY, [] as ToolboxList[]).map(
-      normalizeToolboxList,
-    ),
-  );
+  const statusItems = ref<StatusItem[]>(createDefaultStatusItems());
+  const toolboxLists = ref<ToolboxList[]>([]);
   const navFeatureVisibility = ref<NavFeatureVisibility>(
     normalizeNavFeatureVisibility(
       loadFromStorage<Partial<NavFeatureVisibility> | null>(
@@ -323,23 +322,39 @@ export const useTaskStore = defineStore("task", () => {
   const orderedNavFeatures = computed(() =>
     getOrderedNavFeatures(navFeatureOrder.value),
   );
-  const taskAvatars = ref<TaskAvatar[]>(
-    normalizeTaskAvatars(
-      loadFromStorage<TaskAvatar[] | null>(TASK_AVATARS_KEY, null),
-    ),
+  const taskAvatars = ref<TaskAvatar[]>([...DEFAULT_TASK_AVATARS]);
+  const sidebarCarousel = ref<SidebarCarouselState>({
+    ...defaultSidebarCarouselState,
+    images: [],
+  });
+
+  const tasksSaver = createDebouncedSaver(() => saveTasks(tasks.value));
+  const labelsSaver = createDebouncedSaver(() => saveLabels(labels.value));
+  const statusSaver = createDebouncedSaver(() =>
+    saveStatusItems(statusItems.value),
   );
-  const sidebarCarousel = ref<SidebarCarouselState>(
-    normalizeSidebarCarouselState(
-      loadFromStorage<SidebarCarouselState | null>(SIDEBAR_CAROUSEL_KEY, null),
-    ),
+  const reflectionsSaver = createDebouncedSaver(() =>
+    saveDailyReflections(dailyReflections.value),
+  );
+  const toolboxSaver = createDebouncedSaver(() =>
+    saveToolboxLists(toolboxLists.value),
+  );
+  const avatarsSaver = createDebouncedSaver(() =>
+    saveTaskAvatars(taskAvatars.value),
+  );
+  const carouselSaver = createDebouncedSaver(() =>
+    saveSidebarCarousel(sidebarCarousel.value),
+  );
+  const promptSaver = createDebouncedSaver(() =>
+    saveAiManagerPrompt(aiManagerPrompt.value),
   );
 
   function persistStatusItems() {
-    saveToStorage(STATUS_ITEMS_KEY, statusItems.value);
+    statusSaver.schedule();
   }
 
   function persistToolboxLists() {
-    saveToStorage(TOOLBOX_LISTS_KEY, toolboxLists.value);
+    toolboxSaver.schedule();
   }
 
   function persistNavFeatures() {
@@ -351,16 +366,41 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function persistTaskAvatars() {
-    saveToStorage(TASK_AVATARS_KEY, taskAvatars.value);
+    avatarsSaver.schedule();
   }
 
-  function persistSidebarCarousel() {
+  async function persistSidebarCarousel() {
+    if (!initialized.value) return true;
     try {
-      saveToStorage(SIDEBAR_CAROUSEL_KEY, sidebarCarousel.value);
+      await saveSidebarCarousel(sidebarCarousel.value);
       return true;
     } catch {
       return false;
     }
+  }
+
+  async function flushAppData() {
+    await Promise.all([
+      tasksSaver.flush(),
+      labelsSaver.flush(),
+      statusSaver.flush(),
+      reflectionsSaver.flush(),
+      toolboxSaver.flush(),
+      avatarsSaver.flush(),
+      carouselSaver.flush(),
+      promptSaver.flush(),
+    ]);
+  }
+
+  function enableAppDataSavers() {
+    tasksSaver.enable();
+    labelsSaver.enable();
+    statusSaver.enable();
+    reflectionsSaver.enable();
+    toolboxSaver.enable();
+    avatarsSaver.enable();
+    carouselSaver.enable();
+    promptSaver.enable();
   }
 
   function isNavFeatureEnabled(id: NavFeatureId): boolean {
@@ -405,7 +445,7 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function persistDailyReflections() {
-    saveToStorage(DAILY_REFLECTIONS_KEY, dailyReflections.value);
+    reflectionsSaver.schedule();
   }
 
   function persistReflectionPromptState() {
@@ -418,43 +458,74 @@ export const useTaskStore = defineStore("task", () => {
 
   function setAiManagerPrompt(prompt: string) {
     aiManagerPrompt.value = prompt.trim();
-    saveToStorage(AI_MANAGER_PROMPT_KEY, aiManagerPrompt.value);
+    promptSaver.schedule();
   }
 
-  function persist() {
-    saveToStorage(TASKS_KEY, tasks.value);
-    saveToStorage(LABELS_KEY, labels.value);
+  function persistPrefs() {
     saveToStorage(SELECTED_DATE_KEY, selectedDate.value);
     saveToStorage(EXPAND_IMAGES_KEY, expandImages.value);
     saveToStorage(EXPAND_TASKS_KEY, expandAllTasks.value);
   }
 
-  function init() {
+  let initPromise: Promise<void> | null = null;
+
+  async function init() {
     if (initialized.value) return;
-    const storedTasks = loadFromStorage<Task[] | null>(TASKS_KEY, null);
-    const storedLabels = loadFromStorage<Label[] | null>(LABELS_KEY, null);
-    const storedDate = loadFromStorage<string | null>(SELECTED_DATE_KEY, null);
+    if (initPromise) return initPromise;
 
-    tasks.value = migrateLegacyDuplicates(storedTasks ?? [...mockTasks]);
-    labels.value = storedLabels ?? [...mockLabels];
-    selectedDate.value = storedDate ?? todayString();
+    initPromise = (async () => {
+      clearLegacyLocalData();
 
-    removeFromStorage("bullet-journal-difficulty-notes");
+      const [
+        storedTasks,
+        storedLabels,
+        storedStatusItems,
+        storedReflections,
+        storedToolbox,
+        storedAvatars,
+        storedCarousel,
+        storedPrompt,
+      ] = await Promise.all([
+        loadTasks(),
+        loadLabels(),
+        loadStatusItems(),
+        loadDailyReflections(),
+        loadToolboxLists(),
+        loadTaskAvatars(),
+        loadSidebarCarousel(),
+        loadAiManagerPrompt(),
+      ]);
 
-    checkDailyPrompts();
+      tasks.value = storedTasks ? migrateLegacyDuplicates(storedTasks) : [];
+      labels.value = storedLabels ?? [];
+      selectedDate.value =
+        loadFromStorage<string | null>(SELECTED_DATE_KEY, null) ??
+        todayString();
+      statusItems.value = normalizeStatusItems(storedStatusItems);
+      dailyReflections.value = (storedReflections ?? []).map(
+        normalizeDailyReflection,
+      );
+      toolboxLists.value = (storedToolbox ?? []).map(normalizeToolboxList);
+      taskAvatars.value = normalizeTaskAvatars(storedAvatars);
+      sidebarCarousel.value = normalizeSidebarCarouselState(storedCarousel);
+      aiManagerPrompt.value = storedPrompt ?? "";
 
-    initialized.value = true;
-    persist();
+      initialized.value = true;
+      enableAppDataSavers();
+      checkDailyPrompts();
+    })();
+
+    return initPromise;
   }
 
-  watch([tasks, labels, selectedDate, expandImages, expandAllTasks], persist, {
-    deep: true,
-  });
-
+  watch([selectedDate, expandImages, expandAllTasks], persistPrefs);
+  watch(tasks, () => tasksSaver.schedule(), { deep: true });
+  watch(labels, () => labelsSaver.schedule(), { deep: true });
   watch(statusItems, persistStatusItems, { deep: true });
+  watch(dailyReflections, persistDailyReflections, { deep: true });
   watch(toolboxLists, persistToolboxLists, { deep: true });
   watch(taskAvatars, persistTaskAvatars, { deep: true });
-  watch(sidebarCarousel, persistSidebarCarousel, { deep: true });
+  watch(sidebarCarousel, () => carouselSaver.schedule(), { deep: true });
 
   const tasksForSelectedDate = computed(() =>
     getTasksByDate(selectedDate.value),
@@ -1711,7 +1782,7 @@ export const useTaskStore = defineStore("task", () => {
       ...previous,
       images: [...previous.images, ...added],
     };
-    if (!persistSidebarCarousel()) {
+    if (!(await persistSidebarCarousel())) {
       sidebarCarousel.value = previous;
       throw new Error("儲存空間不足，請刪除部分圖片後再試");
     }
@@ -1753,7 +1824,7 @@ export const useTaskStore = defineStore("task", () => {
     return `${task.date}::${task.title.trim()}`;
   }
 
-  function mergeImportedBackup(source: BackupSource) {
+  async function mergeImportedBackup(source: BackupSource) {
     const summary = {
       labelsAdded: 0,
       labelsSkipped: 0,
@@ -2009,10 +2080,11 @@ export const useTaskStore = defineStore("task", () => {
       summary.aiPromptRestored = true;
     }
 
+    await flushAppData();
     return summary;
   }
 
-  function clearAllData() {
+  async function clearAllData() {
     tasks.value = [];
     labels.value = [];
     selectedDate.value = todayString();
@@ -2030,18 +2102,13 @@ export const useTaskStore = defineStore("task", () => {
     navFeatureOrder.value = [...defaultNavFeatureOrder];
     taskAvatars.value = [...DEFAULT_TASK_AVATARS];
     sidebarCarousel.value = { ...defaultSidebarCarouselState, images: [] };
-    persist();
-    removeFromStorage("bullet-journal-difficulty-notes");
+    persistPrefs();
     persistMigrationReviewState();
-    persistDailyReflections();
     persistReflectionPromptState();
-    saveToStorage(AI_MANAGER_PROMPT_KEY, aiManagerPrompt.value);
-    persistStatusItems();
-    persistToolboxLists();
     persistNavFeatures();
     persistNavFeatureOrder();
-    persistTaskAvatars();
-    persistSidebarCarousel();
+    await clearAppData();
+    await flushAppData();
   }
 
   return {
@@ -2160,5 +2227,6 @@ export const useTaskStore = defineStore("task", () => {
     reorderSidebarCarouselImages,
     mergeImportedBackup,
     clearAllData,
+    flushAppData,
   };
 });

@@ -34,7 +34,8 @@ function isAvatarIcon(value: unknown): value is AppIconName {
 }
 
 function normalizeImageUrl(value: unknown): string | null {
-  return typeof value === 'string' && value.startsWith('data:image/')
+  return typeof value === 'string' &&
+    (value.startsWith('data:image/') || value.startsWith('blob:'))
     ? value
     : null
 }
