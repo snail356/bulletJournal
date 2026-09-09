@@ -15,6 +15,8 @@ export interface BackupPrefs {
   /** 每月幾號（1–31；該月沒有此日時改用該月最後一天） */
   monthlyDate: number;
   lastDownloadedAt: string | null;
+  /** 最近一次自動備份時間；手動下載不寫入，因此不擋該期排程 */
+  lastAutoDownloadedAt: string | null;
   folderName: string | null;
 }
 
@@ -37,6 +39,7 @@ export function defaultBackupPrefs(): BackupPrefs {
     weeklyDay: 0,
     monthlyDate: 1,
     lastDownloadedAt: null,
+    lastAutoDownloadedAt: null,
     folderName: null,
   };
 }
@@ -62,6 +65,11 @@ export function normalizeBackupPrefs(raw: unknown): BackupPrefs {
       typeof incoming.lastDownloadedAt === "string" && incoming.lastDownloadedAt
         ? incoming.lastDownloadedAt
         : null,
+    lastAutoDownloadedAt:
+      typeof incoming.lastAutoDownloadedAt === "string" &&
+      incoming.lastAutoDownloadedAt
+        ? incoming.lastAutoDownloadedAt
+        : null,
     folderName:
       typeof incoming.folderName === "string" && incoming.folderName.trim()
         ? incoming.folderName.trim()
@@ -83,8 +91,15 @@ export function updateBackupPrefs(patch: Partial<BackupPrefs>): BackupPrefs {
   return next;
 }
 
-export function markBackupDownloaded(at = new Date()): BackupPrefs {
-  return updateBackupPrefs({ lastDownloadedAt: at.toISOString() });
+export function markBackupDownloaded(
+  source: "manual" | "auto" = "manual",
+  at = new Date(),
+): BackupPrefs {
+  const iso = at.toISOString();
+  return updateBackupPrefs({
+    lastDownloadedAt: iso,
+    ...(source === "auto" ? { lastAutoDownloadedAt: iso } : {}),
+  });
 }
 
 function localDateOf(iso: string | null): string | null {
@@ -111,8 +126,8 @@ export function isAutoBackupDue(prefs: BackupPrefs, now = new Date()): boolean {
   const scheduled = scheduledBackupDate(prefs, now);
   const today = formatDate(now);
   if (today < scheduled) return false;
-  const last = localDateOf(prefs.lastDownloadedAt);
-  if (last && last >= scheduled) return false;
+  const lastAuto = localDateOf(prefs.lastAutoDownloadedAt);
+  if (lastAuto && lastAuto >= scheduled) return false;
   return true;
 }
 

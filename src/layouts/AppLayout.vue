@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
 import FloatingSphere from '@/components/FloatingSphere.vue'
@@ -12,13 +12,32 @@ import type { DailyReflectionInput, MigrationReviewAction } from '@/types'
 
 const store = useTaskStore()
 const router = useRouter()
+const autoBackupToast = ref('')
+let autoBackupToastTimer: ReturnType<typeof setTimeout> | null = null
+
+function showAutoBackupToast() {
+  autoBackupToast.value = '已完成自動備份'
+  if (autoBackupToastTimer) clearTimeout(autoBackupToastTimer)
+  autoBackupToastTimer = setTimeout(() => {
+    autoBackupToast.value = ''
+    autoBackupToastTimer = null
+  }, 4000)
+}
+
+function checkAutoBackup() {
+  void maybeRunAutoBackup()
+    .then((ran) => {
+      if (ran) showAutoBackupToast()
+    })
+    .catch(() => {
+      // 背景自動備份失敗時下次再開啟再試
+    })
+}
 
 function onVisibilityChange() {
   if (document.visibilityState === 'visible') {
     store.checkDailyPrompts()
-    void maybeRunAutoBackup().catch(() => {
-      // 背景自動備份失敗時下次再開啟再試
-    })
+    checkAutoBackup()
   }
 }
 
@@ -45,13 +64,12 @@ function onReflectionSubmit(input: DailyReflectionInput) {
 
 onMounted(() => {
   document.addEventListener('visibilitychange', onVisibilityChange)
-  void maybeRunAutoBackup().catch(() => {
-    // 背景自動備份失敗時下次再開啟再試
-  })
+  checkAutoBackup()
 })
 
 onUnmounted(() => {
   document.removeEventListener('visibilitychange', onVisibilityChange)
+  if (autoBackupToastTimer) clearTimeout(autoBackupToastTimer)
 })
 </script>
 
@@ -81,6 +99,12 @@ onUnmounted(() => {
       @save="store.saveDailyReflectionDraft"
       @cancel="store.dismissReflectionModal"
     />
+
+    <Teleport to="body">
+      <Transition name="backup-toast">
+        <div v-if="autoBackupToast" class="backup-toast">{{ autoBackupToast }}</div>
+      </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -101,6 +125,31 @@ onUnmounted(() => {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+}
+
+.backup-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3000;
+  background: #1f2937;
+  color: white;
+  padding: 12px 16px;
+  border-radius: $radius-sm;
+  box-shadow: $shadow-lg;
+  font-size: 13px;
+}
+
+.backup-toast-enter-active,
+.backup-toast-leave-active {
+  transition: all 0.25s ease;
+}
+
+.backup-toast-enter-from,
+.backup-toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
 }
 
 @media (max-width: $breakpoint-md) {

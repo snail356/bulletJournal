@@ -35,17 +35,26 @@ export function collectBackupSource(): BackupSource {
   };
 }
 
+export const BACKUP_UPDATED_EVENT = "bullet-journal-backup-updated";
+
+function notifyBackupUpdated() {
+  window.dispatchEvent(new Event(BACKUP_UPDATED_EVENT));
+}
+
 export async function executeBackup(options?: {
   interactive?: boolean;
+  source?: "manual" | "auto";
 }): Promise<BackupResult> {
   if (backupRun) return backupRun;
   const interactive = options?.interactive !== false;
+  const source = options?.source === "auto" ? "auto" : "manual";
   backupRun = (async () => {
     const directoryHandle = await getUsableBackupDirectory(interactive);
     const result = await downloadBackupZip(collectBackupSource(), {
       directoryHandle,
     });
-    markBackupDownloaded();
+    markBackupDownloaded(source);
+    notifyBackupUpdated();
     return result;
   })();
   try {
@@ -58,7 +67,7 @@ export async function executeBackup(options?: {
 export async function maybeRunAutoBackup(): Promise<boolean> {
   const prefs = loadBackupPrefs();
   if (!isAutoBackupDue(prefs)) return false;
-  await executeBackup({ interactive: false });
+  await executeBackup({ interactive: false, source: "auto" });
   return true;
 }
 

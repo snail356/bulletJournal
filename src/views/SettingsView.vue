@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
@@ -13,6 +13,7 @@ import { useStockStore } from '@/stores/stockStore'
 import { mockLabels, mockTasks } from '@/mock/data'
 import { importBackupZip } from '@/utils/backupImport'
 import {
+  BACKUP_UPDATED_EVENT,
   chooseBackupFolder,
   clearBackupFolder,
   executeBackup,
@@ -161,7 +162,7 @@ function patchBackupPrefs(patch: Partial<BackupPrefs>) {
   backupPrefs.value = updateBackupPrefs(patch)
 }
 
-async function tryAutoBackupNow(successMessage = '已依排程自動備份') {
+async function tryAutoBackupNow(successMessage = '已完成自動備份') {
   if (!backupPrefs.value.autoEnabled) return
   try {
     const ran = await maybeRunAutoBackup()
@@ -320,10 +321,17 @@ watch(
   },
 )
 
+function refreshBackupPrefs() {
+  backupPrefs.value = loadBackupPrefs()
+}
+
 onMounted(() => {
-  void syncBackupFolderState().then(() => {
-    backupPrefs.value = loadBackupPrefs()
-  })
+  window.addEventListener(BACKUP_UPDATED_EVENT, refreshBackupPrefs)
+  void syncBackupFolderState().then(refreshBackupPrefs)
+})
+
+onUnmounted(() => {
+  window.removeEventListener(BACKUP_UPDATED_EVENT, refreshBackupPrefs)
 })
 </script>
 
@@ -475,7 +483,7 @@ onMounted(() => {
             <div class="backup-row">
               <div class="backup-copy">
                 <span class="backup-label">自動備份</span>
-                <span class="backup-meta">到期時自動觸發備份；手動或自動下載都會更新下方日期</span>
+                <span class="backup-meta">到期時自動觸發備份；該期若已手動下載，超過設定日仍會再自動備份一次</span>
               </div>
               <AppSwitch
                 :model-value="backupPrefs.autoEnabled"
@@ -535,7 +543,7 @@ onMounted(() => {
             <div class="backup-row">
               <div class="backup-copy">
                 <span class="backup-label">最新下載日期</span>
-                <span class="backup-meta">{{ lastDownloadLabel }}</span>
+                <span class="backup-date">{{ lastDownloadLabel }}</span>
               </div>
             </div>
           </div>
@@ -554,7 +562,7 @@ onMounted(() => {
                 判斷已存在：任務比對「同一筆 id」或「同一天相同標題」；任務標籤與狀態標籤比對名稱；思考清單比對標題；回顧日誌比對日期；自選股比對代碼。
               </li>
               <li>
-                自動備份會在開啟應用程式時檢查是否到期。若該週／該月已手動或自動下載過，則不會重複備份。
+                自動備份會在開啟應用程式時檢查是否到期。同一週／同一月若已手動下載，超過設定日仍會再自動備份；該期已自動備份過則不會重複。
               </li>
             </ul>
           </div>
@@ -722,6 +730,12 @@ onMounted(() => {
 .backup-meta {
   font-size: 12px;
   color: $text-muted;
+  line-height: 1.4;
+}
+
+.backup-date {
+  font-size: 12px;
+  color: #f87171;
   line-height: 1.4;
 }
 
