@@ -3,24 +3,37 @@ import type {
   Attachment,
   AttachmentOwnerType,
   ContentFormat,
+  DailyReflection,
+  FavoriteStock,
   Label,
   Note,
+  SidebarCarouselState,
   StatusItem,
   SubTask,
   Task,
+  TaskAvatar,
   ToolboxList,
 } from "@/types";
+import { writeBlobToDirectory } from "@/utils/backupDirectory";
+import type { NavFeatureId, NavFeatureVisibility } from "@/utils/navFeatures";
 import { getBuiltinStatusName, STATUS_SORT_BACKUP_LABELS } from "@/utils/status";
 
 export const BACKUP_JSON_FILE = "data.json";
 export const BACKUP_FORMAT = "bullet-journal-md-webp";
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 
 export interface BackupSource {
   tasks: Task[];
   labels: Label[];
   statusItems: StatusItem[];
   toolboxLists: ToolboxList[];
+  dailyReflections?: DailyReflection[];
+  taskAvatars?: TaskAvatar[];
+  sidebarCarousel?: SidebarCarouselState;
+  stockFavorites?: FavoriteStock[];
+  aiManagerPrompt?: string;
+  navFeatureVisibility?: NavFeatureVisibility;
+  navFeatureOrder?: NavFeatureId[];
 }
 
 export interface BackupFileAttachment {
@@ -46,6 +59,28 @@ export interface BackupFileTask extends Omit<
   >;
 }
 
+export interface BackupFileTaskAvatar {
+  id: string;
+  name: string;
+  icon: TaskAvatar["icon"];
+  imageFile: string | null;
+}
+
+export interface BackupFileCarouselImage {
+  id: string;
+  fileName: string;
+  imageFile: string;
+  createdAt: string;
+}
+
+export interface BackupFileCarousel {
+  enabled: boolean;
+  mode: SidebarCarouselState["mode"];
+  intervalHours: number;
+  selectedImageId: string | null;
+  images: BackupFileCarouselImage[];
+}
+
 export interface BackupPayload {
   version: number;
   format: string;
@@ -54,14 +89,28 @@ export interface BackupPayload {
   statusItems: StatusItem[];
   toolboxLists: ToolboxList[];
   tasks: BackupFileTask[];
+  dailyReflections: DailyReflection[];
+  taskAvatars: BackupFileTaskAvatar[];
+  sidebarCarousel: BackupFileCarousel;
+  stockFavorites: FavoriteStock[];
+  aiManagerPrompt: string;
+  navFeatureVisibility?: NavFeatureVisibility;
+  navFeatureOrder?: NavFeatureId[];
 }
 
 export interface BackupResult {
   fileName: string;
+  savedToFolder: boolean;
   taskCount: number;
   labelCount: number;
+  statusCount: number;
   toolboxCount: number;
+  reflectionCount: number;
   photoCount: number;
+}
+
+export interface DownloadBackupOptions {
+  directoryHandle?: FileSystemDirectoryHandle | null;
 }
 
 const NOTE_COLOR_LABEL: Record<Note["color"], string> = {
@@ -213,34 +262,58 @@ function canvasToWebp(img: HTMLImageElement, quality = 0.85): Promise<Blob> {
   });
 }
 
-async function convertAttachmentToPhoto(
-  attachment: Attachment,
+async function convertDataUrlToPhoto(
+  id: string,
+  dataUrl: string,
 ): Promise<PhotoFile | null> {
-  if (!attachment.url) return null;
+  if (!dataUrl) return null;
 
-  const decoded = decodeBase64DataUrl(attachment.url);
+  const decoded = decodeBase64DataUrl(dataUrl);
   if (decoded?.mime === "image/webp") {
     return {
-      zipPath: `photos/${attachment.id}.webp`,
+      zipPath: `photos/${id}.webp`,
       blob: bytesToBlob(decoded.bytes, "image/webp"),
     };
   }
 
   try {
-    const img = await loadImage(attachment.url);
+    const img = await loadImage(dataUrl);
     const blob = await canvasToWebp(img);
     return {
-      zipPath: `photos/${attachment.id}.webp`,
+      zipPath: `photos/${id}.webp`,
       blob,
     };
   } catch {
     if (!decoded) return null;
     const ext = extensionForMime(decoded.mime);
     return {
-      zipPath: `photos/${attachment.id}${ext}`,
+      zipPath: `photos/${id}${ext}`,
       blob: bytesToBlob(decoded.bytes, decoded.mime),
     };
   }
+}
+
+async function convertAttachmentToPhoto(
+  attachment: Attachment,
+): Promise<PhotoFile | null> {
+  if (!attachment.url) return null;
+  return convertDataUrlToPhoto(attachment.id, attachment.url);
+}
+
+async function collectPhotoFromDataUrl(
+  id: string,
+  dataUrl: string | null | undefined,
+  photos: Map<string, string>,
+  photoFiles: PhotoFile[],
+): Promise<string | null> {
+  if (!dataUrl) return null;
+  const existing = photos.get(id);
+  if (existing) return existing;
+  const photo = await convertDataUrlToPhoto(id, dataUrl);
+  if (!photo) return null;
+  photos.set(id, photo.zipPath);
+  photoFiles.push(photo);
+  return photo.zipPath;
 }
 
 function photoMarkdown(
@@ -402,12 +475,106 @@ function buildToolboxMarkdown(list: ToolboxList): string {
   ]);
 }
 
+function buildReflectionMarkdown(item: DailyReflection): string {
+  return joinSections([
+    `# ${item.date} 回顧`,
+    [
+      `| 欄位 | 內容 |`,
+      `| --- | --- |`,
+      `| 狀態 | ${item.status === "draft" ? "暫存" : "已提交"} |`,
+      `| 建立時間 | ${escapeTableCell(formatDateTime(item.createdAt))} |`,
+      `| 更新時間 | ${escapeTableCell(formatDateTime(item.updatedAt))} |`,
+      `| AI 建議時間 | ${item.aiGeneratedAt ? escapeTableCell(formatDateTime(item.aiGeneratedAt)) : "—"} |`,
+    ].join("\n"),
+    item.morningContent.trim()
+      ? `## 上午\n\n${item.morningContent.trim()}`
+      : "",
+    item.afternoon1to3Content.trim()
+      ? `## 下午 13–15\n\n${item.afternoon1to3Content.trim()}`
+      : "",
+    item.afternoonAfter3Content.trim()
+      ? `## 下午 15 之後\n\n${item.afternoonAfter3Content.trim()}`
+      : "",
+    item.summaryContent.trim()
+      ? `## 當日總結\n\n${item.summaryContent.trim()}`
+      : "",
+    item.aiManagerAdvice.trim()
+      ? `## AI 主管建議\n\n${item.aiManagerAdvice.trim()}`
+      : "",
+  ]);
+}
+
+function buildExtrasMarkdown(params: {
+  taskAvatars: TaskAvatar[];
+  avatarPhotos: Map<string, string>;
+  carousel: SidebarCarouselState;
+  carouselPhotos: Map<string, string>;
+  stockFavorites: FavoriteStock[];
+  aiManagerPrompt: string;
+}): string {
+  const avatarRows = params.taskAvatars.length
+    ? [
+        "| 名稱 | 圖示 | 圖片 |",
+        "| --- | --- | --- |",
+        ...params.taskAvatars.map((avatar) => {
+          const path = params.avatarPhotos.get(avatar.id);
+          const image = path ? mdImage(avatar.name || "頭像", path) : "—";
+          return `| ${escapeTableCell(avatar.name)} | ${escapeTableCell(avatar.icon)} | ${image} |`;
+        }),
+      ].join("\n")
+    : "_尚無任務頭像_";
+
+  const carouselImages = params.carousel.images
+    .map((image) => {
+      const path = params.carouselPhotos.get(image.id);
+      if (!path) return "";
+      return `### ${escapeTableCell(image.fileName)}\n\n${mdImage(image.fileName, path)}`;
+    })
+    .filter(Boolean)
+    .join("\n\n");
+
+  const stockRows = params.stockFavorites.length
+    ? [
+        "| 代碼 | 名稱 | 市場 | 置頂 |",
+        "| --- | --- | --- | --- |",
+        ...params.stockFavorites.map(
+          (stock) =>
+            `| ${escapeTableCell(stock.code)} | ${escapeTableCell(stock.name)} | ${stock.market === "tpex" ? "櫃買" : "上市"} | ${stock.pinned ? "是" : "否"} |`,
+        ),
+      ].join("\n")
+    : "_尚無自選股_";
+
+  return joinSections([
+    "# 其他資料",
+    "## 任務頭像",
+    avatarRows,
+    "## 側邊圖片輪播",
+    [
+      `| 欄位 | 內容 |`,
+      `| --- | --- |`,
+      `| 啟用 | ${params.carousel.enabled ? "是" : "否"} |`,
+      `| 模式 | ${params.carousel.mode === "interval" ? "間隔輪播" : "每日切換"} |`,
+      `| 間隔時數 | ${params.carousel.intervalHours} |`,
+    ].join("\n"),
+    carouselImages || "_尚無側邊圖片_",
+    "## 小股力自選",
+    stockRows,
+    params.aiManagerPrompt.trim()
+      ? `## AI 主管 Prompt\n\n${params.aiManagerPrompt.trim()}`
+      : "",
+  ]);
+}
+
 function buildReadme(params: {
   exportedAt: string;
   taskCount: number;
   labelCount: number;
   statusCount: number;
   toolboxCount: number;
+  reflectionCount: number;
+  avatarCount: number;
+  carouselCount: number;
+  stockCount: number;
   photoCount: number;
   taskEntries: Array<{ date: string; title: string; path: string }>;
   toolboxEntries: Array<{ title: string; path: string }>;
@@ -438,7 +605,7 @@ function buildReadme(params: {
 
   return joinSections([
     "# Bullet Journal 備份",
-    "此備份以 Markdown 撰寫，照片另存為 WebP（若轉換失敗則保留原格式）並放在 `photos/`。請用設定頁「匯入備份」還原；已存在的任務、標籤與清單會跳過、不會重複新增。",
+    "此備份以 Markdown 撰寫，照片另存為 WebP（若轉換失敗則保留原格式）並放在 `photos/`。請用設定頁「匯入備份」還原；已存在的任務、標籤、狀態標籤、清單、回顧日誌、頭像、側邊圖片與自選股會跳過、不會重複新增。",
     [
       `| 項目 | 數量 |`,
       `| --- | --- |`,
@@ -447,14 +614,20 @@ function buildReadme(params: {
       `| 任務標籤 | ${params.labelCount} |`,
       `| 狀態標籤 | ${params.statusCount} |`,
       `| 工具箱與思考清單 | ${params.toolboxCount} |`,
+      `| 回顧日誌 | ${params.reflectionCount} |`,
+      `| 任務頭像 | ${params.avatarCount} |`,
+      `| 側邊圖片 | ${params.carouselCount} |`,
+      `| 自選股 | ${params.stockCount} |`,
       `| 照片 | ${params.photoCount} |`,
     ].join("\n"),
     "## 檔案",
     [
       `- ${mdLink("標籤", "標籤.md")}`,
+      `- ${mdLink("其他資料", "其他資料.md")}`,
       `- ${mdLink("還原用資料 data.json", BACKUP_JSON_FILE)}`,
       `- 任務/`,
       `- 工具箱與思考清單/`,
+      `- 回顧日誌/`,
       `- photos/`,
     ].join("\n"),
     "## 任務目錄",
@@ -496,7 +669,16 @@ function buildBackupPayload(
   source: BackupSource,
   photos: Map<string, string>,
   exportedAt: Date,
+  avatarPhotos: Map<string, string>,
+  carouselPhotos: Map<string, string>,
 ): BackupPayload {
+  const carousel = source.sidebarCarousel ?? {
+    enabled: false,
+    mode: "daily" as const,
+    intervalHours: 6,
+    images: [],
+    selectedImageId: null,
+  };
   return {
     version: BACKUP_VERSION,
     format: BACKUP_FORMAT,
@@ -522,16 +704,51 @@ function buildBackupPayload(
         ),
       })),
     })),
+    dailyReflections: source.dailyReflections ?? [],
+    taskAvatars: (source.taskAvatars ?? []).map((avatar) => ({
+      id: avatar.id,
+      name: avatar.name,
+      icon: avatar.icon,
+      imageFile: avatarPhotos.get(avatar.id) ?? null,
+    })),
+    sidebarCarousel: {
+      enabled: carousel.enabled,
+      mode: carousel.mode,
+      intervalHours: carousel.intervalHours,
+      selectedImageId: carousel.selectedImageId,
+      images: carousel.images.map((image) => ({
+        id: image.id,
+        fileName: image.fileName,
+        imageFile: carouselPhotos.get(image.id) ?? "",
+        createdAt: image.createdAt,
+      })),
+    },
+    stockFavorites: source.stockFavorites ?? [],
+    aiManagerPrompt: source.aiManagerPrompt ?? "",
+    navFeatureVisibility: source.navFeatureVisibility,
+    navFeatureOrder: source.navFeatureOrder,
   };
 }
 
 export async function downloadBackupZip(
   source: BackupSource,
+  options?: DownloadBackupOptions,
 ): Promise<BackupResult> {
   const exportedAt = new Date();
   const labelsById = new Map(source.labels.map((label) => [label.id, label]));
   const uniqueTaskName = createUniqueName();
   const uniqueToolboxName = createUniqueName();
+  const uniqueReflectionName = createUniqueName();
+  const reflections = source.dailyReflections ?? [];
+  const taskAvatars = source.taskAvatars ?? [];
+  const carousel = source.sidebarCarousel ?? {
+    enabled: false,
+    mode: "daily" as const,
+    intervalHours: 6,
+    images: [],
+    selectedImageId: null,
+  };
+  const stockFavorites = source.stockFavorites ?? [];
 
   const attachments = source.tasks.flatMap(collectTaskAttachments);
   const photos = new Map<string, string>();
@@ -543,6 +760,28 @@ export async function downloadBackupZip(
     if (!photo) continue;
     photos.set(attachment.id, photo.zipPath);
     photoFiles.push(photo);
+  }
+
+  const avatarPhotos = new Map<string, string>();
+  for (const avatar of taskAvatars) {
+    const path = await collectPhotoFromDataUrl(
+      `task-avatar-${avatar.id}`,
+      avatar.imageUrl,
+      photos,
+      photoFiles,
+    );
+    if (path) avatarPhotos.set(avatar.id, path);
+  }
+
+  const carouselPhotos = new Map<string, string>();
+  for (const image of carousel.images) {
+    const path = await collectPhotoFromDataUrl(
+      `sidebar-${image.id}`,
+      image.imageUrl,
+      photos,
+      photoFiles,
+    );
+    if (path) carouselPhotos.set(image.id, path);
   }
 
   const sortedTasks = [...source.tasks].sort((a, b) => {
@@ -581,10 +820,41 @@ export async function downloadBackupZip(
     toolboxEntries.push({ title, path });
   }
 
+  for (const reflection of [...reflections].sort((a, b) =>
+    b.date.localeCompare(a.date),
+  )) {
+    const fileName = uniqueReflectionName(
+      sanitizeFileName(reflection.date, "reflection"),
+      ".md",
+    );
+    zip.file(`回顧日誌/${fileName}`, buildReflectionMarkdown(reflection));
+  }
+
   zip.file("標籤.md", buildLabelsMarkdown(source.labels, source.statusItems));
   zip.file(
+    "其他資料.md",
+    buildExtrasMarkdown({
+      taskAvatars,
+      avatarPhotos,
+      carousel,
+      carouselPhotos,
+      stockFavorites,
+      aiManagerPrompt: source.aiManagerPrompt ?? "",
+    }),
+  );
+  zip.file(
     BACKUP_JSON_FILE,
-    JSON.stringify(buildBackupPayload(source, photos, exportedAt), null, 2),
+    JSON.stringify(
+      buildBackupPayload(
+        source,
+        photos,
+        exportedAt,
+        avatarPhotos,
+        carouselPhotos,
+      ),
+      null,
+      2,
+    ),
   );
   zip.file(
     "README.md",
@@ -594,6 +864,10 @@ export async function downloadBackupZip(
       labelCount: source.labels.length,
       statusCount: source.statusItems.length,
       toolboxCount: source.toolboxLists.length,
+      reflectionCount: reflections.length,
+      avatarCount: taskAvatars.length,
+      carouselCount: carousel.images.length,
+      stockCount: stockFavorites.length,
       photoCount: photoFiles.length,
       taskEntries,
       toolboxEntries,
@@ -610,13 +884,27 @@ export async function downloadBackupZip(
     compression: "DEFLATE",
     compressionOptions: { level: 6 },
   });
-  triggerDownload(blob, fileName);
+
+  let savedToFolder = false;
+  if (options?.directoryHandle) {
+    try {
+      await writeBlobToDirectory(options.directoryHandle, fileName, blob);
+      savedToFolder = true;
+    } catch {
+      triggerDownload(blob, fileName);
+    }
+  } else {
+    triggerDownload(blob, fileName);
+  }
 
   return {
     fileName,
+    savedToFolder,
     taskCount: source.tasks.length,
     labelCount: source.labels.length,
+    statusCount: source.statusItems.length,
     toolboxCount: source.toolboxLists.length,
+    reflectionCount: reflections.length,
     photoCount: photoFiles.length,
   };
 }

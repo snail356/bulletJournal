@@ -19,3 +19,23 @@ declare module '*.module.scss' {
   const classes: Record<string, string>
   export default classes
 }
+
+interface DirectoryPickerOptions {
+  id?: string
+  mode?: 'read' | 'readwrite'
+  startIn?: FileSystemHandle | WellKnownDirectory
+}
+
+type WellKnownDirectory =
+  | 'desktop'
+  | 'documents'
+  | 'downloads'
+  | 'music'
+  | 'pictures'
+  | 'videos'
+
+interface Window {
+  showDirectoryPicker: (
+    options?: DirectoryPickerOptions,
+  ) => Promise<FileSystemDirectoryHandle>
+}

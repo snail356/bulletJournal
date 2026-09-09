@@ -3,11 +3,15 @@ import type {
   Attachment,
   AttachmentOwnerType,
   ContentFormat,
+  DailyReflection,
+  FavoriteStock,
   Label,
   Note,
+  SidebarCarouselState,
   StatusItem,
   SubTask,
   Task,
+  TaskAvatar,
   TaskStatus,
   ToolboxItem,
   ToolboxList,
@@ -15,13 +19,17 @@ import type {
 import {
   BACKUP_JSON_FILE,
   type BackupFileAttachment,
+  type BackupFileCarousel,
   type BackupFileTask,
+  type BackupFileTaskAvatar,
   type BackupPayload,
   type BackupSource,
 } from "@/utils/backup";
+import { defaultSidebarCarouselState } from "@/utils/sidebarCarousel";
 import { resolveContentType } from "@/utils/detectContentType";
 import { generateId } from "@/utils/id";
 import { DEFAULT_LABEL_COLOR } from "@/utils/labelColors";
+import type { NavFeatureId, NavFeatureVisibility } from "@/utils/navFeatures";
 import {
   DEFAULT_STATUS_ID,
   getStatusBgForColor,
@@ -628,6 +636,51 @@ function hydrateTask(task: BackupFileTask, photos: PhotoIndex): Task {
   };
 }
 
+function hydrateAvatar(
+  raw: BackupFileTaskAvatar & { imageUrl?: string | null },
+  photos: PhotoIndex,
+): TaskAvatar {
+  const fromFile = raw.imageFile ? lookupPhoto(photos, raw.imageFile) : undefined;
+  const fromUrl =
+    typeof raw.imageUrl === "string" && raw.imageUrl.startsWith("data:image/")
+      ? raw.imageUrl
+      : null;
+  return {
+    id: raw.id,
+    name: raw.name,
+    icon: raw.icon,
+    imageUrl: fromFile ?? fromUrl,
+  };
+}
+
+function hydrateCarousel(
+  raw: BackupFileCarousel | undefined,
+  photos: PhotoIndex,
+): SidebarCarouselState | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  return {
+    enabled: raw.enabled === true,
+    mode: raw.mode === "interval" ? "interval" : "daily",
+    intervalHours:
+      typeof raw.intervalHours === "number" ? raw.intervalHours : defaultSidebarCarouselState.intervalHours,
+    selectedImageId: raw.selectedImageId ?? null,
+    images: asArray<BackupFileCarousel["images"][number]>(raw.images)
+      .map((image) => {
+        const imageUrl =
+          (image.imageFile ? lookupPhoto(photos, image.imageFile) : undefined) ??
+          "";
+        if (!imageUrl) return null;
+        return {
+          id: image.id,
+          fileName: image.fileName,
+          imageUrl,
+          createdAt: image.createdAt,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => Boolean(item)),
+  };
+}
+
 async function parseFromJson(
   entry: JSZip.JSZipObject,
   photos: PhotoIndex,
@@ -643,6 +696,18 @@ async function parseFromJson(
     tasks: asArray<BackupFileTask>(raw.tasks).map((task) =>
       hydrateTask(task, photos),
     ),
+    dailyReflections: asArray<DailyReflection>(raw.dailyReflections),
+    taskAvatars: asArray<BackupFileTaskAvatar>(raw.taskAvatars).map((item) =>
+      hydrateAvatar(item, photos),
+    ),
+    sidebarCarousel: hydrateCarousel(raw.sidebarCarousel, photos),
+    stockFavorites: asArray<FavoriteStock>(raw.stockFavorites),
+    aiManagerPrompt:
+      typeof raw.aiManagerPrompt === "string" ? raw.aiManagerPrompt : "",
+    navFeatureVisibility: raw.navFeatureVisibility as
+      | NavFeatureVisibility
+      | undefined,
+    navFeatureOrder: asArray<NavFeatureId>(raw.navFeatureOrder),
   };
 }
 
@@ -698,7 +763,12 @@ export async function importBackupZip(file: File): Promise<BackupSource> {
   if (
     !source.tasks.length &&
     !source.labels.length &&
-    !source.toolboxLists.length
+    !source.toolboxLists.length &&
+    !source.statusItems.length &&
+    !(source.dailyReflections?.length) &&
+    !(source.taskAvatars?.length) &&
+    !(source.sidebarCarousel?.images.length) &&
+    !(source.stockFavorites?.length)
   ) {
     throw new Error("找不到備份內容。請選擇本應用程式匯出的 ZIP。");
   }

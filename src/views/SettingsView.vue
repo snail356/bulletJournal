@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ConfirmDialog from '@/components/ConfirmDialog.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
@@ -11,8 +11,24 @@ import TaskAvatarsManager from '@/components/TaskAvatarsManager.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { useStockStore } from '@/stores/stockStore'
 import { mockLabels, mockTasks } from '@/mock/data'
-import { downloadBackupZip } from '@/utils/backup'
 import { importBackupZip } from '@/utils/backupImport'
+import {
+  chooseBackupFolder,
+  clearBackupFolder,
+  executeBackup,
+  isDirectoryPickerSupported,
+  maybeRunAutoBackup,
+  syncBackupFolderState,
+} from '@/utils/runBackup'
+import {
+  formatLastDownloadedAt,
+  loadBackupPrefs,
+  MONTH_DAY_OPTIONS,
+  updateBackupPrefs,
+  WEEKDAY_OPTIONS,
+  type BackupFrequency,
+  type BackupPrefs,
+} from '@/utils/backupPrefs'
 import { TASKS_KEY, LABELS_KEY, SELECTED_DATE_KEY, saveToStorage } from '@/utils/storage'
 import { todayString } from '@/utils/date'
 import { getGeminiModel, hasGeminiApiKey } from '@/utils/gemini'
@@ -32,6 +48,17 @@ const exporting = ref(false)
 const importing = ref(false)
 const importInput = ref<HTMLInputElement | null>(null)
 const busy = computed(() => exporting.value || importing.value)
+const backupPrefs = ref<BackupPrefs>(loadBackupPrefs())
+const folderPicking = ref(false)
+const directoryPickerSupported = isDirectoryPickerSupported()
+const lastDownloadLabel = computed(() =>
+  formatLastDownloadedAt(backupPrefs.value.lastDownloadedAt),
+)
+const folderLabel = computed(() =>
+  backupPrefs.value.folderName
+    ? backupPrefs.value.folderName
+    : '系統預設下載資料夾',
+)
 const aiPromptDraft = ref(store.aiManagerPrompt)
 const aiPromptMessage = ref('')
 const confirmVisible = ref(false)
@@ -114,14 +141,13 @@ async function backupData() {
   message.value = ''
   messageError.value = false
   try {
-    const result = await downloadBackupZip({
-      tasks: store.tasks,
-      labels: store.labels,
-      statusItems: store.statusItems,
-      toolboxLists: store.toolboxLists,
-    })
+    const result = await executeBackup({ interactive: true })
+    backupPrefs.value = loadBackupPrefs()
+    const where = result.savedToFolder
+      ? `已儲存至「${backupPrefs.value.folderName || '指定資料夾'}」`
+      : '已下載'
     showFeedback(
-      `已下載 ${result.fileName}（任務 ${result.taskCount}、標籤 ${result.labelCount}、清單 ${result.toolboxCount}、照片 ${result.photoCount}）`,
+      `${where} ${result.fileName}（任務 ${result.taskCount}、標籤 ${result.labelCount}、狀態 ${result.statusCount}、清單 ${result.toolboxCount}、日誌 ${result.reflectionCount}、照片 ${result.photoCount}）`,
     )
   } catch (err) {
     const reason = err instanceof Error && err.message ? err.message : '請稍後再試'
@@ -129,6 +155,63 @@ async function backupData() {
   } finally {
     exporting.value = false
   }
+}
+
+function patchBackupPrefs(patch: Partial<BackupPrefs>) {
+  backupPrefs.value = updateBackupPrefs(patch)
+}
+
+async function tryAutoBackupNow(successMessage = '已依排程自動備份') {
+  if (!backupPrefs.value.autoEnabled) return
+  try {
+    const ran = await maybeRunAutoBackup()
+    backupPrefs.value = loadBackupPrefs()
+    if (ran) showFeedback(successMessage)
+  } catch (err) {
+    const reason = err instanceof Error && err.message ? err.message : '請稍後再試'
+    showFeedback(`自動備份失敗：${reason}`, true)
+  }
+}
+
+function setAutoBackup(enabled: boolean) {
+  patchBackupPrefs({ autoEnabled: enabled })
+}
+
+function setBackupFrequency(frequency: BackupFrequency) {
+  patchBackupPrefs({ frequency })
+  void tryAutoBackupNow()
+}
+
+function setWeeklyDay(day: number) {
+  patchBackupPrefs({ weeklyDay: day })
+  void tryAutoBackupNow()
+}
+
+function setMonthlyDate(day: number) {
+  patchBackupPrefs({ monthlyDate: day })
+  void tryAutoBackupNow()
+}
+
+async function onChooseFolder() {
+  if (busy.value || folderPicking.value) return
+  folderPicking.value = true
+  try {
+    const name = await chooseBackupFolder()
+    backupPrefs.value = loadBackupPrefs()
+    showFeedback(`已選擇資料夾「${name}」`)
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') return
+    const reason = err instanceof Error && err.message ? err.message : '請稍後再試'
+    showFeedback(`選擇資料夾失敗：${reason}`, true)
+  } finally {
+    folderPicking.value = false
+  }
+}
+
+async function onClearFolder() {
+  await clearBackupFolder()
+  backupPrefs.value = loadBackupPrefs()
+  showFeedback('已改回系統預設下載資料夾')
 }
 
 function chooseImportFile() {
@@ -143,7 +226,7 @@ function onImportFileChange(event: Event) {
   if (!file) return
   openConfirm(
     '匯入備份',
-    `將匯入「${file.name}」中尚未存在的任務、標籤、工具箱與思考清單。已存在的項目會跳過，不會覆蓋或重複新增。`,
+    `將匯入「${file.name}」中尚未存在的任務、標籤、狀態標籤、工具箱、回顧日誌、頭像、側邊圖片與自選股。已存在的項目會跳過，不會覆蓋或重複新增。`,
     () => {
       void runImport(file)
     },
@@ -159,16 +242,24 @@ async function runImport(file: File) {
   try {
     const source = await importBackupZip(file)
     const summary = store.mergeImportedBackup(source)
+    const stocks = stockStore.mergeFavorites(source.stockFavorites ?? [])
     const added =
       summary.tasksAdded +
       summary.labelsAdded +
+      summary.statusAdded +
       summary.toolboxListsAdded +
-      summary.toolboxItemsAdded
+      summary.toolboxItemsAdded +
+      summary.reflectionsAdded +
+      summary.avatarsAdded +
+      summary.avatarsUpdated +
+      summary.carouselAdded +
+      stocks.added +
+      (summary.aiPromptRestored ? 1 : 0)
     if (!added) {
       showFeedback('沒有新增資料，備份中的項目都已存在')
     } else {
       showFeedback(
-        `已匯入：任務 ${summary.tasksAdded}（跳過 ${summary.tasksSkipped}）、標籤 ${summary.labelsAdded}（跳過 ${summary.labelsSkipped}）、清單 ${summary.toolboxListsAdded}（跳過 ${summary.toolboxListsSkipped}）`,
+        `已匯入：任務 ${summary.tasksAdded}、標籤 ${summary.labelsAdded}、狀態 ${summary.statusAdded}、清單 ${summary.toolboxListsAdded}、日誌 ${summary.reflectionsAdded}、頭像 ${summary.avatarsAdded + summary.avatarsUpdated}、側邊圖 ${summary.carouselAdded}、自選股 ${stocks.added}`,
       )
     }
   } catch (err) {
@@ -228,6 +319,12 @@ watch(
     if (activeTab.value !== next) activeTab.value = next
   },
 )
+
+onMounted(() => {
+  void syncBackupFolderState().then(() => {
+    backupPrefs.value = loadBackupPrefs()
+  })
+})
 </script>
 
 <template>
@@ -306,7 +403,7 @@ watch(
         <div class="settings-card">
           <h2>資料管理</h2>
           <p class="desc">
-            所有資料儲存於瀏覽器 localStorage，無需後端。可備份或匯入任務、標籤、工具箱與思考清單。
+            所有資料儲存於瀏覽器 localStorage，無需後端。可備份或匯入任務、標籤管理（任務標籤與狀態標籤）、工具箱、回顧日誌、任務頭像、側邊圖片與自選股。
           </p>
           <div class="actions">
             <button
@@ -340,20 +437,125 @@ watch(
             @change="onImportFileChange"
           />
           <p v-if="message" class="feedback" :class="{ error: messageError }">{{ message }}</p>
+
+          <div class="backup-settings">
+            <div class="backup-row">
+              <div class="backup-copy">
+                <span class="backup-label">下載資料夾</span>
+                <span class="backup-meta">目前：{{ folderLabel }}</span>
+              </div>
+              <div class="backup-controls">
+                <button
+                  v-if="directoryPickerSupported"
+                  type="button"
+                  class="btn-secondary"
+                  :disabled="busy || folderPicking"
+                  @click="onChooseFolder"
+                >
+                  {{ backupPrefs.folderName ? '改選資料夾' : '選擇資料夾' }}
+                </button>
+                <button
+                  v-if="directoryPickerSupported && backupPrefs.folderName"
+                  type="button"
+                  class="btn-secondary"
+                  :disabled="busy || folderPicking"
+                  @click="onClearFolder"
+                >
+                  改回預設
+                </button>
+              </div>
+            </div>
+            <p v-if="!directoryPickerSupported" class="backup-hint">
+              此瀏覽器不支援指定資料夾，備份會存到系統預設下載位置。
+            </p>
+            <p v-else class="backup-hint">
+              未選擇時維持系統預設下載資料夾。自動備份建議先指定資料夾，才能在背景寫入、較不受瀏覽器攔截下載限制。
+            </p>
+
+            <div class="backup-row">
+              <div class="backup-copy">
+                <span class="backup-label">自動備份</span>
+                <span class="backup-meta">到期時自動觸發備份；手動或自動下載都會更新下方日期</span>
+              </div>
+              <AppSwitch
+                :model-value="backupPrefs.autoEnabled"
+                :disabled="busy"
+                @update:model-value="setAutoBackup"
+              />
+            </div>
+
+            <div class="backup-row schedule" :class="{ disabled: !backupPrefs.autoEnabled }">
+              <div class="backup-copy">
+                <span class="backup-label">自動下載週期</span>
+              </div>
+              <div class="backup-controls schedule-controls">
+                <label class="freq-option" :class="{ active: backupPrefs.frequency === 'weekly' }">
+                  <input
+                    type="radio"
+                    name="backup-frequency"
+                    value="weekly"
+                    :checked="backupPrefs.frequency === 'weekly'"
+                    :disabled="!backupPrefs.autoEnabled || busy"
+                    @change="setBackupFrequency('weekly')"
+                  />
+                  每周
+                </label>
+                <select
+                  :value="backupPrefs.weeklyDay"
+                  :disabled="!backupPrefs.autoEnabled || backupPrefs.frequency !== 'weekly' || busy"
+                  @change="setWeeklyDay(Number(($event.target as HTMLSelectElement).value))"
+                >
+                  <option v-for="day in WEEKDAY_OPTIONS" :key="day.value" :value="day.value">
+                    {{ day.label }}
+                  </option>
+                </select>
+                <label class="freq-option" :class="{ active: backupPrefs.frequency === 'monthly' }">
+                  <input
+                    type="radio"
+                    name="backup-frequency"
+                    value="monthly"
+                    :checked="backupPrefs.frequency === 'monthly'"
+                    :disabled="!backupPrefs.autoEnabled || busy"
+                    @change="setBackupFrequency('monthly')"
+                  />
+                  每月
+                </label>
+                <select
+                  :value="backupPrefs.monthlyDate"
+                  :disabled="!backupPrefs.autoEnabled || backupPrefs.frequency !== 'monthly' || busy"
+                  @change="setMonthlyDate(Number(($event.target as HTMLSelectElement).value))"
+                >
+                  <option v-for="day in MONTH_DAY_OPTIONS" :key="day" :value="day">
+                    {{ day }} 日
+                  </option>
+                </select>
+              </div>
+            </div>
+
+            <div class="backup-row">
+              <div class="backup-copy">
+                <span class="backup-label">最新下載日期</span>
+                <span class="backup-meta">{{ lastDownloadLabel }}</span>
+              </div>
+            </div>
+          </div>
+
           <div class="usage">
             <h3>使用說明</h3>
             <ul>
               <li>
                 <strong>備份資料</strong>：下載 ZIP。內含可閱讀的 Markdown、外置 WebP 照片，以及供還原用的
-                <code>data.json</code>。
+                <code>data.json</code>（含標籤管理、回顧日誌、頭像、側邊圖片與自選股）。
               </li>
               <li>
                 <strong>匯入備份</strong>：選擇先前下載的 ZIP。只會新增目前沒有的項目，已存在的不會覆蓋、也不會重複。
               </li>
               <li>
-                判斷已存在：任務比對「同一筆 id」或「同一天相同標題」；標籤比對名稱；思考清單比對標題，清單內思考點比對內容。
+                判斷已存在：任務比對「同一筆 id」或「同一天相同標題」；任務標籤與狀態標籤比對名稱；思考清單比對標題；回顧日誌比對日期；自選股比對代碼。
               </li>
-              <li>回顧日誌與狀態標籤不會被這份備份匯入更動。</li>
+              <li>
+                自動備份會在開啟應用程式時檢查是否到期。若該週／該月已手動或自動下載過，則不會重複備份。
+              </li>
             </ul>
           </div>
         </div>
@@ -477,6 +679,110 @@ watch(
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.backup-settings {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid $border;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.backup-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  &.schedule {
+    align-items: flex-start;
+  }
+
+  &.disabled {
+    opacity: 0.55;
+  }
+}
+
+.backup-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.backup-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text;
+}
+
+.backup-meta {
+  font-size: 12px;
+  color: $text-muted;
+  line-height: 1.4;
+}
+
+.backup-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.schedule-controls {
+  max-width: 100%;
+}
+
+.backup-hint {
+  color: $text-muted;
+  font-size: 12px;
+  line-height: 1.5;
+  margin-top: -6px;
+}
+
+.freq-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: $text;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: $radius-sm;
+  border: 1px solid transparent;
+
+  &.active {
+    background: $primary-light;
+    color: $primary-dark;
+  }
+
+  input {
+    accent-color: $primary;
+  }
+}
+
+.backup-settings select {
+  padding: 6px 10px;
+  border: 1px solid $border;
+  border-radius: $radius-sm;
+  background: $bg;
+  color: $text;
+  outline: none;
+
+  &:focus {
+    border-color: $primary;
+    box-shadow: 0 0 0 2px rgba($primary, 0.12);
+  }
+
+  &:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+  }
 }
 
 .prompt-field {

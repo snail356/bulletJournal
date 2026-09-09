@@ -25,6 +25,7 @@ const STOCK_EX_ANNOUNCE_KEY = "bullet-journal-stock-ex-announce";
 const STOCK_DIVIDEND_CACHE_KEY = "bullet-journal-stock-dividends";
 const AURORA_MODE_KEY = "bullet-journal-aurora-mode";
 const FLOATING_SPHERE_POSITION_KEY = "bullet-journal-floating-sphere-position";
+const BACKUP_PREFS_KEY = "bullet-journal-backup-prefs";
 
 const defaultMigrationReviewState: MigrationReviewState = {
   snoozedUntil: null,
@@ -95,6 +96,7 @@ export {
   STOCK_DIVIDEND_CACHE_KEY,
   AURORA_MODE_KEY,
   FLOATING_SPHERE_POSITION_KEY,
+  BACKUP_PREFS_KEY,
   defaultMigrationReviewState,
   defaultReflectionPromptState,
   defaultGeminiUsageState,

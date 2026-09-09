@@ -71,6 +71,7 @@ import {
   fileToAvatarDataUrl,
   findTaskAvatar,
   isDefaultTaskAvatar,
+  normalizeTaskAvatar,
   normalizeTaskAvatars,
 } from "@/utils/taskAvatars";
 import {
@@ -88,6 +89,7 @@ import {
   getStatusBgForColor,
   isCompletedStatus,
   normalizeStatusItems,
+  parseStatusSortOnSelect,
 } from "@/utils/status";
 import {
   NAV_FEATURES,
@@ -1755,12 +1757,22 @@ export const useTaskStore = defineStore("task", () => {
     const summary = {
       labelsAdded: 0,
       labelsSkipped: 0,
+      statusAdded: 0,
+      statusSkipped: 0,
       tasksAdded: 0,
       tasksSkipped: 0,
       toolboxListsAdded: 0,
       toolboxListsSkipped: 0,
       toolboxItemsAdded: 0,
       toolboxItemsSkipped: 0,
+      reflectionsAdded: 0,
+      reflectionsSkipped: 0,
+      avatarsAdded: 0,
+      avatarsUpdated: 0,
+      avatarsSkipped: 0,
+      carouselAdded: 0,
+      carouselSkipped: 0,
+      aiPromptRestored: false,
     };
 
     const labelIdMap = new Map<string, string>();
@@ -1787,6 +1799,40 @@ export const useTaskStore = defineStore("task", () => {
       labelsByName.set(name, next);
       labelIdMap.set(label.id, next.id);
       summary.labelsAdded += 1;
+    }
+
+    const statusById = new Map(statusItems.value.map((item) => [item.id, item]));
+    const statusByName = new Map(
+      statusItems.value.map((item) => [item.name.trim(), item]),
+    );
+    const addedStatuses: StatusItem[] = [];
+    for (const incoming of source.statusItems ?? []) {
+      const id = incoming.id?.trim();
+      const name = incoming.name?.trim() || id;
+      if (!id || !name) {
+        summary.statusSkipped += 1;
+        continue;
+      }
+      const existing = statusById.get(id) ?? statusByName.get(name);
+      if (existing) {
+        summary.statusSkipped += 1;
+        continue;
+      }
+      const color = incoming.color || "#9ca3af";
+      const next: StatusItem = {
+        id,
+        name,
+        color,
+        bgColor: incoming.bgColor || getStatusBgForColor(color),
+        sortOnSelect: parseStatusSortOnSelect(incoming.sortOnSelect, id),
+      };
+      addedStatuses.push(next);
+      statusById.set(next.id, next);
+      statusByName.set(name, next);
+      summary.statusAdded += 1;
+    }
+    if (addedStatuses.length) {
+      statusItems.value = [...statusItems.value, ...addedStatuses];
     }
 
     const taskIds = new Set(tasks.value.map((task) => task.id));
@@ -1859,6 +1905,108 @@ export const useTaskStore = defineStore("task", () => {
 
     if (addedLists.length) {
       toolboxLists.value = [...addedLists, ...toolboxLists.value];
+    }
+
+    const reflectionDates = new Set(
+      dailyReflections.value.map((item) => item.date),
+    );
+    const reflectionIds = new Set(dailyReflections.value.map((item) => item.id));
+    const addedReflections: DailyReflection[] = [];
+    for (const incoming of source.dailyReflections ?? []) {
+      if (!incoming?.date) {
+        summary.reflectionsSkipped += 1;
+        continue;
+      }
+      if (reflectionDates.has(incoming.date) || reflectionIds.has(incoming.id)) {
+        summary.reflectionsSkipped += 1;
+        continue;
+      }
+      const next = normalizeDailyReflection(incoming);
+      addedReflections.push(next);
+      reflectionDates.add(next.date);
+      reflectionIds.add(next.id);
+      summary.reflectionsAdded += 1;
+    }
+    if (addedReflections.length) {
+      dailyReflections.value = [...dailyReflections.value, ...addedReflections];
+      persistDailyReflections();
+    }
+
+    if (source.taskAvatars?.length) {
+      let avatars = [...taskAvatars.value];
+      for (const incoming of source.taskAvatars) {
+        if (!incoming?.id) {
+          summary.avatarsSkipped += 1;
+          continue;
+        }
+        const index = avatars.findIndex((item) => item.id === incoming.id);
+        if (index >= 0) {
+          const current = avatars[index];
+          if (!current.imageUrl && incoming.imageUrl) {
+            avatars[index] = { ...current, imageUrl: incoming.imageUrl };
+            summary.avatarsUpdated += 1;
+          } else {
+            summary.avatarsSkipped += 1;
+          }
+          continue;
+        }
+        avatars.push(
+          normalizeTaskAvatar(incoming, {
+            id: incoming.id,
+            name: incoming.name?.trim() || "自訂頭像",
+            icon: "star",
+            imageUrl: null,
+          }),
+        );
+        summary.avatarsAdded += 1;
+      }
+      taskAvatars.value = avatars;
+    }
+
+    const incomingCarousel = source.sidebarCarousel;
+    if (incomingCarousel?.images.length) {
+      const existingIds = new Set(
+        sidebarCarousel.value.images.map((item) => item.id),
+      );
+      const room =
+        SIDEBAR_CAROUSEL_MAX_IMAGES - sidebarCarousel.value.images.length;
+      const addedImages: SidebarCarouselImage[] = [];
+      for (const image of incomingCarousel.images) {
+        if (!image?.id || !image.imageUrl || existingIds.has(image.id)) {
+          summary.carouselSkipped += 1;
+          continue;
+        }
+        if (addedImages.length >= room) {
+          summary.carouselSkipped += 1;
+          continue;
+        }
+        addedImages.push(image);
+        existingIds.add(image.id);
+        summary.carouselAdded += 1;
+      }
+      if (addedImages.length) {
+        const hadImages = sidebarCarousel.value.images.length > 0;
+        sidebarCarousel.value = {
+          ...sidebarCarousel.value,
+          enabled: hadImages
+            ? sidebarCarousel.value.enabled
+            : incomingCarousel.enabled,
+          mode: hadImages ? sidebarCarousel.value.mode : incomingCarousel.mode,
+          intervalHours: hadImages
+            ? sidebarCarousel.value.intervalHours
+            : incomingCarousel.intervalHours,
+          images: [...sidebarCarousel.value.images, ...addedImages],
+        };
+      }
+    }
+
+    if (
+      !aiManagerPrompt.value.trim() &&
+      source.aiManagerPrompt &&
+      source.aiManagerPrompt.trim()
+    ) {
+      setAiManagerPrompt(source.aiManagerPrompt);
+      summary.aiPromptRestored = true;
     }
 
     return summary;

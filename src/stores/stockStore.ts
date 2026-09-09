@@ -298,6 +298,28 @@ export const useStockStore = defineStore("stock", () => {
     else addFavorite(stock);
   }
 
+  function mergeFavorites(incoming: FavoriteStock[]) {
+    const normalized = normalizeFavoriteStocks(incoming);
+    let added = 0;
+    let skipped = 0;
+    const codes = new Set(favorites.value.map((stock) => stock.code));
+    const next = [...favorites.value];
+    for (const stock of normalized) {
+      if (codes.has(stock.code)) {
+        skipped += 1;
+        continue;
+      }
+      next.push(stock);
+      codes.add(stock.code);
+      added += 1;
+    }
+    if (added) {
+      favorites.value = next;
+      persistFavorites();
+    }
+    return { added, skipped };
+  }
+
   function clearAll() {
     favorites.value = [];
     quotesByCode.value = {};
@@ -332,6 +354,7 @@ export const useStockStore = defineStore("stock", () => {
     stopPolling,
     leavePage,
     refreshLiveForFavorites,
+    mergeFavorites,
     clearAll,
   };
 });

@@ -7,6 +7,7 @@ import MigrationReviewModal from '@/components/MigrationReviewModal.vue'
 import ReflectionModal from '@/components/ReflectionModal.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { todayString } from '@/utils/date'
+import { maybeRunAutoBackup } from '@/utils/runBackup'
 import type { DailyReflectionInput, MigrationReviewAction } from '@/types'
 
 const store = useTaskStore()
@@ -15,6 +16,9 @@ const router = useRouter()
 function onVisibilityChange() {
   if (document.visibilityState === 'visible') {
     store.checkDailyPrompts()
+    void maybeRunAutoBackup().catch(() => {
+      // 背景自動備份失敗時下次再開啟再試
+    })
   }
 }
 
@@ -41,6 +45,9 @@ function onReflectionSubmit(input: DailyReflectionInput) {
 
 onMounted(() => {
   document.addEventListener('visibilitychange', onVisibilityChange)
+  void maybeRunAutoBackup().catch(() => {
+    // 背景自動備份失敗時下次再開啟再試
+  })
 })
 
 onUnmounted(() => {
