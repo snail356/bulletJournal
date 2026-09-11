@@ -38,11 +38,15 @@ import {
 } from "@/utils/status";
 
 const NOTE_COLOR_FROM_LABEL: Record<string, Note["color"]> = {
+  黃: "yellow",
+  紅: "red",
   紫: "purple",
   橙: "orange",
   綠: "green",
   藍: "blue",
   灰: "gray",
+  yellow: "yellow",
+  red: "red",
   purple: "purple",
   orange: "orange",
   green: "green",

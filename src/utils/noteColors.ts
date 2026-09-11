@@ -1,6 +1,8 @@
 import type { Note } from '@/types'
 
 export const NOTE_COLOR_BG: Record<Note['color'], string> = {
+  yellow: '#fef9c3',
+  red: '#fee2e2',
   purple: '#ede9fe',
   orange: '#ffedd5',
   green: '#dcfce7',
@@ -9,6 +11,8 @@ export const NOTE_COLOR_BG: Record<Note['color'], string> = {
 }
 
 export const NOTE_COLOR_DOT: Record<Note['color'], string> = {
+  yellow: '#facc15',
+  red: '#f87171',
   purple: '#c4b5fd',
   orange: '#fdba74',
   green: '#86efac',

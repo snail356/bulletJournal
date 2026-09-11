@@ -114,6 +114,8 @@ export interface DownloadBackupOptions {
 }
 
 const NOTE_COLOR_LABEL: Record<Note["color"], string> = {
+  yellow: "黃",
+  red: "紅",
   purple: "紫",
   orange: "橙",
   green: "綠",

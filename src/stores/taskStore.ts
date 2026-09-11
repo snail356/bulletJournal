@@ -1182,7 +1182,7 @@ export const useTaskStore = defineStore("task", () => {
   function createNote(
     taskId: string,
     content: string,
-    color: Note["color"] = "purple",
+    color: Note["color"] = "yellow",
     contentType?: Note["contentType"],
   ): Note | null {
     const task = findTask(taskId);

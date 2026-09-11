@@ -25,7 +25,7 @@ export interface Note {
   taskId: string;
   content: string;
   contentType: ContentFormat;
-  color: "purple" | "orange" | "green" | "blue" | "gray";
+  color: "yellow" | "red" | "purple" | "orange" | "green" | "blue" | "gray";
   attachments: Attachment[];
   createdAt: string;
   updatedAt: string;

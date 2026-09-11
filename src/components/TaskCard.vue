@@ -275,7 +275,7 @@ function addNoteInline() {
 
 function onComposerCommit(content: string, contentType: ContentFormat) {
   if (!content.trim()) return
-  store.createNote(props.task.id, content, 'purple', contentType)
+  store.createNote(props.task.id, content, 'yellow', contentType)
   notesExpanded.value = true
 }
 
