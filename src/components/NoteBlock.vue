@@ -27,6 +27,8 @@ const editorRef = ref<InstanceType<typeof FormattedContentEditor> | null>(null)
 const noteEl = ref<HTMLElement | null>(null)
 const keepAlive = ref(false)
 const editing = ref(false)
+const copied = ref(false)
+let copiedTimer: ReturnType<typeof setTimeout> | null = null
 
 const isFormatted = computed(
   () => props.note.contentType === 'code' || props.note.contentType === 'markdown',
@@ -100,18 +102,25 @@ function setColor(color: string) {
   store.updateNote(props.taskId, props.note.id, { color: color as Note['color'] })
 }
 
+async function copyContent() {
+  try {
+    await navigator.clipboard.writeText(props.note.content)
+    copied.value = true
+    if (copiedTimer) clearTimeout(copiedTimer)
+    copiedTimer = setTimeout(() => {
+      copied.value = false
+    }, 1500)
+  } catch {
+    // 瀏覽器不允許剪貼簿時略過
+  }
+}
+
 function convertToText() {
   store.updateNote(props.taskId, props.note.id, { contentType: 'text' })
 }
 
 function toggleCollapsed() {
   collapsed.value = !collapsed.value
-}
-
-async function startEditing() {
-  collapsed.value = false
-  await nextTick()
-  editorRef.value?.startEditing()
 }
 
 function onNotePointerDown() {
@@ -206,8 +215,13 @@ function formatTag(type: ContentFormat): string | null {
             size="xs"
           />
         </button>
-        <button type="button" title="編輯" @click="startEditing">
-          <AppIcon name="pen" size="xs" />
+        <button
+          type="button"
+          :title="copied ? '已複製' : '複製全部內容'"
+          :aria-label="copied ? '已複製' : '複製全部內容'"
+          @click="copyContent"
+        >
+          <AppIcon :name="copied ? 'check' : 'copy'" size="xs" />
         </button>
         <button
           v-if="isFormatted"

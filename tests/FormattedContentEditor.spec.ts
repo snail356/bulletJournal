@@ -155,17 +155,33 @@ describe('FormattedContentEditor', () => {
     wrapper.unmount()
   })
 
-  it('previewUntilEdit 時點兩下進入編輯', async () => {
+  it('previewUntilEdit 時純文字點一下進入編輯', async () => {
     const wrapper = mountEditor({
       content: '展開後的備註',
       previewUntilEdit: true,
     })
-    await wrapper.get('.formatted-content-editor').trigger('dblclick')
+    await wrapper.get('.text-preview').trigger('click')
     await nextTick()
     expect(textarea(wrapper).element.value).toBe('展開後的備註')
     expect(document.activeElement).toBe(textarea(wrapper).element)
     expect(wrapper.classes()).toContain('is-editing')
     expect(wrapper.attributes('title')).toBe('編輯中')
+    wrapper.unmount()
+  })
+
+  it('markdown 需點兩下才進入編輯', async () => {
+    const wrapper = mountEditor({
+      content: SAMPLE_MARKDOWN,
+      contentType: 'markdown',
+      previewUntilEdit: true,
+    })
+    await wrapper.get('.formatted-content-editor').trigger('click')
+    await nextTick()
+    expect(wrapper.find('textarea').exists()).toBe(false)
+
+    await wrapper.get('.formatted-content-editor').trigger('dblclick')
+    await nextTick()
+    expect(textarea(wrapper).element.value).toBe(SAMPLE_MARKDOWN)
     wrapper.unmount()
   })
 

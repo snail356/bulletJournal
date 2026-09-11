@@ -193,7 +193,7 @@ async function onPaste(e: ClipboardEvent) {
 }
 
 function onDoubleClick(e: MouseEvent) {
-  if (showEditor.value) return
+  if (showEditor.value || !isFormatted.value) return
   e.preventDefault()
   e.stopPropagation()
   startEditing()
@@ -242,6 +242,7 @@ defineExpose({ startEditing })
       v-else-if="showTextPreview"
       class="text-preview"
       :class="{ 'is-placeholder': !content }"
+      @click="startEditing"
     >
       {{ content || placeholder }}
     </p>
