@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { Attachment, ContentFormat, Task } from '@/types'
 import AttachmentList from './AttachmentList.vue'
-import CodeSnippet from './CodeSnippet.vue'
-import MarkdownContent from './MarkdownContent.vue'
 import AppIcon from './AppIcon.vue'
+import FormattedContentEditor from './FormattedContentEditor.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { resolveContentType } from '@/utils/detectContentType'
 import { getBodyExpanded, setBodyExpanded } from '@/utils/sectionCollapseState'
@@ -21,6 +20,7 @@ const emit = defineEmits<{
 }>()
 
 const store = useTaskStore()
+const fileInput = ref<HTMLInputElement | null>(null)
 
 function defaultBodyExpanded(): boolean {
   return props.content.trim().length > 0 || props.attachments.length > 0
@@ -38,19 +38,11 @@ watch(
     expanded.value = getBodyExpanded(taskId, defaultBodyExpanded())
   },
 )
-const editingFormatted = ref(false)
-const draft = ref(props.content)
-const textareaRef = ref<HTMLTextAreaElement | null>(null)
-const fileInput = ref<HTMLInputElement | null>(null)
 
-const isCode = computed(() => props.contentType === 'code')
-const isMarkdown = computed(() => props.contentType === 'markdown')
-const isFormatted = computed(() => isCode.value || isMarkdown.value)
 const hasContent = computed(() => props.content.trim().length > 0)
 const hasCollapsedPreview = computed(
   () => hasContent.value || props.attachments.length > 0,
 )
-const showEditor = computed(() => !isFormatted.value || editingFormatted.value)
 
 const preview = computed(() => {
   const text = props.content.trim().replace(/\s+/g, ' ')
@@ -61,84 +53,24 @@ const preview = computed(() => {
   return text.length > 48 ? `${text.slice(0, 48)}…` : text
 })
 
-watch(
-  () => props.content,
-  (value) => {
-    if (!showEditor.value || document.activeElement !== textareaRef.value) {
-      draft.value = value
-    }
-  },
-)
-
-watch(
-  [expanded, showEditor, draft],
-  async () => {
-    if (!expanded.value || !showEditor.value) return
-    await nextTick()
-    if (textareaRef.value) autoResize(textareaRef.value)
-  },
-  { flush: 'post' },
-)
-
-onMounted(() => {
-  if (expanded.value && showEditor.value && textareaRef.value) {
-    autoResize(textareaRef.value)
-  }
-})
-
-function commitDraft() {
-  const next = draft.value.replace(/\n$/, '')
+function commitContent(content: string, contentType: ContentFormat) {
   store.updateTask(props.taskId, {
-    bodyContent: next,
-    bodyContentType: resolveContentType(next),
+    bodyContent: content,
+    bodyContentType: contentType,
   })
-  editingFormatted.value = false
-  draft.value = next
 }
 
 function convertToText() {
   store.updateTask(props.taskId, { bodyContentType: 'text' })
-  editingFormatted.value = false
-  draft.value = props.content
-}
-
-async function startEditFormatted() {
-  editingFormatted.value = true
-  draft.value = props.content
-  await nextTick()
-  const el = textareaRef.value
-  if (!el) return
-  el.focus()
-  el.setSelectionRange(el.value.length, el.value.length)
-  autoResize(el)
 }
 
 function toggleExpanded() {
   expanded.value = !expanded.value
 }
 
-function autoResize(el: HTMLTextAreaElement) {
-  el.style.height = 'auto'
-  el.style.height = `${el.scrollHeight}px`
-}
-
-function onInput(e: Event) {
-  const el = e.target as HTMLTextAreaElement
-  draft.value = el.value
-  autoResize(el)
-}
-
-function applyPastedContent(text: string) {
-  const contentType = resolveContentType(text)
-  if (contentType === 'text') return false
-
-  store.updateTask(props.taskId, {
-    bodyContent: text.replace(/\n$/, ''),
-    bodyContentType: contentType,
-  })
-  editingFormatted.value = false
-  draft.value = text.replace(/\n$/, '')
-  return true
+async function onPasteImage(file: File) {
+  expanded.value = true
+  await store.addAttachment('task', props.taskId, file)
 }
 
 async function onPaste(e: ClipboardEvent) {
@@ -149,14 +81,13 @@ async function onPaste(e: ClipboardEvent) {
         e.preventDefault()
         e.stopPropagation()
         const file = item.getAsFile()
-        if (file) {
-          expanded.value = true
-          await store.addAttachment('task', props.taskId, file)
-        }
+        if (file) await onPasteImage(file)
         return
       }
     }
   }
+
+  if (expanded.value) return
 
   const text = e.clipboardData?.getData('text/plain') ?? ''
   if (!text.trim()) return
@@ -164,20 +95,9 @@ async function onPaste(e: ClipboardEvent) {
   const contentType = resolveContentType(text)
   if (contentType === 'text') return
 
-  if (!showEditor.value) {
-    e.preventDefault()
-    e.stopPropagation()
-    applyPastedContent(text)
-    return
-  }
-
-  nextTick(() => {
-    const el = textareaRef.value
-    if (!el) return
-    draft.value = el.value
-    autoResize(el)
-    applyPastedContent(el.value)
-  })
+  e.preventDefault()
+  e.stopPropagation()
+  commitContent(text.replace(/\n$/, ''), contentType)
 }
 
 function triggerUpload() {
@@ -249,40 +169,13 @@ function formatTag(type: ContentFormat): string | null {
     </p>
 
     <div v-else-if="expanded" class="body-area">
-      <div v-if="isCode && !editingFormatted" class="formatted-body">
-        <div class="formatted-actions">
-          <button type="button" title="編輯" @click="startEditFormatted">
-            <AppIcon name="pen" size="xs" />
-          </button>
-          <button type="button" title="轉為一般文字" @click="convertToText">
-            <AppIcon name="file-lines" size="xs" />
-          </button>
-        </div>
-        <CodeSnippet :code="content" />
-      </div>
-      <div v-else-if="isMarkdown && !editingFormatted" class="formatted-body">
-        <div class="formatted-actions">
-          <button type="button" title="編輯" @click="startEditFormatted">
-            <AppIcon name="pen" size="xs" />
-          </button>
-          <button type="button" title="轉為一般文字" @click="convertToText">
-            <AppIcon name="file-lines" size="xs" />
-          </button>
-        </div>
-        <MarkdownContent :content="content" />
-      </div>
-      <textarea
-        v-else
-        ref="textareaRef"
-        class="body-textarea"
-        :class="{ 'is-code': isCode }"
-        :value="draft"
-        rows="1"
+      <FormattedContentEditor
+        :content="content"
+        :content-type="contentType"
         placeholder="尚無內容"
-        @input="onInput"
-        @blur="commitDraft"
-        @paste="onPaste"
-        @contextmenu="onContextMenu"
+        @commit="commitContent"
+        @convert-to-text="convertToText"
+        @paste-image="onPasteImage"
       />
 
       <AttachmentList
@@ -309,8 +202,7 @@ function formatTag(type: ContentFormat): string | null {
 
   &:hover,
   &:focus-within {
-    .upload-btn,
-    .formatted-actions {
+    .upload-btn {
       opacity: 1;
       pointer-events: auto;
     }
@@ -407,90 +299,5 @@ function formatTag(type: ContentFormat): string | null {
 
 .body-area {
   min-width: 0;
-}
-
-.body-textarea {
-  display: block;
-  width: 100%;
-  box-sizing: border-box;
-  min-height: 0;
-  padding: 8px 10px;
-  border: 1px solid $border;
-  border-radius: $radius-sm;
-  background: $bg;
-  color: $text;
-  font-size: 13px;
-  line-height: 1.55;
-  font-family: inherit;
-  resize: none;
-  overflow: hidden;
-  field-sizing: content;
-
-  &::placeholder {
-    color: $text-muted;
-  }
-
-  &:hover {
-    border-color: #d1d5db;
-  }
-
-  &:focus {
-    outline: none;
-    border-color: $primary;
-    box-shadow: 0 0 0 2px $primary-light;
-    background: $surface;
-  }
-
-  &.is-code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 12px;
-    background: #1f2937;
-    color: #e5e7eb;
-    border-color: #374151;
-
-    &::placeholder {
-      color: #9ca3af;
-    }
-
-    &:focus {
-      border-color: $primary;
-      box-shadow: 0 0 0 2px $primary-light;
-    }
-  }
-}
-
-.formatted-body {
-  position: relative;
-  min-width: 0;
-}
-
-.formatted-actions {
-  position: absolute;
-  top: 0;
-  right: 0;
-  z-index: 1;
-  display: flex;
-  gap: 4px;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.12s ease;
-
-  button {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    color: $text-muted;
-    border: 1px solid $border;
-    background: rgba($surface, 0.95);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-
-    &:hover {
-      color: $primary;
-      border-color: $primary;
-    }
-  }
 }
 </style>

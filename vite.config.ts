@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig, type ProxyOptions } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
@@ -48,5 +49,9 @@ export default defineConfig({
   },
   preview: {
     proxy: twStockProxy,
+  },
+  test: {
+    environment: 'happy-dom',
+    include: ['tests/**/*.spec.ts'],
   },
 })

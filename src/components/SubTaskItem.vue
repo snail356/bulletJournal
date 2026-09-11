@@ -4,12 +4,10 @@ import type { Attachment, ContentFormat, SubTask } from "@/types";
 import AttachmentList from "./AttachmentList.vue";
 import AppIcon from "./AppIcon.vue";
 import DeleteIconButton from "./DeleteIconButton.vue";
-import CodeSnippet from "./CodeSnippet.vue";
-import MarkdownContent from "./MarkdownContent.vue";
 import InlineEditable from "./InlineEditable.vue";
+import FormattedContentEditor from "./FormattedContentEditor.vue";
 import { SUBTASK_DRAG_KEY } from "@/composables/taskDrag";
 import { useTaskStore } from "@/stores/taskStore";
-import { resolveContentType } from "@/utils/detectContentType";
 import {
   getSubtaskNoteExpanded,
   setSubtaskNoteExpanded,
@@ -34,20 +32,15 @@ const isDragOver = computed(
   () => subtaskDrag?.dragOverId.value === props.subtask.id,
 );
 const hasNote = computed(() => props.subtask.note.trim().length > 0);
-const isCodeNote = computed(() => props.subtask.noteContentType === "code");
-const isMarkdownNote = computed(
-  () => props.subtask.noteContentType === "markdown",
-);
 const editing = ref(false);
 const noteEditing = ref(false);
-const editingFormattedNote = ref(false);
 const hovered = ref(false);
 const noteExpanded = ref(
   getSubtaskNoteExpanded(props.subtask.id, hasNote.value),
 );
 const fileInput = ref<HTMLInputElement | null>(null);
 const titleRef = ref<InstanceType<typeof InlineEditable> | null>(null);
-const noteRef = ref<InstanceType<typeof InlineEditable> | null>(null);
+const noteRef = ref<InstanceType<typeof FormattedContentEditor> | null>(null);
 const subtaskEl = ref<HTMLElement | null>(null);
 
 watch(noteExpanded, (value) => {
@@ -88,32 +81,23 @@ function saveTitle(title: string) {
   store.updateSubTask(props.taskId, props.subtask.id, { title });
 }
 
-function saveNote(note: string) {
+function saveNote(note: string, noteContentType: ContentFormat) {
   store.updateSubTask(props.taskId, props.subtask.id, {
     note,
-    noteContentType: resolveContentType(note),
+    noteContentType,
   });
-  editingFormattedNote.value = false;
 }
 
 function convertNoteToText() {
   store.updateSubTask(props.taskId, props.subtask.id, {
     noteContentType: "text",
   });
-  editingFormattedNote.value = false;
-}
-
-async function startEditFormattedNote() {
-  noteExpanded.value = true;
-  editingFormattedNote.value = true;
-  await nextTick();
-  noteRef.value?.startEditing();
 }
 
 function toggleNote() {
   noteExpanded.value = !noteExpanded.value;
   if (noteExpanded.value && !hasNote.value) {
-    noteRef.value?.startEditing();
+    nextTick(() => noteRef.value?.startEditing());
   }
 }
 
@@ -123,18 +107,6 @@ function toggle() {
 
 function remove() {
   store.deleteSubTask(props.taskId, props.subtask.id);
-}
-
-function applyPastedNote(text: string) {
-  const noteContentType = resolveContentType(text);
-  if (noteContentType === "text") return;
-
-  noteExpanded.value = true;
-  editingFormattedNote.value = false;
-  store.updateSubTask(props.taskId, props.subtask.id, {
-    note: text.replace(/\n$/, ""),
-    noteContentType,
-  });
 }
 
 async function onPaste(e: ClipboardEvent) {
@@ -149,16 +121,6 @@ async function onPaste(e: ClipboardEvent) {
       return;
     }
   }
-
-  const text = e.clipboardData?.getData("text/plain") ?? "";
-  if (!text.trim()) return;
-
-  const noteContentType = resolveContentType(text);
-  if (noteContentType === "text") return;
-
-  e.preventDefault();
-  e.stopPropagation();
-  applyPastedNote(text);
 }
 
 function focusSubtask() {
@@ -169,7 +131,7 @@ function onSubtaskMouseDown(e: MouseEvent) {
   const target = e.target as HTMLElement | null;
   if (
     target?.closest(
-      ".inline-editable, [contenteditable], input, button, label, .drag-handle, a, .code-snippet, .markdown-content",
+      ".inline-editable, [contenteditable], textarea, input, button, label, .drag-handle, a, .code-snippet, .markdown-content, .formatted-content-editor",
     )
   ) {
     return;
@@ -179,6 +141,11 @@ function onSubtaskMouseDown(e: MouseEvent) {
 
 function triggerUpload() {
   fileInput.value?.click();
+}
+
+async function onPasteImage(file: File) {
+  noteExpanded.value = true;
+  await store.addAttachment("subtask", props.subtask.id, file);
 }
 
 async function onFileChange(e: Event) {
@@ -208,7 +175,7 @@ function formatTag(type: ContentFormat): string | null {
     @mouseenter="hovered = true"
     @mouseleave="hovered = false"
     @mousedown="onSubtaskMouseDown"
-    @paste.capture="onPaste"
+    @paste="onPaste"
     @contextmenu.stop
     @dragover="subtaskDrag?.onDragOver($event, subtask.id)"
     @drop="subtaskDrag?.onDrop($event, subtask.id)"
@@ -246,53 +213,23 @@ function formatTag(type: ContentFormat): string | null {
         @editing-change="editing = $event"
       />
 
-      <div v-if="noteExpanded" class="note-area">
-        <div
-          v-if="isCodeNote && !editingFormattedNote"
-          class="formatted-note"
-        >
-          <div class="formatted-note-actions">
-            <button type="button" title="編輯" @click="startEditFormattedNote">
-              <AppIcon name="pen" size="xs" />
-            </button>
-            <button type="button" title="轉為一般文字" @click="convertNoteToText">
-              <AppIcon name="file-lines" size="xs" />
-            </button>
-          </div>
-          <CodeSnippet :code="subtask.note" />
-        </div>
-        <div
-          v-else-if="isMarkdownNote && !editingFormattedNote"
-          class="formatted-note"
-        >
-          <div class="formatted-note-actions">
-            <button type="button" title="編輯" @click="startEditFormattedNote">
-              <AppIcon name="pen" size="xs" />
-            </button>
-            <button type="button" title="轉為一般文字" @click="convertNoteToText">
-              <AppIcon name="file-lines" size="xs" />
-            </button>
-          </div>
-          <MarkdownContent :content="subtask.note" />
-        </div>
-        <InlineEditable
-          v-else
+      <div
+        v-if="noteExpanded"
+        class="note-area"
+        :class="{ 'is-editing': noteEditing }"
+      >
+        <FormattedContentEditor
           ref="noteRef"
-          :model-value="subtask.note"
-          tag="p"
-          class="note"
-          :class="{ 'note-code': isCodeNote }"
-          multiline
-          hint
-          save-when-empty
+          :content="subtask.note"
+          :content-type="subtask.noteContentType"
           placeholder="新增備註…"
-          @save="saveNote"
-          @editing-change="
-            (v) => {
-              noteEditing = v;
-              if (!v) editingFormattedNote = false;
-            }
-          "
+          compact
+          preview-until-edit
+          borderless
+          @commit="saveNote"
+          @convert-to-text="convertNoteToText"
+          @paste-image="onPasteImage"
+          @editing-change="noteEditing = $event"
         />
       </div>
 
@@ -445,50 +382,26 @@ function formatTag(type: ContentFormat): string | null {
 }
 
 .note-area {
+  position: relative;
   margin-top: 4px;
   margin-right: -92px;
   padding: 6px 8px;
   border-left: 2px solid $border;
   background: rgba(0, 0, 0, 0.03);
   border-radius: 0 $radius-sm $radius-sm 0;
-}
+  overflow: visible;
 
-.note {
-  font-size: 12px;
-  line-height: 1.5;
-  white-space: pre-wrap;
-  color: $text-muted;
-
-  &.note-code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    color: $text;
-  }
-}
-
-.formatted-note {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.formatted-note-actions {
-  display: flex;
-  gap: 2px;
-  justify-content: flex-end;
-
-  button {
-    width: 24px;
-    height: 24px;
-    border-radius: 4px;
-    color: $text-muted;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &:hover {
-      color: $primary;
-      background: rgba(255, 255, 255, 0.8);
-    }
+  &.is-editing::before {
+    content: '';
+    position: absolute;
+    top: 6px;
+    left: -18px;
+    z-index: 2;
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+    background: no-repeat center / contain;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%237c3aed'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E");
   }
 }
 

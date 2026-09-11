@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, nextTick, provide, ref, watch } from 'vue'
-import type { Attachment, SubTask, Task } from '@/types'
+import type { Attachment, ContentFormat, SubTask, Task } from '@/types'
 import {
   formatDisplayDate,
   formatShortDate,
@@ -19,10 +19,10 @@ import TaskStatusDropdown from './TaskStatusDropdown.vue'
 import TaskAvatarDropdown from './TaskAvatarDropdown.vue'
 import TaskAvatarFace from './TaskAvatarFace.vue'
 import TaskLabelsDropdown from './TaskLabelsDropdown.vue'
-import QuickInputModal from './QuickInputModal.vue'
 import ConfirmDialog from './ConfirmDialog.vue'
 import AppIcon from './AppIcon.vue'
 import InlineEditable from './InlineEditable.vue'
+import FormattedContentEditor from './FormattedContentEditor.vue'
 import { SUBTASK_DRAG_KEY, TASK_DRAG_KEY } from '@/composables/taskDrag'
 import { useReorderDrag } from '@/composables/useReorderDrag'
 import { useTaskStore } from '@/stores/taskStore'
@@ -59,9 +59,9 @@ const menuVisible = ref(false)
 const menuX = ref(0)
 const menuY = ref(0)
 const showEditModal = ref(false)
-const showNoteModal = ref(false)
 const showCompleteConfirm = ref(false)
 const pendingFocusSubtaskId = ref<string | null>(null)
+const pendingFocusNoteId = ref<string | null>(null)
 const datePickerMode = ref<'start' | 'end' | 'move' | null>(null)
 const datePickerValue = ref('')
 const datePickerInput = ref<HTMLInputElement | null>(null)
@@ -263,9 +263,27 @@ function addSubtaskInline() {
   }
 }
 
-function saveEmptyNote(content: string) {
-  store.createNote(props.task.id, content)
+function addNoteInline() {
   notesExpanded.value = true
+  const note = store.createNote(props.task.id, '')
+  if (!note) return
+  pendingFocusNoteId.value = note.id
+  nextTick(() => {
+    pendingFocusNoteId.value = null
+  })
+}
+
+function onComposerCommit(content: string, contentType: ContentFormat) {
+  if (!content.trim()) return
+  store.createNote(props.task.id, content, 'purple', contentType)
+  notesExpanded.value = true
+}
+
+async function onComposerPasteImage(file: File) {
+  const note = store.createNote(props.task.id, '')
+  if (!note) return
+  notesExpanded.value = true
+  await store.addAttachment('note', note.id, file)
 }
 
 function onCompleteChange(e: Event) {
@@ -295,8 +313,7 @@ function onMenuSelect(key: string) {
       addSubtaskInline()
       break
     case 'add-note':
-      notesExpanded.value = true
-      showNoteModal.value = true
+      addNoteInline()
       break
     case 'paste-image':
       onContextPaste()
@@ -395,10 +412,6 @@ function onLabelsChange(labels: string[]) {
   store.updateTask(props.task.id, { labels })
 }
 
-function addNote(content: string) {
-  store.createNote(props.task.id, content)
-  notesExpanded.value = true
-}
 
 async function onPaste(e: ClipboardEvent) {
   const target = e.target as HTMLElement
@@ -670,7 +683,7 @@ async function onContextPaste() {
               </span>
             </p>
           </button>
-          <button type="button" class="add-btn" @click="showNoteModal = true">
+          <button type="button" class="add-btn" @click="addNoteInline">
             + 新增
           </button>
         </div>
@@ -687,17 +700,20 @@ async function onContextPaste() {
             :key="note.id"
             :note="note"
             :task-id="task.id"
+            :autofocus="pendingFocusNoteId === note.id"
             @preview="emit('preview', $event)"
           />
-          <InlineEditable
-            v-if="!task.notes.length"
-            model-value=""
-            tag="p"
-            class="empty-hint"
-            hint
-            placeholder="尚無備註"
-            @save="saveEmptyNote"
-          />
+          <div v-if="!task.notes.length" class="note-composer">
+            <FormattedContentEditor
+              content=""
+              content-type="text"
+              placeholder="輸入備註或目前進度…"
+              borderless
+              :show-formatted-actions="false"
+              @commit="onComposerCommit"
+              @paste-image="onComposerPasteImage"
+            />
+          </div>
         </template>
       </div>
     </div>
@@ -727,15 +743,6 @@ async function onContextPaste() {
       cancel-label="否"
       @confirm="confirmCompleteWithSubtasks"
       @close="showCompleteConfirm = false"
-    />
-
-    <QuickInputModal
-      :visible="showNoteModal"
-      title="新增備註"
-      placeholder="輸入備註或目前進度..."
-      multiline
-      @confirm="addNote"
-      @close="showNoteModal = false"
     />
 
     <input ref="fileInput" type="file" accept="image/*" hidden @change="onFileChange" />
@@ -1181,9 +1188,8 @@ async function onContextPaste() {
   }
 }
 
-.empty-hint {
-  font-size: 12px;
-  padding: 4px 0;
+.note-composer {
+  margin-top: 8px;
 }
 
 @media (max-width: $breakpoint-sm) {

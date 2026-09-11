@@ -3,11 +3,9 @@ import { computed, nextTick, ref, watch } from 'vue'
 import type { Attachment, ContentFormat, Note } from '@/types'
 import AttachmentList from './AttachmentList.vue'
 import ColorDotPicker from './ColorDotPicker.vue'
-import CodeSnippet from './CodeSnippet.vue'
-import MarkdownContent from './MarkdownContent.vue'
 import AppIcon from './AppIcon.vue'
 import DeleteIconButton from './DeleteIconButton.vue'
-import InlineEditable from './InlineEditable.vue'
+import FormattedContentEditor from './FormattedContentEditor.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { resolveContentType } from '@/utils/detectContentType'
 import { NOTE_COLOR_BG, NOTE_COLOR_DOT, NOTE_COLOR_OPTIONS } from '@/utils/noteColors'
@@ -16,6 +14,7 @@ import { getNoteCollapsed, setNoteCollapsed } from '@/utils/sectionCollapseState
 const props = defineProps<{
   note: Note
   taskId: string
+  autofocus?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -24,12 +23,14 @@ const emit = defineEmits<{
 
 const store = useTaskStore()
 const fileInput = ref<HTMLInputElement | null>(null)
-const contentRef = ref<InstanceType<typeof InlineEditable> | null>(null)
-const editingFormatted = ref(false)
+const editorRef = ref<InstanceType<typeof FormattedContentEditor> | null>(null)
+const noteEl = ref<HTMLElement | null>(null)
+const keepAlive = ref(false)
+const editing = ref(false)
 
-const isCode = computed(() => props.note.contentType === 'code')
-const isMarkdown = computed(() => props.note.contentType === 'markdown')
-const isFormatted = computed(() => isCode.value || isMarkdown.value)
+const isFormatted = computed(
+  () => props.note.contentType === 'code' || props.note.contentType === 'markdown',
+)
 
 function shouldStartCollapsed(content: string): boolean {
   const trimmed = content.trim()
@@ -55,18 +56,39 @@ watch(
   },
 )
 
+watch(
+  () => props.autofocus,
+  (value) => {
+    if (!value) return
+    collapsed.value = false
+    nextTick(() => editorRef.value?.startEditing())
+  },
+  { immediate: true },
+)
+
 const oneLinePreview = computed(() => {
   const text = props.note.content.trim().replace(/\s+/g, ' ')
   if (!text) return '（空白備註）'
   return text.length > 72 ? `${text.slice(0, 72)}…` : text
 })
 
-function saveContent(content: string) {
-  store.updateNote(props.taskId, props.note.id, {
-    content,
-    contentType: resolveContentType(content),
-  })
-  editingFormatted.value = false
+function saveContent(content: string, contentType: ContentFormat) {
+  if (!content.trim() && !props.note.attachments.length) {
+    const pointerKeep = keepAlive.value
+    nextTick(() => {
+      if (pointerKeep || noteEl.value?.contains(document.activeElement)) {
+        store.updateNote(props.taskId, props.note.id, {
+          content: '',
+          contentType: 'text',
+        })
+        return
+      }
+      store.deleteNote(props.taskId, props.note.id)
+    })
+    return
+  }
+
+  store.updateNote(props.taskId, props.note.id, { content, contentType })
   collapsed.value = shouldStartCollapsed(content)
 }
 
@@ -80,7 +102,6 @@ function setColor(color: string) {
 
 function convertToText() {
   store.updateNote(props.taskId, props.note.id, { contentType: 'text' })
-  editingFormatted.value = false
 }
 
 function toggleCollapsed() {
@@ -89,38 +110,33 @@ function toggleCollapsed() {
 
 async function startEditing() {
   collapsed.value = false
-  if (isFormatted.value) {
-    editingFormatted.value = true
-    await nextTick()
-  }
-  contentRef.value?.startEditing()
+  await nextTick()
+  editorRef.value?.startEditing()
 }
 
-function applyPastedContent(text: string) {
-  const contentType = resolveContentType(text)
-  if (contentType === 'text') return
-
-  store.updateNote(props.taskId, props.note.id, {
-    content: text.replace(/\n$/, ''),
-    contentType,
+function onNotePointerDown() {
+  keepAlive.value = true
+  requestAnimationFrame(() => {
+    keepAlive.value = false
   })
-  editingFormatted.value = false
-  collapsed.value = shouldStartCollapsed(text)
 }
 
 async function onPaste(e: ClipboardEvent) {
   const items = e.clipboardData?.items
-  if (!items) return
-
-  for (const item of items) {
-    if (item.type.startsWith('image/')) {
-      e.preventDefault()
-      e.stopPropagation()
-      const file = item.getAsFile()
-      if (file) await store.addAttachment('note', props.note.id, file)
-      return
+  if (items) {
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault()
+        e.stopPropagation()
+        collapsed.value = false
+        const file = item.getAsFile()
+        if (file) await store.addAttachment('note', props.note.id, file)
+        return
+      }
     }
   }
+
+  if (!collapsed.value) return
 
   const text = e.clipboardData?.getData('text/plain') ?? ''
   if (!text.trim()) return
@@ -130,7 +146,11 @@ async function onPaste(e: ClipboardEvent) {
 
   e.preventDefault()
   e.stopPropagation()
-  applyPastedContent(text)
+  store.updateNote(props.taskId, props.note.id, {
+    content: text.replace(/\n$/, ''),
+    contentType,
+  })
+  collapsed.value = shouldStartCollapsed(text)
 }
 
 function triggerUpload() {
@@ -144,6 +164,11 @@ async function onFileChange(e: Event) {
   input.value = ''
 }
 
+async function onPasteImage(file: File) {
+  collapsed.value = false
+  await store.addAttachment('note', props.note.id, file)
+}
+
 function formatTag(type: ContentFormat): string | null {
   if (type === 'code') return 'code'
   if (type === 'markdown') return 'md'
@@ -153,15 +178,18 @@ function formatTag(type: ContentFormat): string | null {
 
 <template>
   <div
+    ref="noteEl"
     class="note"
     :class="{
-      'is-formatted': isFormatted && !editingFormatted && !collapsed,
+      'is-formatted': isFormatted && !collapsed,
       collapsed,
+      'is-editing': editing,
     }"
     :style="{
       background: NOTE_COLOR_BG[note.color],
       borderColor: NOTE_COLOR_DOT[note.color],
     }"
+    @pointerdown="onNotePointerDown"
     @paste="onPaste"
     @contextmenu.stop
   >
@@ -219,21 +247,18 @@ function formatTag(type: ContentFormat): string | null {
       <span class="preview-text">{{ oneLinePreview }}</span>
     </button>
     <template v-else>
-      <CodeSnippet v-if="isCode && !editingFormatted" :code="note.content" />
-      <MarkdownContent
-        v-else-if="isMarkdown && !editingFormatted"
+      <FormattedContentEditor
+        ref="editorRef"
         :content="note.content"
-      />
-      <InlineEditable
-        v-else
-        ref="contentRef"
-        :model-value="note.content"
-        tag="p"
-        class="content"
-        :class="{ 'content-code': isCode }"
-        multiline
-        @save="saveContent"
-        @editing-change="(v) => { if (!v) editingFormatted = false }"
+        :content-type="note.contentType"
+        placeholder="輸入備註或目前進度…"
+        preview-until-edit
+        borderless
+        :show-formatted-actions="false"
+        @commit="saveContent"
+        @convert-to-text="convertToText"
+        @paste-image="onPasteImage"
+        @editing-change="editing = $event"
       />
 
       <AttachmentList
@@ -252,10 +277,10 @@ function formatTag(type: ContentFormat): string | null {
 .note {
   position: relative;
   padding: 12px;
-  padding-right: 160px;
   border-radius: $radius-sm;
   border-left: 3px solid;
   margin-top: 8px;
+  overflow: visible;
 
   &:hover .actions,
   .actions:focus-within {
@@ -266,6 +291,19 @@ function formatTag(type: ContentFormat): string | null {
   &.collapsed {
     padding-top: 8px;
     padding-bottom: 8px;
+  }
+
+  &.is-editing::before {
+    content: '';
+    position: absolute;
+    top: 12px;
+    left: -20px;
+    z-index: 2;
+    width: 12px;
+    height: 12px;
+    pointer-events: none;
+    background: no-repeat center / contain;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%237c3aed'%3E%3Cpath d='M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z'/%3E%3C/svg%3E");
   }
 }
 
@@ -304,17 +342,6 @@ function formatTag(type: ContentFormat): string | null {
   background: #1f2937;
 }
 
-.content {
-  font-size: 13px;
-  white-space: pre-wrap;
-  line-height: 1.6;
-
-  &.content-code {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 12px;
-  }
-}
-
 .actions-anchor {
   position: sticky;
   top: 8px;
@@ -325,7 +352,7 @@ function formatTag(type: ContentFormat): string | null {
 .actions {
   position: absolute;
   top: -4px;
-  right: -152px;
+  right: 0;
   display: flex;
   gap: 2px;
   align-items: center;
@@ -354,11 +381,15 @@ function formatTag(type: ContentFormat): string | null {
 
 @media (max-width: $breakpoint-sm) {
   .note {
-    padding-right: 12px;
     padding-top: 44px;
 
     &.collapsed {
       padding-top: 44px;
+    }
+
+    &.is-editing::before {
+      top: -16px;
+      left: 8px;
     }
   }
 
