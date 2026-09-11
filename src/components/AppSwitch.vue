@@ -38,6 +38,7 @@ function onToggle() {
   gap: 8px;
   cursor: pointer;
   user-select: none;
+  touch-action: manipulation;
 
   &.disabled {
     cursor: not-allowed;

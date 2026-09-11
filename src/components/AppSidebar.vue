@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import MiniCalendar from "./MiniCalendar.vue";
 import SidebarCarousel from "./SidebarCarousel.vue";
 import TodayProgress from "./TodayProgress.vue";
@@ -9,6 +9,7 @@ import { useTaskStore } from "@/stores/taskStore";
 import { todayString } from "@/utils/date";
 
 const route = useRoute();
+const router = useRouter();
 const store = useTaskStore();
 const menuOpen = ref(false);
 
@@ -33,11 +34,13 @@ function toggleMenu() {
   menuOpen.value = !menuOpen.value;
 }
 
-function onNavClick(path: string) {
+function goTo(path: string) {
   closeMenu();
   if (path === "/today") {
     store.setSelectedDate(todayString());
   }
+  if (route.path === path) return;
+  void router.push(path);
 }
 
 function openMigrationReview() {
@@ -130,19 +133,19 @@ function onResize() {
             <AppIcon name="xmark" />
           </button>
         </div>
-        <RouterLink
+        <a
           v-for="item in navItems"
           :key="item.path"
-          :to="item.path"
+          :href="item.path"
           class="nav-item"
           :class="{ active: isActive(item.path) }"
-          @click="onNavClick(item.path)"
+          @click.prevent="goTo(item.path)"
         >
           <span class="nav-icon">
             <AppIcon :name="item.icon" />
           </span>
           {{ item.label }}
-        </RouterLink>
+        </a>
         <button
           v-if="store.overdueTaskCount > 0"
           type="button"
@@ -188,7 +191,7 @@ function onResize() {
 .sidebar {
   width: $sidebar-width;
   min-width: $sidebar-width;
-  height: 100vh;
+  height: 100%;
   background: $surface;
   border-right: 1px solid $border;
   display: flex;

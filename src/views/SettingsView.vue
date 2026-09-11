@@ -307,9 +307,14 @@ activeTab.value = tabFromQuery()
 watch(activeTab, (tab) => {
   const current = typeof route.query.tab === 'string' ? route.query.tab : 'features'
   if (current === tab) return
-  void router.replace({
-    query: tab === 'features' ? { ...route.query, tab: undefined } : { ...route.query, tab },
-  })
+  void router
+    .replace({
+      path: route.path,
+      query: tab === 'features' ? { ...route.query, tab: undefined } : { ...route.query, tab },
+    })
+    .catch(() => {
+      // 獨立視窗重複導航時略過
+    })
 })
 
 watch(
