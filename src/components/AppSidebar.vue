@@ -40,7 +40,9 @@ function goTo(path: string) {
     store.setSelectedDate(todayString());
   }
   if (route.path === path) return;
-  void router.push(path);
+  void router.push(path).catch(() => {
+    // 獨立視窗重複導航時略過
+  });
 }
 
 function openMigrationReview() {
@@ -133,19 +135,19 @@ function onResize() {
             <AppIcon name="xmark" />
           </button>
         </div>
-        <a
+        <button
           v-for="item in navItems"
           :key="item.path"
-          :href="item.path"
+          type="button"
           class="nav-item"
           :class="{ active: isActive(item.path) }"
-          @click.prevent="goTo(item.path)"
+          @click="goTo(item.path)"
         >
           <span class="nav-icon">
             <AppIcon :name="item.icon" />
           </span>
           {{ item.label }}
-        </a>
+        </button>
         <button
           v-if="store.overdueTaskCount > 0"
           type="button"
@@ -258,10 +260,13 @@ function onResize() {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: 100%;
   padding: 10px 12px;
   border-radius: $radius-sm;
   color: $text-muted;
+  font-size: inherit;
   font-weight: 500;
+  text-align: left;
   transition: all 0.15s;
 
   &:hover {

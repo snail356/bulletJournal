@@ -16,17 +16,22 @@ function onToggle() {
 </script>
 
 <template>
-  <label
+  <button
+    type="button"
     class="app-switch"
+    role="switch"
     :class="{ disabled }"
+    :aria-checked="modelValue ? 'true' : 'false'"
     :aria-disabled="disabled ? 'true' : undefined"
-    @click.prevent="onToggle"
+    :disabled="disabled"
+    @click.stop="onToggle"
+    @pointerdown.stop
   >
-    <span class="track" :class="{ on: modelValue }">
+    <span class="track" :class="{ on: modelValue }" aria-hidden="true">
       <span class="thumb" />
     </span>
     <span v-if="label" class="label">{{ label }}</span>
-  </label>
+  </button>
 </template>
 
 <style scoped lang="scss">
@@ -36,11 +41,19 @@ function onToggle() {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  flex-shrink: 0;
+  padding: 4px;
+  margin: -4px;
   cursor: pointer;
   user-select: none;
   touch-action: manipulation;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
 
-  &.disabled {
+  &.disabled,
+  &:disabled {
     cursor: not-allowed;
     opacity: 0.55;
   }
