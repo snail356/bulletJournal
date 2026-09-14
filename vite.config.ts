@@ -2,6 +2,7 @@
 import { defineConfig, type ProxyOptions } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { fileURLToPath, URL } from 'node:url'
+import { backlogProxyPlugin } from './backlogProxy'
 
 const twseWwwHeaders: ProxyOptions['configure'] = (proxy) => {
   proxy.on('proxyReq', (proxyReq) => {
@@ -38,7 +39,7 @@ const twStockProxy: Record<string, ProxyOptions> = {
 export default defineConfig({
   // GitHub Pages 專案站台路徑為 /bulletJournal/；本地開發仍用根路徑
   base: process.env.GITHUB_ACTIONS ? '/bulletJournal/' : '/',
-  plugins: [vue()],
+  plugins: [vue(), backlogProxyPlugin()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

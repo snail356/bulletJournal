@@ -69,6 +69,12 @@ const router = createRouter({
       meta: { title: '小股力', navFeature: 'xiaoguli' },
     },
     {
+      path: '/backlog',
+      name: 'backlog',
+      component: () => import('@/views/BacklogImportView.vue'),
+      meta: { title: 'Backlog', navFeature: 'backlog' },
+    },
+    {
       path: '/settings',
       name: 'settings',
       component: () => import('@/views/SettingsView.vue'),

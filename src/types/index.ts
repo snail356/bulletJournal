@@ -139,6 +139,12 @@ export interface Task {
   attachments: Attachment[];
   labels: string[];
   migrationHistory: MigrationRecord[];
+  /** Backlog issue 數字 id；非匯入任務為 null */
+  backlogIssueId: number | null;
+  /** Backlog issue key，如 PROJ-123 */
+  backlogIssueKey: string | null;
+  /** 點標題開啟的 Backlog 頁面網址 */
+  backlogUrl: string | null;
   createdAt: string;
   updatedAt: string;
 }

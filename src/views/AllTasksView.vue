@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import type { TaskStatus } from '@/types'
+import type { Task, TaskStatus } from '@/types'
 import { useTaskStore } from '@/stores/taskStore'
 import AppIcon from '@/components/AppIcon.vue'
 import { getTaskDuration, getTaskEndDate } from '@/utils/date'
+import { openBacklogUrl } from '@/utils/backlog'
 
 const store = useTaskStore()
 const router = useRouter()
@@ -14,6 +15,14 @@ const tasks = computed(() => store.getAllTasksFiltered(filter.value))
 
 function goDetail(id: string) {
   router.push(`/tasks/${id}`)
+}
+
+function onTitleClick(task: Task) {
+  if (task.backlogUrl) {
+    openBacklogUrl(task.backlogUrl)
+    return
+  }
+  goDetail(task.id)
 }
 </script>
 
@@ -69,7 +78,15 @@ function goDetail(id: string) {
             class="row"
             @click="goDetail(task.id)"
           >
-            <td class="title">{{ task.title }}</td>
+            <td class="title" @click.stop="onTitleClick(task)">
+              <span>{{ task.title }}</span>
+              <AppIcon
+                v-if="task.backlogUrl"
+                name="up-right-from-square"
+                size="xs"
+                class="backlog-link-icon"
+              />
+            </td>
             <td>{{ task.date }}</td>
             <td>{{ getTaskEndDate(task) }}</td>
             <td>{{ getTaskDuration(task) }}</td>
@@ -185,7 +202,16 @@ td {
 
   .title {
     font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
+}
+
+.backlog-link-icon {
+  flex-shrink: 0;
+  color: $primary;
+  opacity: 0.7;
 }
 
 .status-tag {

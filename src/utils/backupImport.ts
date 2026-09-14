@@ -515,6 +515,9 @@ function parseTaskMarkdown(
       .map((name) => labelsByName.get(name)?.id)
       .filter((labelId): labelId is string => Boolean(labelId)),
     migrationHistory: parseMigrations(sections["遷移紀錄"] ?? ""),
+    backlogIssueId: null,
+    backlogIssueKey: null,
+    backlogUrl: null,
     createdAt,
     updatedAt,
   };

@@ -33,6 +33,7 @@ import {
 import { todayString } from '@/utils/date'
 import { getGeminiModel, hasGeminiApiKey } from '@/utils/gemini'
 import { useSimpleReorderDrag } from '@/composables/useReorderDrag'
+import BacklogSettingsPanel from '@/components/BacklogSettingsPanel.vue'
 import { type NavFeatureId } from '@/utils/navFeatures'
 
 const store = useTaskStore()
@@ -291,6 +292,7 @@ const settingsTabs: AppTabItem[] = [
   { id: 'carousel', label: '側邊圖片', icon: 'image' },
   { id: 'data', label: '資料管理', icon: 'copy' },
   { id: 'ai', label: 'AI 設定', icon: 'file-lines' },
+  { id: 'backlog', label: 'Backlog', icon: 'clipboard-list' },
   { id: 'about', label: '關於', icon: 'book' },
 ]
 const settingsTabIds = new Set(settingsTabs.map((tab) => tab.id))
@@ -612,6 +614,13 @@ onUnmounted(() => {
               最近錯誤：{{ store.geminiUsage.lastError }}
             </li>
           </ul>
+        </div>
+      </template>
+
+      <template #backlog>
+        <div class="settings-card">
+          <h2>Backlog 串接</h2>
+          <BacklogSettingsPanel />
         </div>
       </template>
 

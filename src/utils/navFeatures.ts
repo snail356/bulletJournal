@@ -8,6 +8,7 @@ export type NavFeatureId =
   | 'reflections'
   | 'stats'
   | 'xiaoguli'
+  | 'backlog'
   | 'settings'
 
 export type NavFeatureVisibility = Record<NavFeatureId, boolean>
@@ -75,6 +76,13 @@ export const NAV_FEATURES: NavFeature[] = [
     icon: 'chart-line',
   },
   {
+    id: 'backlog',
+    path: '/backlog',
+    label: 'Backlog',
+    description: '串接 Backlog，批次將指派給自己的任務匯入為主任務',
+    icon: 'clipboard-list',
+  },
+  {
     id: 'settings',
     path: '/settings',
     label: '設定',
@@ -92,6 +100,7 @@ export const defaultNavFeatureVisibility: NavFeatureVisibility = {
   reflections: false,
   stats: false,
   xiaoguli: true,
+  backlog: false,
   settings: true,
 }
 

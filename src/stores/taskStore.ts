@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import type {
   Attachment,
   AttachmentOwnerType,
+  ContentFormat,
   DailyReflection,
   DailyReflectionInput,
   GeminiUsageState,
@@ -112,6 +113,13 @@ import {
   type NavFeatureId,
   type NavFeatureVisibility,
 } from "@/utils/navFeatures";
+import {
+  getConfiguredSpace,
+  mapBacklogIssueToCreatePayload,
+  normalizeBacklogLink,
+  partitionBacklogIssues,
+  type BacklogIssue,
+} from "@/utils/backlog";
 
 function cloneTask(task: Task): Task {
   return JSON.parse(JSON.stringify(task)) as Task;
@@ -132,7 +140,7 @@ function normalizeNote(note: Note): Note {
   };
 }
 
-function normalizeTask(task: Task & { carriedFromDate?: string; difficultyNote?: string }): Task {
+export function normalizeTask(task: Task & { carriedFromDate?: string; difficultyNote?: string }): Task {
   const migrationHistory = task.migrationHistory ?? [];
   if (task.carriedFromDate && !migrationHistory.length) {
     migrationHistory.push({
@@ -152,6 +160,7 @@ function normalizeTask(task: Task & { carriedFromDate?: string; difficultyNote?:
     subtasks: task.subtasks.map(normalizeSubTask),
     notes: (task.notes ?? []).map(normalizeNote),
     avatarId: task.avatarId ?? null,
+    ...normalizeBacklogLink(task),
   };
 }
 
@@ -322,6 +331,13 @@ export const useTaskStore = defineStore("task", () => {
   const orderedNavFeatures = computed(() =>
     getOrderedNavFeatures(navFeatureOrder.value),
   );
+  const importedBacklogIssueIds = computed(() => {
+    const ids = new Set<number>();
+    for (const task of tasks.value) {
+      if (task.backlogIssueId != null) ids.add(task.backlogIssueId);
+    }
+    return ids;
+  });
   const taskAvatars = ref<TaskAvatar[]>([...DEFAULT_TASK_AVATARS]);
   const sidebarCarousel = ref<SidebarCarouselState>({
     ...defaultSidebarCarouselState,
@@ -946,6 +962,11 @@ export const useTaskStore = defineStore("task", () => {
     labels?: string[];
     endDate?: string | null;
     avatarId?: string | null;
+    bodyContent?: string;
+    bodyContentType?: ContentFormat;
+    backlogIssueId?: number | null;
+    backlogIssueKey?: string | null;
+    backlogUrl?: string | null;
   }): Task {
     const now = new Date().toISOString();
     const status = payload.status ?? getDefaultStatusId();
@@ -956,8 +977,8 @@ export const useTaskStore = defineStore("task", () => {
       title: payload.title,
       status,
       statusHours: null,
-      bodyContent: "",
-      bodyContentType: "text",
+      bodyContent: payload.bodyContent ?? "",
+      bodyContentType: payload.bodyContentType ?? "text",
       completed: isCompletedStatus(status),
       subtasks: [],
       notes: [],
@@ -965,11 +986,32 @@ export const useTaskStore = defineStore("task", () => {
       labels: payload.labels ?? [],
       avatarId: payload.avatarId ?? null,
       migrationHistory: [],
+      ...normalizeBacklogLink(payload),
       createdAt: now,
       updatedAt: now,
     };
     tasks.value.unshift(task);
     return task;
+  }
+
+  function importBacklogIssues(issues: BacklogIssue[]): {
+    created: number;
+    skipped: number;
+  } {
+    const space = getConfiguredSpace();
+    if (!space) return { created: 0, skipped: issues.length };
+    const { fresh, skipped } = partitionBacklogIssues(
+      issues,
+      importedBacklogIssueIds.value,
+    );
+    for (const issue of fresh) {
+      createTask(mapBacklogIssueToCreatePayload(issue, selectedDate.value, space.origin));
+    }
+    return { created: fresh.length, skipped: skipped.length };
+  }
+
+  function isBacklogIssueImported(issueId: number): boolean {
+    return importedBacklogIssueIds.value.has(issueId);
   }
 
   function updateTask(id: string, payload: Partial<Omit<Task, "id">>) {
@@ -1070,6 +1112,9 @@ export const useTaskStore = defineStore("task", () => {
       ownerId: newId,
       ownerType: "task" as const,
     }));
+    copy.backlogIssueId = null;
+    copy.backlogIssueKey = null;
+    copy.backlogUrl = null;
     tasks.value.push(copy);
     return copy;
   }
@@ -2135,6 +2180,7 @@ export const useTaskStore = defineStore("task", () => {
     navFeatureVisibility,
     navFeatureOrder,
     orderedNavFeatures,
+    importedBacklogIssueIds,
     taskAvatars,
     sidebarCarousel,
     firstEnabledNavPath,
@@ -2166,6 +2212,8 @@ export const useTaskStore = defineStore("task", () => {
     tasksForSelectedDate,
     todayProgress,
     createTask,
+    importBacklogIssues,
+    isBacklogIssueImported,
     updateTask,
     setTaskDateRange,
     deleteTask,

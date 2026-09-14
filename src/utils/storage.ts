@@ -15,6 +15,7 @@ const NAV_FEATURE_ORDER_KEY = "bullet-journal-nav-feature-order";
 const AURORA_MODE_KEY = "bullet-journal-aurora-mode";
 const FLOATING_SPHERE_POSITION_KEY = "bullet-journal-floating-sphere-position";
 const BACKUP_PREFS_KEY = "bullet-journal-backup-prefs";
+const BACKLOG_PREFS_KEY = "bullet-journal-backlog-prefs";
 const STORAGE_BACKEND_KEY = "bullet-journal-storage-backend";
 
 const LEGACY_LOCAL_DATA_KEYS = [
@@ -99,6 +100,7 @@ export {
   AURORA_MODE_KEY,
   FLOATING_SPHERE_POSITION_KEY,
   BACKUP_PREFS_KEY,
+  BACKLOG_PREFS_KEY,
   STORAGE_BACKEND_KEY,
   defaultMigrationReviewState,
   defaultReflectionPromptState,

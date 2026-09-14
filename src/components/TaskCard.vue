@@ -26,6 +26,7 @@ import FormattedContentEditor from './FormattedContentEditor.vue'
 import { SUBTASK_DRAG_KEY, TASK_DRAG_KEY } from '@/composables/taskDrag'
 import { useReorderDrag } from '@/composables/useReorderDrag'
 import { useTaskStore } from '@/stores/taskStore'
+import { openBacklogUrl } from '@/utils/backlog'
 import { getNotesExpanded, setNotesExpanded } from '@/utils/sectionCollapseState'
 import {
   getSubtasksExpanded,
@@ -48,6 +49,7 @@ const taskDrag = inject(TASK_DRAG_KEY, null)
 const isTaskDragging = computed(() => taskDrag?.draggingId.value === props.task.id)
 const isTaskDragOver = computed(() => taskDrag?.dragOverId.value === props.task.id)
 const avatar = computed(() => store.getTaskAvatar(props.task.avatarId))
+const isBacklogLinked = computed(() => Boolean(props.task.backlogUrl))
 
 const subtaskDrag = useReorderDrag<SubTask>(
   () => props.task.subtasks,
@@ -206,6 +208,12 @@ function onStatusHoursClick(e: MouseEvent) {
 function goToCurrentDate() {
   if (!isMigrated.value) return
   store.setSelectedDate(props.task.date)
+}
+
+function openLinkedBacklog(e: MouseEvent) {
+  e.preventDefault()
+  e.stopPropagation()
+  if (props.task.backlogUrl) openBacklogUrl(props.task.backlogUrl)
 }
 
 const menuItems = computed<ContextMenuItem[]>(() => [
@@ -500,7 +508,17 @@ async function onContextPaste() {
         <span v-else-if="avatar" class="task-avatar" :title="avatar.name">
           <TaskAvatarFace :avatar="avatar" size="sm" />
         </span>
-        <h3 v-if="isMigrated" class="title">{{ task.title }}</h3>
+        <h3 v-if="isMigrated && !isBacklogLinked" class="title">{{ task.title }}</h3>
+        <button
+          v-else-if="isBacklogLinked"
+          type="button"
+          class="title title-backlog"
+          :title="`在 Backlog 開啟 ${task.backlogIssueKey || task.title}`"
+          @click.stop="openLinkedBacklog"
+        >
+          <span class="title-text">{{ task.title }}</span>
+          <AppIcon name="up-right-from-square" size="xs" class="backlog-link-icon" />
+        </button>
         <InlineEditable
           v-else
           :model-value="task.title"
@@ -904,6 +922,41 @@ async function onContextPaste() {
   min-width: 0;
   flex: 1;
   line-height: 20px;
+}
+
+.title-backlog {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+
+  .title-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &:hover {
+    color: $primary;
+
+    .backlog-link-icon {
+      opacity: 1;
+    }
+  }
+}
+
+.backlog-link-icon {
+  flex-shrink: 0;
+  opacity: 0.55;
+  color: $primary;
 }
 
 .meta-primary {

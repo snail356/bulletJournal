@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, provide, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import type { Attachment, Task } from '@/types'
 import TaskCard from '@/components/TaskCard.vue'
 import TaskFormModal from '@/components/TaskFormModal.vue'
@@ -12,8 +13,10 @@ import { TASK_DRAG_KEY } from '@/composables/taskDrag'
 import { useReorderDrag } from '@/composables/useReorderDrag'
 import { useTaskStore } from '@/stores/taskStore'
 import { formatDisplayDate } from '@/utils/date'
+import { hasBacklogCredentials } from '@/utils/backlog'
 
 const store = useTaskStore()
+const router = useRouter()
 const showCreateModal = ref(false)
 const previewAttachment = ref<Attachment | null>(null)
 const toastVisible = ref(false)
@@ -65,6 +68,15 @@ function undoDelete() {
     deletedTaskBackup.value = null
   }
 }
+
+function openBacklogImport() {
+  if (!hasBacklogCredentials()) {
+    void router.push({ path: '/settings', query: { tab: 'backlog' } })
+    return
+  }
+  store.setNavFeatureEnabled('backlog', true)
+  void router.push('/backlog')
+}
 </script>
 
 <template>
@@ -96,6 +108,9 @@ function undoDelete() {
         >
           {{ journalButtonLabel }}
         </button>
+        <button type="button" class="btn-secondary" @click="openBacklogImport">
+          從 Backlog 匯入
+        </button>
         <button type="button" class="btn-primary" @click="showCreateModal = true">
           + 新增任務
         </button>
@@ -116,9 +131,14 @@ function undoDelete() {
     <div v-else class="empty">
       <AppIcon name="clipboard-list" size="lg" class="empty-icon" />
       <p>今天還沒有任務</p>
-      <button type="button" class="btn-primary" @click="showCreateModal = true">
-        建立第一個任務
-      </button>
+      <div class="empty-actions">
+        <button type="button" class="btn-secondary" @click="openBacklogImport">
+          從 Backlog 匯入
+        </button>
+        <button type="button" class="btn-primary" @click="showCreateModal = true">
+          建立第一個任務
+        </button>
+      </div>
     </div>
 
     <TaskFormModal
@@ -178,6 +198,7 @@ function undoDelete() {
   align-items: center;
   gap: 12px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .btn-primary {
@@ -240,6 +261,13 @@ function undoDelete() {
     color: $text-muted;
     margin-bottom: 16px;
   }
+}
+
+.empty-actions {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 @media (max-width: $breakpoint-md) {
