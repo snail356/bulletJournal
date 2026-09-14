@@ -40,10 +40,21 @@ export const BACKLOG_ALLOWED_PROJECTS = [
   'NUP',
 ] as const
 
+/** 不列入 milestone 篩選的專案（比對 name 或 projectKey，不分大小寫） */
+export const BACKLOG_EXCLUDED_MILESTONE_PROJECTS = ['TSS'] as const
+
 export interface BacklogStatus {
   id: number
   name: string
   color?: string
+  displayOrder?: number
+}
+
+export interface BacklogMilestone {
+  id: number
+  projectId: number
+  name: string
+  archived: boolean
   displayOrder?: number
 }
 
@@ -59,6 +70,11 @@ export interface BacklogIssue {
     id: number
     name: string
   }
+  milestone?: Array<{
+    id: number
+    name: string
+    projectId?: number
+  }>
 }
 
 export interface BacklogCreateTaskPayload {
@@ -140,6 +156,10 @@ const allowedProjectLabels = new Set(
   BACKLOG_ALLOWED_PROJECTS.map((label) => normalizeProjectLabel(label)),
 )
 
+const excludedMilestoneProjectLabels = new Set(
+  BACKLOG_EXCLUDED_MILESTONE_PROJECTS.map((label) => normalizeProjectLabel(label)),
+)
+
 export function isAllowedBacklogProject(project: Pick<BacklogProject, 'name' | 'projectKey'>): boolean {
   return (
     allowedProjectLabels.has(normalizeProjectLabel(project.name)) ||
@@ -147,8 +167,21 @@ export function isAllowedBacklogProject(project: Pick<BacklogProject, 'name' | '
   )
 }
 
+export function isBacklogMilestoneProjectExcluded(
+  project: Pick<BacklogProject, 'name' | 'projectKey'>,
+): boolean {
+  return (
+    excludedMilestoneProjectLabels.has(normalizeProjectLabel(project.name)) ||
+    excludedMilestoneProjectLabels.has(normalizeProjectLabel(project.projectKey))
+  )
+}
+
 export function filterAllowedBacklogProjects(projects: BacklogProject[]): BacklogProject[] {
   return projects.filter(isAllowedBacklogProject)
+}
+
+export function filterMilestoneSourceProjects(projects: BacklogProject[]): BacklogProject[] {
+  return projects.filter((project) => !isBacklogMilestoneProjectExcluded(project))
 }
 
 export function mapBacklogIssueToCreatePayload(
@@ -279,11 +312,22 @@ export function fetchBacklogProjectStatuses(projectId: number) {
   return backlogGet<BacklogStatus[]>(`/projects/${projectId}/statuses`)
 }
 
+export async function fetchBacklogProjectMilestones(projectId: number) {
+  const versions = await backlogGet<BacklogMilestone[]>(`/projects/${projectId}/versions`)
+  return versions.filter((item) => !item.archived)
+}
+
+export function issueMilestoneLabel(issue: Pick<BacklogIssue, 'milestone'>): string {
+  const names = (issue.milestone ?? []).map((item) => item.name.trim()).filter(Boolean)
+  return names.length ? names.join('、') : '—'
+}
+
 export function fetchBacklogIssues(params: {
   assigneeId: number
   projectId?: number
   projectIds?: number[]
   statusId?: number
+  milestoneId?: number
   offset?: number
   count?: number
 }) {
@@ -297,5 +341,6 @@ export function fetchBacklogIssues(params: {
   if (params.projectId != null) query['projectId[]'] = [params.projectId]
   else if (params.projectIds?.length) query['projectId[]'] = params.projectIds
   if (params.statusId != null) query['statusId[]'] = [params.statusId]
+  if (params.milestoneId != null) query['milestoneId[]'] = [params.milestoneId]
   return backlogGet<BacklogIssue[]>('/issues', query)
 }

@@ -1,17 +1,23 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import AppIcon from '@/components/AppIcon.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import {
   fetchBacklogIssues,
   fetchBacklogMyself,
   fetchBacklogProjects,
+  fetchBacklogProjectMilestones,
   fetchBacklogProjectStatuses,
   filterAllowedBacklogProjects,
+  filterMilestoneSourceProjects,
   formatBacklogError,
   hasBacklogCredentials,
+  issueMilestoneLabel,
   isBacklogIssueClosed,
+  isBacklogMilestoneProjectExcluded,
   type BacklogIssue,
+  type BacklogMilestone,
   type BacklogProject,
   type BacklogStatus,
   type BacklogUser,
@@ -30,18 +36,73 @@ const notice = ref('')
 const me = ref<BacklogUser | null>(null)
 const projects = ref<BacklogProject[]>([])
 const projectStatuses = ref<BacklogStatus[]>([])
+const milestones = ref<BacklogMilestone[]>([])
 const issues = ref<BacklogIssue[]>([])
 const projectId = ref<number | 'all'>('all')
 const statusFilter = ref<number | 'open' | 'all'>('open')
+const milestoneId = ref<number | 'all'>('all')
 const offset = ref(0)
 const hasMore = ref(false)
 const selectedIds = ref<Set<number>>(new Set())
 
-const visibleIssues = computed(() => {
-  if (statusFilter.value === 'open') {
-    return issues.value.filter((issue) => !isBacklogIssueClosed(issue))
+type IssueSortKey = 'issueKey' | 'milestone' | 'status' | 'dueDate'
+const sortKey = ref<IssueSortKey | null>(null)
+const sortDir = ref<'asc' | 'desc'>('asc')
+
+function issueDueDate(issue: BacklogIssue): string {
+  return issue.dueDate ? issue.dueDate.slice(0, 10) : ''
+}
+
+function compareIssues(a: BacklogIssue, b: BacklogIssue, key: IssueSortKey): number {
+  if (key === 'dueDate') {
+    const aDate = issueDueDate(a)
+    const bDate = issueDueDate(b)
+    if (!aDate && !bDate) return a.issueKey.localeCompare(b.issueKey, 'zh-Hant', { numeric: true })
+    if (!aDate) return 1
+    if (!bDate) return -1
+    return aDate.localeCompare(bDate) || a.issueKey.localeCompare(b.issueKey, 'zh-Hant', { numeric: true })
   }
-  return issues.value
+  const aText =
+    key === 'issueKey'
+      ? a.issueKey
+      : key === 'milestone'
+        ? issueMilestoneLabel(a)
+        : a.status.name
+  const bText =
+    key === 'issueKey'
+      ? b.issueKey
+      : key === 'milestone'
+        ? issueMilestoneLabel(b)
+        : b.status.name
+  const dashA = aText === '—' ? '' : aText
+  const dashB = bText === '—' ? '' : bText
+  if (!dashA && dashB) return 1
+  if (dashA && !dashB) return -1
+  return dashA.localeCompare(dashB, 'zh-Hant', { numeric: true })
+}
+
+function toggleSort(key: IssueSortKey) {
+  if (sortKey.value === key) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+    return
+  }
+  sortKey.value = key
+  sortDir.value = 'asc'
+}
+
+function sortIcon(key: IssueSortKey): 'arrow-up' | 'arrow-down' {
+  return sortKey.value === key && sortDir.value === 'desc' ? 'arrow-down' : 'arrow-up'
+}
+
+const visibleIssues = computed(() => {
+  const filtered =
+    statusFilter.value === 'open'
+      ? issues.value.filter((issue) => !isBacklogIssueClosed(issue))
+      : issues.value
+  if (!sortKey.value) return filtered
+  const key = sortKey.value
+  const dir = sortDir.value === 'asc' ? 1 : -1
+  return [...filtered].sort((a, b) => compareIssues(a, b, key) * dir)
 })
 
 const statusOptions = computed(() => {
@@ -54,6 +115,18 @@ const statusOptions = computed(() => {
   }
   return [...byId.values()]
 })
+
+const milestoneOptions = computed(() => {
+  const byId = new Map<number, BacklogMilestone>()
+  for (const item of milestones.value) byId.set(item.id, item)
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh-Hant'))
+})
+
+function milestoneOptionLabel(item: BacklogMilestone): string {
+  if (projectId.value !== 'all') return item.name
+  const project = projects.value.find((entry) => entry.id === item.projectId)
+  return project ? `${item.name}（${project.projectKey}）` : item.name
+}
 
 const selectableIssues = computed(() =>
   visibleIssues.value.filter((issue) => !store.isBacklogIssueImported(issue.id)),
@@ -119,6 +192,38 @@ async function loadStatuses() {
   }
 }
 
+async function loadMilestones() {
+  const sourceProjects =
+    projectId.value === 'all'
+      ? filterMilestoneSourceProjects(projects.value)
+      : projects.value.filter(
+          (project) =>
+            project.id === projectId.value && !isBacklogMilestoneProjectExcluded(project),
+        )
+  const targetIds = sourceProjects.map((project) => project.id)
+  if (!targetIds.length) {
+    milestones.value = []
+    if (milestoneId.value !== 'all') milestoneId.value = 'all'
+    return
+  }
+  const lists = await Promise.all(
+    targetIds.map(async (id) => {
+      try {
+        return await fetchBacklogProjectMilestones(id)
+      } catch {
+        return [] as BacklogMilestone[]
+      }
+    }),
+  )
+  milestones.value = lists.flat()
+  if (
+    milestoneId.value !== 'all' &&
+    !milestones.value.some((item) => item.id === milestoneId.value)
+  ) {
+    milestoneId.value = 'all'
+  }
+}
+
 async function loadIssues(reset: boolean) {
   if (!me.value) return
   if (reset) {
@@ -139,10 +244,15 @@ async function loadIssues(reset: boolean) {
     projectId: projectId.value === 'all' ? undefined : projectId.value,
     projectIds: projectId.value === 'all' ? allowedIds : undefined,
     statusId: typeof statusFilter.value === 'number' ? statusFilter.value : undefined,
+    milestoneId: milestoneId.value === 'all' ? undefined : milestoneId.value,
     offset: offset.value,
     count: PAGE_SIZE,
   })
-  const scoped = page.filter((issue) => allowedIds.includes(issue.projectId))
+  const scoped = page.filter((issue) => {
+    if (!allowedIds.includes(issue.projectId)) return false
+    if (milestoneId.value === 'all') return true
+    return (issue.milestone ?? []).some((item) => item.id === milestoneId.value)
+  })
   issues.value = reset ? scoped : [...issues.value, ...scoped]
   offset.value += page.length
   hasMore.value = page.length === PAGE_SIZE
@@ -157,6 +267,8 @@ async function refresh() {
     me.value = null
     projects.value = []
     issues.value = []
+    milestones.value = []
+    projectStatuses.value = []
     return
   }
   loading.value = true
@@ -170,6 +282,7 @@ async function refresh() {
       projectId.value = 'all'
     }
     await loadStatuses()
+    await loadMilestones()
     await loadIssues(true)
   } catch (e) {
     error.value = formatBacklogError(e)
@@ -206,8 +319,28 @@ async function onFilterChange() {
 
 async function onProjectChange() {
   if (typeof statusFilter.value === 'number') statusFilter.value = 'open'
+  milestoneId.value = 'all'
   await loadStatuses()
+  await loadMilestones()
   await onFilterChange()
+}
+
+function onMilestoneSelect(event: Event) {
+  const value = (event.target as HTMLSelectElement).value
+  milestoneId.value = value === 'all' ? 'all' : Number(value)
+  void onFilterChange()
+}
+
+function clearMilestone() {
+  if (milestoneId.value === 'all') return
+  milestoneId.value = 'all'
+  void onFilterChange()
+}
+
+function clearStatus() {
+  if (statusFilter.value === 'all') return
+  statusFilter.value = 'all'
+  void onFilterChange()
 }
 
 function importSelected() {
@@ -229,6 +362,12 @@ function onProjectSelect(event: Event) {
   void onProjectChange()
 }
 
+function clearProject() {
+  if (projectId.value === 'all') return
+  projectId.value = 'all'
+  void onProjectChange()
+}
+
 function onStatusSelect(event: Event) {
   const value = (event.target as HTMLSelectElement).value
   statusFilter.value = value === 'open' || value === 'all' ? value : Number(value)
@@ -246,7 +385,7 @@ onMounted(() => {
       <div>
         <h1>Backlog</h1>
         <p class="subtitle">
-          預設顯示指派給我的任務，可再以專案／狀態篩選。勾選後會新增為
+          預設顯示指派給我的任務，可再以專案／milestone／狀態篩選。勾選後會新增為
           {{ store.selectedDate }} 的主任務。
         </p>
       </div>
@@ -267,22 +406,64 @@ onMounted(() => {
       <div class="toolbar">
         <label class="filter">
           <span>專案</span>
-          <select :value="String(projectId)" :disabled="loading" @change="onProjectSelect">
-            <option value="all">指定專案全部</option>
-            <option v-for="project in projects" :key="project.id" :value="String(project.id)">
-              {{ project.projectKey }} {{ project.name }}
-            </option>
-          </select>
+          <div class="filter-control">
+            <select :value="String(projectId)" :disabled="loading" @change="onProjectSelect">
+              <option value="all">指定專案全部</option>
+              <option v-for="project in projects" :key="project.id" :value="String(project.id)">
+                {{ project.projectKey }} {{ project.name }}
+              </option>
+            </select>
+            <button
+              type="button"
+              class="filter-clear"
+              :disabled="loading || projectId === 'all'"
+              aria-label="重置專案為全部"
+              @click="clearProject"
+            >
+              <AppIcon name="xmark" size="xs" />
+            </button>
+          </div>
+        </label>
+        <label class="filter">
+          <span>milestone</span>
+          <div class="filter-control">
+            <select :value="String(milestoneId)" :disabled="loading" @change="onMilestoneSelect">
+              <option value="all">全部</option>
+              <option v-for="item in milestoneOptions" :key="item.id" :value="String(item.id)">
+                {{ milestoneOptionLabel(item) }}
+              </option>
+            </select>
+            <button
+              type="button"
+              class="filter-clear"
+              :disabled="loading || milestoneId === 'all'"
+              aria-label="重置 milestone 為全部"
+              @click="clearMilestone"
+            >
+              <AppIcon name="xmark" size="xs" />
+            </button>
+          </div>
         </label>
         <label class="filter">
           <span>狀態</span>
-          <select :value="String(statusFilter)" :disabled="loading" @change="onStatusSelect">
-            <option value="open">進行中</option>
-            <option value="all">全部狀態</option>
-            <option v-for="status in statusOptions" :key="status.id" :value="String(status.id)">
-              {{ status.name }}
-            </option>
-          </select>
+          <div class="filter-control">
+            <select :value="String(statusFilter)" :disabled="loading" @change="onStatusSelect">
+              <option value="open">進行中</option>
+              <option value="all">全部狀態</option>
+              <option v-for="status in statusOptions" :key="status.id" :value="String(status.id)">
+                {{ status.name }}
+              </option>
+            </select>
+            <button
+              type="button"
+              class="filter-clear"
+              :disabled="loading || statusFilter === 'all'"
+              aria-label="重置狀態為全部狀態"
+              @click="clearStatus"
+            >
+              <AppIcon name="xmark" size="xs" />
+            </button>
+          </div>
         </label>
         <p v-if="me" class="whoami">登入：{{ me.name }}</p>
       </div>
@@ -320,10 +501,31 @@ onMounted(() => {
           <thead>
             <tr>
               <th class="check-col"></th>
-              <th>Key</th>
+              <th>
+                <button type="button" class="sort-btn" :class="{ active: sortKey === 'issueKey' }" @click="toggleSort('issueKey')">
+                  Key
+                  <AppIcon v-if="sortKey === 'issueKey'" :name="sortIcon('issueKey')" size="xs" />
+                </button>
+              </th>
               <th>標題</th>
-              <th>狀態</th>
-              <th>期限</th>
+              <th>
+                <button type="button" class="sort-btn" :class="{ active: sortKey === 'milestone' }" @click="toggleSort('milestone')">
+                  milestone
+                  <AppIcon v-if="sortKey === 'milestone'" :name="sortIcon('milestone')" size="xs" />
+                </button>
+              </th>
+              <th>
+                <button type="button" class="sort-btn" :class="{ active: sortKey === 'status' }" @click="toggleSort('status')">
+                  狀態
+                  <AppIcon v-if="sortKey === 'status'" :name="sortIcon('status')" size="xs" />
+                </button>
+              </th>
+              <th>
+                <button type="button" class="sort-btn" :class="{ active: sortKey === 'dueDate' }" @click="toggleSort('dueDate')">
+                  期限
+                  <AppIcon v-if="sortKey === 'dueDate'" :name="sortIcon('dueDate')" size="xs" />
+                </button>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -345,8 +547,9 @@ onMounted(() => {
                 {{ issue.summary }}
                 <span v-if="store.isBacklogIssueImported(issue.id)" class="imported-tag">已匯入</span>
               </td>
+              <td>{{ issueMilestoneLabel(issue) }}</td>
               <td>{{ issue.status.name }}</td>
-              <td>{{ issue.dueDate ? issue.dueDate.slice(0, 10) : '—' }}</td>
+              <td>{{ issueDueDate(issue) || '—' }}</td>
             </tr>
           </tbody>
         </table>
@@ -406,11 +609,44 @@ onMounted(() => {
   color: $text-muted;
 
   select {
+    box-sizing: border-box;
+    width: 200px;
+    max-width: 200px;
     padding: 6px 10px;
     border: 1px solid $border;
     border-radius: $radius-sm;
     background: $surface;
     color: $text;
+    text-overflow: ellipsis;
+  }
+}
+
+.filter-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.filter-clear {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid $border;
+  border-radius: $radius-sm;
+  color: $text-muted;
+  background: $surface;
+
+  &:hover:not(:disabled) {
+    border-color: $primary;
+    color: $primary;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: default;
   }
 }
 
@@ -466,6 +702,25 @@ th {
   font-size: 12px;
   font-weight: 600;
   background: $bg;
+}
+
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+
+  &:hover,
+  &.active {
+    color: $primary;
+  }
 }
 
 .check-col {

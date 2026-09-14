@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest'
 import {
   backlogDateToYmd,
   isBacklogIssueClosed,
+  issueMilestoneLabel,
   mapBacklogIssueToCreatePayload,
   normalizeBacklogLink,
   partitionBacklogIssues,
   filterAllowedBacklogProjects,
   isAllowedBacklogProject,
+  isBacklogMilestoneProjectExcluded,
+  filterMilestoneSourceProjects,
   type BacklogIssue,
 } from '@/utils/backlog'
 import {
@@ -120,9 +123,22 @@ describe('Backlog issue mapping', () => {
     expect(isAllowedBacklogProject({ name: '其他', projectKey: 'ZZZ' })).toBe(false)
   })
 
+  it('排除 TSS 專案的 milestone', () => {
+    const tss = { id: 9, projectKey: 'TSS', name: '自動化測試', archived: false }
+    const nup = { id: 4, projectKey: 'NUP', name: 'NUP', archived: false }
+    expect(isBacklogMilestoneProjectExcluded(tss)).toBe(true)
+    expect(isBacklogMilestoneProjectExcluded(nup)).toBe(false)
+    expect(filterMilestoneSourceProjects([tss, nup]).map((item) => item.id)).toEqual([4])
+  })
+
   it('日期字串取 YYYY-MM-DD', () => {
     expect(backlogDateToYmd('2026-09-01T15:00:00Z')).toBe('2026-09-01')
     expect(backlogDateToYmd(null)).toBeNull()
+  })
+
+  it('組出 milestone 顯示名稱', () => {
+    expect(issueMilestoneLabel({ milestone: [{ id: 1, name: 'Sprint 12' }] })).toBe('Sprint 12')
+    expect(issueMilestoneLabel({ milestone: [] })).toBe('—')
   })
 })
 
