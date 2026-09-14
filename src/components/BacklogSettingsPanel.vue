@@ -45,8 +45,7 @@ function save(): boolean {
   saving.value = true
   saveBacklogPrefs({ spaceUrl: space.origin, apiKey: apiKey.value })
   spaceUrl.value = space.origin
-  store.setNavFeatureEnabled('backlog', true)
-  showMessage('已儲存連線設定，側邊欄已出現 Backlog 匯入頁')
+  showMessage('已儲存連線設定（僅存在本機瀏覽器）')
   saving.value = false
   return true
 }
@@ -60,7 +59,10 @@ function openImportPage() {
   } else if (canSave.value) {
     save()
   }
-  store.setNavFeatureEnabled('backlog', true)
+  if (!store.isNavFeatureEnabled('backlog')) {
+    showMessage('請先開啟「在側邊欄顯示 Backlog 匯入頁」', true)
+    return
+  }
   void router.push('/backlog')
 }
 

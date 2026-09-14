@@ -74,7 +74,6 @@ function openBacklogImport() {
     void router.push({ path: '/settings', query: { tab: 'backlog' } })
     return
   }
-  store.setNavFeatureEnabled('backlog', true)
   void router.push('/backlog')
 }
 </script>
@@ -108,7 +107,12 @@ function openBacklogImport() {
         >
           {{ journalButtonLabel }}
         </button>
-        <button type="button" class="btn-secondary" @click="openBacklogImport">
+        <button
+          v-if="store.isNavFeatureEnabled('backlog')"
+          type="button"
+          class="btn-secondary"
+          @click="openBacklogImport"
+        >
           從 Backlog 匯入
         </button>
         <button type="button" class="btn-primary" @click="showCreateModal = true">
@@ -132,7 +136,12 @@ function openBacklogImport() {
       <AppIcon name="clipboard-list" size="lg" class="empty-icon" />
       <p>今天還沒有任務</p>
       <div class="empty-actions">
-        <button type="button" class="btn-secondary" @click="openBacklogImport">
+        <button
+          v-if="store.isNavFeatureEnabled('backlog')"
+          type="button"
+          class="btn-secondary"
+          @click="openBacklogImport"
+        >
           從 Backlog 匯入
         </button>
         <button type="button" class="btn-primary" @click="showCreateModal = true">
