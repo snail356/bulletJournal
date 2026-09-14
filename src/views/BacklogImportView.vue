@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AppIcon from '@/components/AppIcon.vue'
 import { useTaskStore } from '@/stores/taskStore'
@@ -41,6 +41,7 @@ const issues = ref<BacklogIssue[]>([])
 const projectId = ref<number | 'all'>('all')
 const statusFilter = ref<number | 'open' | 'all'>('open')
 const milestoneId = ref<number | 'all'>('all')
+const keyword = ref('')
 const offset = ref(0)
 const hasMore = ref(false)
 const selectedIds = ref<Set<number>>(new Set())
@@ -94,11 +95,26 @@ function sortIcon(key: IssueSortKey): 'arrow-up' | 'arrow-down' {
   return sortKey.value === key && sortDir.value === 'desc' ? 'arrow-down' : 'arrow-up'
 }
 
+function matchesKeyword(issue: BacklogIssue, query: string): boolean {
+  const haystack = [
+    issue.issueKey,
+    issue.summary,
+    issueMilestoneLabel(issue),
+    issue.status.name,
+    issueDueDate(issue),
+  ]
+    .join('\n')
+    .toLowerCase()
+  return haystack.includes(query)
+}
+
 const visibleIssues = computed(() => {
-  const filtered =
+  const query = keyword.value.trim().toLowerCase()
+  let filtered =
     statusFilter.value === 'open'
       ? issues.value.filter((issue) => !isBacklogIssueClosed(issue))
       : issues.value
+  if (query) filtered = filtered.filter((issue) => matchesKeyword(issue, query))
   if (!sortKey.value) return filtered
   const key = sortKey.value
   const dir = sortDir.value === 'asc' ? 1 : -1
@@ -177,6 +193,8 @@ function pruneSelection() {
   }
   selectedIds.value = next
 }
+
+watch(keyword, pruneSelection)
 
 function selectedIssues(): BacklogIssue[] {
   return visibleIssues.value.filter((issue) => selectedIds.value.has(issue.id))
@@ -465,6 +483,27 @@ onMounted(() => {
             </button>
           </div>
         </label>
+        <label class="filter">
+          <span>搜尋</span>
+          <div class="filter-control">
+            <input
+              v-model="keyword"
+              type="search"
+              class="search-input"
+              placeholder="Key、標題、milestone…"
+              :disabled="loading"
+            />
+            <button
+              type="button"
+              class="filter-clear"
+              :disabled="!keyword.trim()"
+              aria-label="清除搜尋"
+              @click="keyword = ''"
+            >
+              <AppIcon name="xmark" size="xs" />
+            </button>
+          </div>
+        </label>
         <p v-if="me" class="whoami">登入：{{ me.name }}</p>
       </div>
 
@@ -618,6 +657,32 @@ onMounted(() => {
     background: $surface;
     color: $text;
     text-overflow: ellipsis;
+  }
+
+  .search-input {
+    box-sizing: border-box;
+    width: 200px;
+    max-width: 200px;
+    padding: 6px 10px;
+    border: 1px solid $border;
+    border-radius: $radius-sm;
+    background: $surface;
+    color: $text;
+    font: inherit;
+
+    &:focus {
+      outline: none;
+      border-color: $primary;
+      box-shadow: 0 0 0 2px $primary-light;
+    }
+
+    &:disabled {
+      opacity: 0.65;
+    }
+
+    &::-webkit-search-cancel-button {
+      display: none;
+    }
   }
 }
 
