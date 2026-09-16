@@ -10,6 +10,7 @@ import {
   createDefaultCommandCategories,
   normalizeCommandCategory,
   normalizeCommandItem,
+  normalizeCommandText,
 } from "@/utils/commandCheatsheet";
 import { generateId } from "@/utils/id";
 
@@ -97,8 +98,8 @@ export const useCommandStore = defineStore("commands", () => {
     const now = new Date().toISOString();
     const item: CommandItem = {
       id: generateId(),
-      content: content.trim(),
-      note: note.trim(),
+      content: normalizeCommandText(content),
+      note: normalizeCommandText(note),
       createdAt: now,
       updatedAt: now,
     };
@@ -117,8 +118,12 @@ export const useCommandStore = defineStore("commands", () => {
     if (!category) return;
     const item = category.items.find((entry) => entry.id === itemId);
     if (!item) return;
-    if (payload.content !== undefined) item.content = payload.content.trim();
-    if (payload.note !== undefined) item.note = payload.note.trim();
+    if (payload.content !== undefined) {
+      item.content = normalizeCommandText(payload.content);
+    }
+    if (payload.note !== undefined) {
+      item.note = normalizeCommandText(payload.note);
+    }
     const now = new Date().toISOString();
     item.updatedAt = now;
     category.updatedAt = now;

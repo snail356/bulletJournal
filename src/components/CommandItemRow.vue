@@ -25,7 +25,8 @@ const store = useCommandStore()
 const editing = ref(!props.item.content.trim())
 const draftContent = ref(props.item.content)
 const draftNote = ref(props.item.note)
-const contentRef = ref<HTMLInputElement | null>(null)
+const contentRef = ref<HTMLTextAreaElement | null>(null)
+const noteRef = ref<HTMLTextAreaElement | null>(null)
 const copied = ref(false)
 let copiedTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -35,7 +36,7 @@ watch(
     if (!value) return
     editing.value = true
     await nextTick()
-    contentRef.value?.focus()
+    focusContent()
   },
   { immediate: true },
 )
@@ -43,16 +44,40 @@ watch(
 watch(editing, async (value) => {
   if (!value) return
   await nextTick()
-  contentRef.value?.focus()
+  focusContent()
 })
+
+function autoResize(el: HTMLTextAreaElement | null) {
+  if (!el) return
+  el.style.height = 'auto'
+  el.style.height = `${Math.max(el.scrollHeight, 40)}px`
+}
+
+function resizeEditors() {
+  autoResize(contentRef.value)
+  autoResize(noteRef.value)
+}
+
+function focusContent() {
+  const el = contentRef.value
+  if (!el) return
+  el.focus()
+  resizeEditors()
+  const end = el.value.length
+  el.setSelectionRange(end, end)
+}
+
+function onEditorInput(event: Event) {
+  autoResize(event.target as HTMLTextAreaElement)
+}
 
 onUnmounted(() => {
   if (copiedTimer) clearTimeout(copiedTimer)
 })
 
 async function copyContent() {
-  const text = props.item.content.trim()
-  if (!text) return
+  const text = props.item.content.replace(/\s+$/, '')
+  if (!text.trim()) return
   try {
     await navigator.clipboard.writeText(text)
     copied.value = true
@@ -73,9 +98,9 @@ function startEdit() {
 
 function commit() {
   if (!editing.value) return
-  const content = draftContent.value.trim()
-  const note = draftNote.value.trim()
-  if (!content) {
+  const content = draftContent.value.replace(/\r\n/g, '\n').replace(/\s+$/, '')
+  const note = draftNote.value.replace(/\r\n/g, '\n').replace(/\s+$/, '')
+  if (!content.trim()) {
     store.deleteItem(props.categoryId, props.item.id)
     return
   }
@@ -124,19 +149,22 @@ function onFocusOut(event: FocusEvent) {
       @submit.prevent="commit"
       @focusout="onFocusOut"
     >
-      <input
+      <textarea
         ref="contentRef"
         v-model="draftContent"
-        type="text"
         class="edit-input command-input"
+        rows="2"
         placeholder="指令或可複製內容"
+        @input="onEditorInput"
         @keydown.escape.prevent="cancel"
       />
-      <input
+      <textarea
+        ref="noteRef"
         v-model="draftNote"
-        type="text"
         class="edit-input"
+        rows="2"
         placeholder="說明（選填）"
+        @input="onEditorInput"
         @keydown.escape.prevent="cancel"
       />
     </form>
@@ -241,7 +269,9 @@ function onFocusOut(event: FocusEvent) {
   font-size: 13px;
   line-height: 1.5;
   color: $text;
-  word-break: break-all;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   border-radius: 4px;
   padding: 2px 4px;
   margin: -2px -4px;
@@ -278,6 +308,8 @@ function onFocusOut(event: FocusEvent) {
   line-height: 1.5;
   color: $text-muted;
   padding-left: 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .item-actions {
@@ -301,6 +333,10 @@ function onFocusOut(event: FocusEvent) {
   border-radius: $radius-sm;
   background: $surface;
   font-size: 13px;
+  line-height: 1.5;
+  resize: none;
+  overflow: hidden;
+  white-space: pre-wrap;
 
   &:focus {
     outline: none;

@@ -1,11 +1,16 @@
 import type { CommandCategory, CommandItem } from "@/types";
 import { generateId } from "@/utils/id";
 
+/** 保留中間換行與行首縮排，只去掉結尾空白與 \r\n */
+export function normalizeCommandText(value: string): string {
+  return value.replace(/\r\n/g, "\n").replace(/\s+$/, "");
+}
+
 export function normalizeCommandItem(item: CommandItem): CommandItem {
   return {
     id: item.id || generateId(),
-    content: item.content ?? "",
-    note: item.note ?? "",
+    content: normalizeCommandText(item.content ?? ""),
+    note: normalizeCommandText(item.note ?? ""),
     createdAt: item.createdAt || new Date().toISOString(),
     updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
   };

@@ -54,6 +54,16 @@ describe('CommandItemRow', () => {
     expect(navigator.clipboard.writeText).toHaveBeenCalledWith('git reset --soft HEAD^')
   })
 
+  it('複製時會保留換行', async () => {
+    const wrapper = mountRow('git add .\ngit commit -m "wip"', '兩行指令')
+    await wrapper.get('.command-text').trigger('click')
+    await nextTick()
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      'git add .\ngit commit -m "wip"',
+    )
+    expect(wrapper.get('.command-text').text()).toBe('git add .\ngit commit -m "wip"')
+  })
+
   it('離開輸入區會儲存指令與說明', async () => {
     const store = useCommandStore()
     store.createCategory('測試')
@@ -77,13 +87,13 @@ describe('CommandItemRow', () => {
     })
     await nextTick()
 
-    await wrapper.get('.command-input').setValue('git status')
-    await wrapper.get('.edit-input:not(.command-input)').setValue('查看狀態')
+    await wrapper.get('.command-input').setValue('git add .\ngit status')
+    await wrapper.get('.edit-input:not(.command-input)').setValue('先暫存\n再查看狀態')
     await wrapper.get('form.edit-form').trigger('focusout', { relatedTarget: null })
     await nextTick()
 
-    expect(store.categories[0].items[0].content).toBe('git status')
-    expect(store.categories[0].items[0].note).toBe('查看狀態')
+    expect(store.categories[0].items[0].content).toBe('git add .\ngit status')
+    expect(store.categories[0].items[0].note).toBe('先暫存\n再查看狀態')
   })
 })
 

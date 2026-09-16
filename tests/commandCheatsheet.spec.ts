@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createDefaultCommandCategories,
   normalizeCommandCategory,
+  normalizeCommandText,
 } from '@/utils/commandCheatsheet'
 
 describe('commandCheatsheet', () => {
@@ -23,6 +24,15 @@ describe('commandCheatsheet', () => {
       'carol.cheng@newtype.com.tw',
       'New@type1',
     ])
+  })
+
+  it('normalizeCommandText 會保留換行與行首縮排', () => {
+    expect(normalizeCommandText('git add .\r\ngit commit -m "wip"\n')).toBe(
+      'git add .\ngit commit -m "wip"',
+    )
+    expect(normalizeCommandText('  indented\n    block')).toBe(
+      '  indented\n    block',
+    )
   })
 
   it('normalize 會補上缺漏的 note 與 items', () => {
