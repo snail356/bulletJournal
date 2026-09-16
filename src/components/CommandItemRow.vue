@@ -3,6 +3,7 @@ import { nextTick, onUnmounted, ref, watch } from 'vue'
 import type { CommandItem } from '@/types'
 import AppIcon from '@/components/AppIcon.vue'
 import DeleteIconButton from '@/components/DeleteIconButton.vue'
+import DragHandle from '@/components/DragHandle.vue'
 import PopoverIconButton from '@/components/PopoverIconButton.vue'
 import { useCommandStore } from '@/stores/commandStore'
 
@@ -133,16 +134,13 @@ function onFocusOut(event: FocusEvent) {
     @dragover="emit('dragOver', $event)"
     @drop="emit('drop', $event)"
   >
-    <span
+    <DragHandle
       v-if="!editing"
-      class="drag-handle"
-      draggable="true"
-      aria-label="拖曳排序"
-      @dragstart="emit('dragStart', $event)"
-      @dragend="emit('dragEnd')"
-    >
-      <AppIcon name="grip-vertical" size="xs" />
-    </span>
+      size="xs"
+      class="item-drag"
+      @drag-start="emit('dragStart', $event)"
+      @drag-end="emit('dragEnd')"
+    />
     <form
       v-if="editing"
       class="edit-form"
@@ -231,20 +229,8 @@ function onFocusOut(event: FocusEvent) {
   }
 }
 
-.drag-handle {
-  color: $text-muted;
-  cursor: grab;
-  opacity: 0.4;
-  line-height: 1;
+.item-drag {
   padding-top: 6px;
-
-  &:hover {
-    opacity: 0.8;
-  }
-
-  &:active {
-    cursor: grabbing;
-  }
 }
 
 .item-body {

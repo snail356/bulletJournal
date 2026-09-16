@@ -7,6 +7,7 @@ import type {
 const SELECTED_DATE_KEY = "bullet-journal-selected-date";
 const EXPAND_IMAGES_KEY = "bullet-journal-expand-images";
 const EXPAND_TASKS_KEY = "bullet-journal-expand-tasks";
+const EXPAND_COMMANDS_KEY = "bullet-journal-expand-commands";
 const MIGRATION_REVIEW_KEY = "bullet-journal-migration-review";
 const REFLECTION_PROMPT_KEY = "bullet-journal-reflection-prompt";
 const GEMINI_USAGE_KEY = "bullet-journal-gemini-usage";
@@ -92,6 +93,7 @@ export {
   SELECTED_DATE_KEY,
   EXPAND_IMAGES_KEY,
   EXPAND_TASKS_KEY,
+  EXPAND_COMMANDS_KEY,
   MIGRATION_REVIEW_KEY,
   REFLECTION_PROMPT_KEY,
   GEMINI_USAGE_KEY,

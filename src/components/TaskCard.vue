@@ -130,6 +130,14 @@ const incompleteSubtaskCount = computed(
 
 const isMigrated = computed(() => props.migratedAway === true)
 
+const showTaskDrag = computed(
+  () =>
+    Boolean(taskDrag) &&
+    !isMigrated.value &&
+    props.task.date === store.selectedDate &&
+    !expanded.value,
+)
+
 const migratedTargetLabel = computed(() => formatDisplayDate(props.task.date))
 
 const postponedDays = computed(() => getPostponedDays(props.task))
@@ -476,14 +484,14 @@ async function onContextPaste() {
     @dragover="!isMigrated && taskDrag?.onDragOver($event, task.id)"
     @drop="!isMigrated && taskDrag?.onDrop($event, task.id)"
   >
-    <header class="header" :class="{ 'has-actions': !isMigrated }">
+    <header class="header" :class="{ 'has-actions': !isMigrated, 'has-drag': showTaskDrag }">
       <span
-        v-if="taskDrag && !isMigrated && task.date === store.selectedDate"
+        v-if="showTaskDrag"
         class="drag-handle"
         draggable="true"
         aria-label="拖曳排序"
-        @dragstart="taskDrag.onDragStart($event, task.id)"
-        @dragend="taskDrag.onDragEnd"
+        @dragstart="taskDrag?.onDragStart($event, task.id)"
+        @dragend="taskDrag?.onDragEnd"
       >
         <AppIcon name="grip-vertical" />
       </span>
@@ -822,6 +830,13 @@ async function onContextPaste() {
     '. meta meta meta';
   align-items: center;
   gap: 6px 8px;
+}
+
+.header:not(.has-drag) {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'check title actions'
+    'meta meta meta';
 }
 
 .header:not(.has-actions) {

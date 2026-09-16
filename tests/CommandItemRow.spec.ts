@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import CommandItemRow from '@/components/CommandItemRow.vue'
 import { useCommandStore } from '@/stores/commandStore'
 import { createDefaultCommandCategories } from '@/utils/commandCheatsheet'
+import { moveItemById } from '@/composables/useReorderDrag'
 
 function mountRow(content = 'git reset --soft HEAD^', note = '想保留修改但取消 commit') {
   return mount(CommandItemRow, {
@@ -102,10 +103,31 @@ describe('createDefaultCommandCategories', () => {
     setActivePinia(createPinia())
     const store = useCommandStore()
     store.categories = createDefaultCommandCategories()
-    expect(store.categoriesSorted.map((category) => category.title)).toEqual([
+    expect(store.categories.map((category) => category.title)).toEqual([
       'git 指令',
       'DeskIn 帳密',
     ])
+  })
+
+  it('reorderCategories 會調整類別順序', () => {
+    setActivePinia(createPinia())
+    const store = useCommandStore()
+    store.categories = createDefaultCommandCategories()
+    const [git, deskin] = store.categories
+    store.reorderCategories(deskin.id, git.id)
+    expect(store.categories.map((category) => category.title)).toEqual([
+      'DeskIn 帳密',
+      'git 指令',
+    ])
+  })
+
+  it('moveItemById 會把項目移到目標位置', () => {
+    const moved = moveItemById(
+      [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
+      'c',
+      'a',
+    )
+    expect(moved?.map((item) => item.id)).toEqual(['c', 'a', 'b'])
   })
 
   it('reorderItems 會調整同一類別內的指令順序', () => {

@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
+import AppSwitch from '@/components/AppSwitch.vue'
 import CommandCategoryCard from '@/components/CommandCategoryCard.vue'
+import { useSimpleReorderDrag } from '@/composables/useReorderDrag'
 import { useCommandStore } from '@/stores/commandStore'
 
 const store = useCommandStore()
 const keyword = ref('')
+const { draggingId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd } =
+  useSimpleReorderDrag(
+    () => store.categories,
+    (fromId, toId) => store.reorderCategories(fromId, toId),
+  )
 
 const categories = computed(() => {
   const query = keyword.value.trim().toLowerCase()
-  const all = store.categoriesSorted
+  const all = store.categories
   if (!query) return all
   return all.filter((category) => {
     const haystack = [
@@ -37,12 +44,19 @@ function createCategory() {
       <div>
         <h1>常用指令</h1>
         <p class="subtitle">
-          依類別收藏指令與帳密；點選可複製，拖曳左側把手可調整順序。
+          依類別收藏指令與帳密；點選可複製。收合時可拖曳類別，展開後可拖曳指令。
         </p>
       </div>
-      <button type="button" class="btn-primary" @click="createCategory">
-        + 新增類別
-      </button>
+      <div class="header-actions">
+        <AppSwitch
+          :model-value="store.expandCategories"
+          label="展開類別"
+          @update:model-value="store.expandCategories = $event"
+        />
+        <button type="button" class="btn-primary" @click="createCategory">
+          + 新增類別
+        </button>
+      </div>
     </header>
 
     <div class="toolbar">
@@ -60,6 +74,12 @@ function createCategory() {
         v-for="category in categories"
         :key="category.id"
         :category="category"
+        :dragging="draggingId === category.id"
+        :drag-over="dragOverId === category.id"
+        @drag-start="onDragStart($event, category.id)"
+        @drag-over="onDragOver($event, category.id)"
+        @drop="onDrop($event, category.id)"
+        @drag-end="onDragEnd"
       />
     </div>
 
@@ -102,6 +122,14 @@ function createCategory() {
   font-size: 13px;
   margin-top: 4px;
   line-height: 1.5;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .toolbar {

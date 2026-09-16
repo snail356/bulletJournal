@@ -14,6 +14,25 @@ export interface ReorderDragHandlers {
   onDragEnd: () => void
 }
 
+export function moveItemById<T extends { id: string }>(
+  items: T[],
+  fromId: string,
+  toId: string,
+): T[] | null {
+  if (fromId === toId) return null
+  const fromIdx = items.findIndex((item) => item.id === fromId)
+  const toIdx = items.findIndex((item) => item.id === toId)
+  if (fromIdx < 0 || toIdx < 0) return null
+  const next = [...items]
+  const [moved] = next.splice(fromIdx, 1)
+  next.splice(toIdx, 0, moved)
+  return next
+}
+
+function belongsToList(items: { id: string }[], id: string | null): boolean {
+  return Boolean(id && items.some((item) => item.id === id))
+}
+
 function shouldReorderAt(
   items: { id: string }[],
   fromId: string,
@@ -118,9 +137,11 @@ export function useSimpleReorderDrag(
     e.preventDefault()
     const fromId = draggingId.value
     if (!fromId || fromId === targetId) return
+    const items = getItems()
+    if (!belongsToList(items, fromId) || !belongsToList(items, targetId)) return
+    e.stopPropagation()
     if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
 
-    const items = getItems()
     const el = e.currentTarget as HTMLElement
     const rect = el.getBoundingClientRect()
     const insertAfter = e.clientY >= rect.top + rect.height / 2
@@ -133,7 +154,10 @@ export function useSimpleReorderDrag(
   }
 
   function onDrop(e: DragEvent, _targetId: string) {
+    const items = getItems()
+    if (!belongsToList(items, draggingId.value)) return
     e.preventDefault()
+    e.stopPropagation()
     draggingId.value = null
     dragOverId.value = null
   }

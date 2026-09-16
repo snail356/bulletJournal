@@ -1,4 +1,4 @@
-import { computed, ref } from "vue";
+import { ref, watch } from "vue";
 import { defineStore } from "pinia";
 import type { CommandCategory, CommandItem } from "@/types";
 import {
@@ -13,9 +13,16 @@ import {
   normalizeCommandText,
 } from "@/utils/commandCheatsheet";
 import { generateId } from "@/utils/id";
+import { moveItemById } from "@/composables/useReorderDrag";
+import {
+  EXPAND_COMMANDS_KEY,
+  loadFromStorage,
+  saveToStorage,
+} from "@/utils/storage";
 
 export const useCommandStore = defineStore("commands", () => {
   const categories = ref<CommandCategory[]>([]);
+  const expandCategories = ref(loadFromStorage(EXPAND_COMMANDS_KEY, true));
   let initialized = false;
   let initPromise: Promise<void> | null = null;
 
@@ -23,13 +30,13 @@ export const useCommandStore = defineStore("commands", () => {
     saveCommandCategories(categories.value),
   );
 
-  const categoriesSorted = computed(() =>
-    [...categories.value].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-  );
-
   function persist() {
     saver.schedule();
   }
+
+  watch(expandCategories, (value) => {
+    saveToStorage(EXPAND_COMMANDS_KEY, value);
+  });
 
   async function flush() {
     await saver.flush();
@@ -88,6 +95,13 @@ export const useCommandStore = defineStore("commands", () => {
     persist();
   }
 
+  function reorderCategories(fromId: string, toId: string) {
+    const updated = moveItemById(categories.value, fromId, toId);
+    if (!updated) return;
+    categories.value = updated;
+    persist();
+  }
+
   function createItem(
     categoryId: string,
     content = "",
@@ -140,13 +154,9 @@ export const useCommandStore = defineStore("commands", () => {
 
   function reorderItems(categoryId: string, fromId: string, toId: string) {
     const category = findCategory(categoryId);
-    if (!category || fromId === toId) return;
-    const fromIdx = category.items.findIndex((item) => item.id === fromId);
-    const toIdx = category.items.findIndex((item) => item.id === toId);
-    if (fromIdx < 0 || toIdx < 0) return;
-    const updated = [...category.items];
-    const [moved] = updated.splice(fromIdx, 1);
-    updated.splice(toIdx, 0, moved);
+    if (!category) return;
+    const updated = moveItemById(category.items, fromId, toId);
+    if (!updated) return;
     category.items = updated;
     persist();
   }
@@ -215,12 +225,13 @@ export const useCommandStore = defineStore("commands", () => {
 
   return {
     categories,
-    categoriesSorted,
+    expandCategories,
     init,
     flush,
     createCategory,
     updateCategory,
     deleteCategory,
+    reorderCategories,
     createItem,
     updateItem,
     deleteItem,
