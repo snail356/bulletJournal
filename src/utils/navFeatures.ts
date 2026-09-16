@@ -5,6 +5,7 @@ export type NavFeatureId =
   | 'calendar'
   | 'all-tasks'
   | 'toolbox'
+  | 'commands'
   | 'reflections'
   | 'stats'
   | 'xiaoguli'
@@ -55,6 +56,13 @@ export const NAV_FEATURES: NavFeature[] = [
     icon: 'toolbox',
   },
   {
+    id: 'commands',
+    path: '/commands',
+    label: '常用指令',
+    description: '依類別收藏指令與帳密，點選即可複製',
+    icon: 'code',
+  },
+  {
     id: 'reflections',
     path: '/reflections',
     label: '回顧日誌',
@@ -97,6 +105,7 @@ export const defaultNavFeatureVisibility: NavFeatureVisibility = {
   calendar: true,
   'all-tasks': false,
   toolbox: true,
+  commands: false,
   reflections: false,
   stats: false,
   xiaoguli: true,

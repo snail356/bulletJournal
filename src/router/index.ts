@@ -51,6 +51,12 @@ const router = createRouter({
       meta: { title: '工具箱與思考清單', navFeature: 'toolbox' },
     },
     {
+      path: '/commands',
+      name: 'commands',
+      component: () => import('@/views/CommandsView.vue'),
+      meta: { title: '常用指令', navFeature: 'commands' },
+    },
+    {
       path: '/reflections',
       name: 'reflections',
       component: () => import('@/views/ReflectionLogView.vue'),

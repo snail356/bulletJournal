@@ -8,6 +8,7 @@ import AppTabs, { type AppTabItem } from '@/components/AppTabs.vue'
 import LabelsManager from '@/components/LabelsManager.vue'
 import SidebarCarouselManager from '@/components/SidebarCarouselManager.vue'
 import TaskAvatarsManager from '@/components/TaskAvatarsManager.vue'
+import { useCommandStore } from '@/stores/commandStore'
 import { useTaskStore } from '@/stores/taskStore'
 import { useStockStore } from '@/stores/stockStore'
 import { mockLabels, mockTasks } from '@/mock/data'
@@ -38,6 +39,7 @@ import { type NavFeatureId } from '@/utils/navFeatures'
 
 const store = useTaskStore()
 const stockStore = useStockStore()
+const commandStore = useCommandStore()
 const { draggingId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd } =
   useSimpleReorderDrag(
     () => store.orderedNavFeatures,
@@ -118,6 +120,7 @@ function clearAllData() {
       void (async () => {
         await store.clearAllData()
         await stockStore.clearAll()
+        await commandStore.clearAll()
         showFeedback('已清除所有資料')
       })()
     },
@@ -148,7 +151,7 @@ async function backupData() {
       ? `已儲存至「${backupPrefs.value.folderName || '指定資料夾'}」`
       : '已下載'
     showFeedback(
-      `${where} ${result.fileName}（任務 ${result.taskCount}、標籤 ${result.labelCount}、狀態 ${result.statusCount}、清單 ${result.toolboxCount}、日誌 ${result.reflectionCount}、照片 ${result.photoCount}）`,
+      `${where} ${result.fileName}（任務 ${result.taskCount}、標籤 ${result.labelCount}、狀態 ${result.statusCount}、清單 ${result.toolboxCount}、指令 ${result.commandCount}、日誌 ${result.reflectionCount}、照片 ${result.photoCount}）`,
     )
   } catch (err) {
     const reason = err instanceof Error && err.message ? err.message : '請稍後再試'
@@ -227,7 +230,7 @@ function onImportFileChange(event: Event) {
   if (!file) return
   openConfirm(
     '匯入備份',
-    `將匯入「${file.name}」中尚未存在的任務、標籤、狀態標籤、工具箱、回顧日誌、頭像、側邊圖片與自選股。已存在的項目會跳過，不會覆蓋或重複新增。`,
+    `將匯入「${file.name}」中尚未存在的任務、標籤、狀態標籤、工具箱、常用指令、回顧日誌、頭像、側邊圖片與自選股。已存在的項目會跳過，不會覆蓋或重複新增。`,
     () => {
       void runImport(file)
     },
@@ -244,6 +247,7 @@ async function runImport(file: File) {
     const source = await importBackupZip(file)
     const summary = await store.mergeImportedBackup(source)
     const stocks = await stockStore.mergeFavorites(source.stockFavorites ?? [])
+    const commands = await commandStore.mergeCategories(source.commandCategories ?? [])
     const added =
       summary.tasksAdded +
       summary.labelsAdded +
@@ -255,12 +259,14 @@ async function runImport(file: File) {
       summary.avatarsUpdated +
       summary.carouselAdded +
       stocks.added +
+      commands.added +
+      commands.itemsAdded +
       (summary.aiPromptRestored ? 1 : 0)
     if (!added) {
       showFeedback('沒有新增資料，備份中的項目都已存在')
     } else {
       showFeedback(
-        `已匯入：任務 ${summary.tasksAdded}、標籤 ${summary.labelsAdded}、狀態 ${summary.statusAdded}、清單 ${summary.toolboxListsAdded}、日誌 ${summary.reflectionsAdded}、頭像 ${summary.avatarsAdded + summary.avatarsUpdated}、側邊圖 ${summary.carouselAdded}、自選股 ${stocks.added}`,
+        `已匯入：任務 ${summary.tasksAdded}、標籤 ${summary.labelsAdded}、狀態 ${summary.statusAdded}、清單 ${summary.toolboxListsAdded}、指令 ${commands.added}、日誌 ${summary.reflectionsAdded}、頭像 ${summary.avatarsAdded + summary.avatarsUpdated}、側邊圖 ${summary.carouselAdded}、自選股 ${stocks.added}`,
       )
     }
   } catch (err) {
@@ -417,7 +423,7 @@ onUnmounted(() => {
         <div class="settings-card">
           <h2>資料管理</h2>
           <p class="desc">
-            任務、標籤、日誌與圖片儲存在瀏覽器 IndexedDB，偏好設定仍在本機。無需後端。可備份或匯入任務、標籤管理（任務標籤與狀態標籤）、工具箱、回顧日誌、任務頭像、側邊圖片與自選股。
+              任務、標籤、日誌與圖片儲存在瀏覽器 IndexedDB，偏好設定仍在本機。無需後端。可備份或匯入任務、標籤管理（任務標籤與狀態標籤）、工具箱、常用指令、回顧日誌、任務頭像、側邊圖片與自選股。
           </p>
           <div class="actions">
             <button
@@ -559,13 +565,13 @@ onUnmounted(() => {
             <ul>
               <li>
                 <strong>備份資料</strong>：下載 ZIP。內含可閱讀的 Markdown、外置 WebP 照片，以及供還原用的
-                <code>data.json</code>（含標籤管理、回顧日誌、頭像、側邊圖片與自選股）。
+                <code>data.json</code>（含標籤管理、回顧日誌、頭像、側邊圖片、常用指令與自選股）。
               </li>
               <li>
                 <strong>匯入備份</strong>：選擇先前下載的 ZIP。只會新增目前沒有的項目，已存在的不會覆蓋、也不會重複。
               </li>
               <li>
-                判斷已存在：任務比對「同一筆 id」或「同一天相同標題」；任務標籤與狀態標籤比對名稱；思考清單比對標題；回顧日誌比對日期；自選股比對代碼。
+                判斷已存在：任務比對「同一筆 id」或「同一天相同標題」；任務標籤與狀態標籤比對名稱；思考清單比對標題；常用指令比對類別標題；回顧日誌比對日期；自選股比對代碼。
               </li>
               <li>
                 自動備份會在開啟應用程式時檢查是否到期。同一週／同一月若已手動下載，超過設定日仍會再自動備份；該期已自動備份過則不會重複。

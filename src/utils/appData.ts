@@ -1,5 +1,6 @@
 import type {
   Attachment,
+  CommandCategory,
   DailyReflection,
   FavoriteStock,
   Label,
@@ -39,6 +40,7 @@ export const IDB_STOCK_FAVORITES_KEY = "stockFavorites";
 export const IDB_STOCK_CATALOG_KEY = "stockCatalog";
 export const IDB_STOCK_EX_HISTORY_KEY = "stockExHistory";
 export const IDB_AI_MANAGER_PROMPT_KEY = "aiManagerPrompt";
+export const IDB_COMMAND_CATEGORIES_KEY = "commandCategories";
 
 const ATT_BLOB_PREFIX = "att:";
 const AVATAR_BLOB_PREFIX = "avatar:";
@@ -290,6 +292,16 @@ export async function loadAiManagerPrompt(): Promise<string | null> {
 
 export async function saveAiManagerPrompt(prompt: string): Promise<void> {
   await idbSet(IDB_AI_MANAGER_PROMPT_KEY, prompt);
+}
+
+export async function loadCommandCategories(): Promise<CommandCategory[] | null> {
+  return (await idbGet<CommandCategory[]>(IDB_COMMAND_CATEGORIES_KEY)) ?? null;
+}
+
+export async function saveCommandCategories(
+  categories: CommandCategory[],
+): Promise<void> {
+  await idbSet(IDB_COMMAND_CATEGORIES_KEY, categories);
 }
 
 export async function clearAppData(): Promise<void> {

@@ -1,3 +1,4 @@
+import { useCommandStore } from "@/stores/commandStore";
 import { useStockStore } from "@/stores/stockStore";
 import { useTaskStore } from "@/stores/taskStore";
 import { downloadBackupZip, type BackupResult, type BackupSource } from "@/utils/backup";
@@ -20,11 +21,13 @@ let backupRun: Promise<BackupResult> | null = null;
 export function collectBackupSource(): BackupSource {
   const store = useTaskStore();
   const stockStore = useStockStore();
+  const commandStore = useCommandStore();
   return {
     tasks: store.tasks,
     labels: store.labels,
     statusItems: store.statusItems,
     toolboxLists: store.toolboxLists,
+    commandCategories: commandStore.categories,
     dailyReflections: store.dailyReflections,
     taskAvatars: store.taskAvatars,
     sidebarCarousel: store.sidebarCarousel,

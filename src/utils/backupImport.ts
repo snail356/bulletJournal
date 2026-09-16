@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import type {
   Attachment,
   AttachmentOwnerType,
+  CommandCategory,
   ContentFormat,
   DailyReflection,
   FavoriteStock,
@@ -700,6 +701,7 @@ async function parseFromJson(
     labels: asArray<Label>(raw.labels),
     statusItems: asArray<StatusItem>(raw.statusItems),
     toolboxLists: asArray<ToolboxList>(raw.toolboxLists),
+    commandCategories: asArray<CommandCategory>(raw.commandCategories),
     tasks: asArray<BackupFileTask>(raw.tasks).map((task) =>
       hydrateTask(task, photos),
     ),
@@ -771,6 +773,7 @@ export async function importBackupZip(file: File): Promise<BackupSource> {
     !source.tasks.length &&
     !source.labels.length &&
     !source.toolboxLists.length &&
+    !(source.commandCategories?.length) &&
     !source.statusItems.length &&
     !(source.dailyReflections?.length) &&
     !(source.taskAvatars?.length) &&

@@ -2,6 +2,7 @@ import JSZip from "jszip";
 import type {
   Attachment,
   AttachmentOwnerType,
+  CommandCategory,
   ContentFormat,
   DailyReflection,
   FavoriteStock,
@@ -27,6 +28,7 @@ export interface BackupSource {
   labels: Label[];
   statusItems: StatusItem[];
   toolboxLists: ToolboxList[];
+  commandCategories?: CommandCategory[];
   dailyReflections?: DailyReflection[];
   taskAvatars?: TaskAvatar[];
   sidebarCarousel?: SidebarCarouselState;
@@ -88,6 +90,7 @@ export interface BackupPayload {
   labels: Label[];
   statusItems: StatusItem[];
   toolboxLists: ToolboxList[];
+  commandCategories: CommandCategory[];
   tasks: BackupFileTask[];
   dailyReflections: DailyReflection[];
   taskAvatars: BackupFileTaskAvatar[];
@@ -105,6 +108,7 @@ export interface BackupResult {
   labelCount: number;
   statusCount: number;
   toolboxCount: number;
+  commandCount: number;
   reflectionCount: number;
   photoCount: number;
 }
@@ -477,6 +481,33 @@ function buildToolboxMarkdown(list: ToolboxList): string {
   ]);
 }
 
+function buildCommandsMarkdown(categories: CommandCategory[]): string {
+  if (!categories.length) {
+    return joinSections(["# 常用指令", "_尚無類別_"]);
+  }
+
+  const sections = [...categories]
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .map((category) => {
+      const items = category.items.length
+        ? category.items
+            .map((item) => {
+              const command = item.content.trim()
+                ? `\`${item.content.trim()}\``
+                : "_（無內容）_";
+              const note = item.note.trim()
+                ? `\n\n${item.note.trim()}`
+                : "";
+              return `- ${command}${note}`;
+            })
+            .join("\n")
+        : "_尚無指令_";
+      return `## ${category.title.trim() || "未命名類別"}\n\n${items}`;
+    });
+
+  return joinSections(["# 常用指令", ...sections]);
+}
+
 function buildReflectionMarkdown(item: DailyReflection): string {
   return joinSections([
     `# ${item.date} 回顧`,
@@ -573,6 +604,7 @@ function buildReadme(params: {
   labelCount: number;
   statusCount: number;
   toolboxCount: number;
+  commandCount: number;
   reflectionCount: number;
   avatarCount: number;
   carouselCount: number;
@@ -607,7 +639,7 @@ function buildReadme(params: {
 
   return joinSections([
     "# Bullet Journal 備份",
-    "此備份以 Markdown 撰寫，照片另存為 WebP（若轉換失敗則保留原格式）並放在 `photos/`。請用設定頁「匯入備份」還原；已存在的任務、標籤、狀態標籤、清單、回顧日誌、頭像、側邊圖片與自選股會跳過、不會重複新增。",
+    "此備份以 Markdown 撰寫，照片另存為 WebP（若轉換失敗則保留原格式）並放在 `photos/`。請用設定頁「匯入備份」還原；已存在的任務、標籤、狀態標籤、清單、常用指令、回顧日誌、頭像、側邊圖片與自選股會跳過、不會重複新增。",
     [
       `| 項目 | 數量 |`,
       `| --- | --- |`,
@@ -616,6 +648,7 @@ function buildReadme(params: {
       `| 任務標籤 | ${params.labelCount} |`,
       `| 狀態標籤 | ${params.statusCount} |`,
       `| 工具箱與思考清單 | ${params.toolboxCount} |`,
+      `| 常用指令 | ${params.commandCount} |`,
       `| 回顧日誌 | ${params.reflectionCount} |`,
       `| 任務頭像 | ${params.avatarCount} |`,
       `| 側邊圖片 | ${params.carouselCount} |`,
@@ -629,6 +662,7 @@ function buildReadme(params: {
       `- ${mdLink("還原用資料 data.json", BACKUP_JSON_FILE)}`,
       `- 任務/`,
       `- 工具箱與思考清單/`,
+      `- ${mdLink("常用指令", "常用指令.md")}`,
       `- 回顧日誌/`,
       `- photos/`,
     ].join("\n"),
@@ -688,6 +722,7 @@ function buildBackupPayload(
     labels: source.labels,
     statusItems: source.statusItems,
     toolboxLists: source.toolboxLists,
+    commandCategories: source.commandCategories ?? [],
     tasks: source.tasks.map((task) => ({
       ...task,
       attachments: task.attachments.map((item) =>
@@ -751,6 +786,7 @@ export async function downloadBackupZip(
     selectedImageId: null,
   };
   const stockFavorites = source.stockFavorites ?? [];
+  const commandCategories = source.commandCategories ?? [];
 
   const attachments = source.tasks.flatMap(collectTaskAttachments);
   const photos = new Map<string, string>();
@@ -833,6 +869,7 @@ export async function downloadBackupZip(
   }
 
   zip.file("標籤.md", buildLabelsMarkdown(source.labels, source.statusItems));
+  zip.file("常用指令.md", buildCommandsMarkdown(commandCategories));
   zip.file(
     "其他資料.md",
     buildExtrasMarkdown({
@@ -866,6 +903,7 @@ export async function downloadBackupZip(
       labelCount: source.labels.length,
       statusCount: source.statusItems.length,
       toolboxCount: source.toolboxLists.length,
+      commandCount: commandCategories.length,
       reflectionCount: reflections.length,
       avatarCount: taskAvatars.length,
       carouselCount: carousel.images.length,
@@ -906,6 +944,7 @@ export async function downloadBackupZip(
     labelCount: source.labels.length,
     statusCount: source.statusItems.length,
     toolboxCount: source.toolboxLists.length,
+    commandCount: commandCategories.length,
     reflectionCount: reflections.length,
     photoCount: photoFiles.length,
   };

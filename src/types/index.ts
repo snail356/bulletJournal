@@ -291,3 +291,23 @@ export interface TwStockDividend {
   /** 近一年除權息明細 */
   history: TwStockExEvent[];
 }
+
+/** 常用指令中的單筆可複製內容 */
+export interface CommandItem {
+  id: string;
+  /** 指令或帳密等可複製文字 */
+  content: string;
+  /** 說明 */
+  note: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 常用指令類別 */
+export interface CommandCategory {
+  id: string;
+  title: string;
+  items: CommandItem[];
+  createdAt: string;
+  updatedAt: string;
+}
