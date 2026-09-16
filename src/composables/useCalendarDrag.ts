@@ -14,6 +14,7 @@ interface DragSession {
   originStart: string
   originEndStored: string | null
   originEffectiveEnd: string
+  originLane: number
   anchorDate: string
   pointerId: number
   startX: number
@@ -72,6 +73,11 @@ export function useCalendarDrag(options: {
     return { [session.value.taskId]: preview.value }
   })
 
+  const pinnedLanes = computed<Record<string, number>>(() => {
+    if (!session.value) return {}
+    return { [session.value.taskId]: session.value.originLane }
+  })
+
   function beginDrag(
     event: PointerEvent,
     payload: {
@@ -80,6 +86,7 @@ export function useCalendarDrag(options: {
       originStart: string
       originEndStored: string | null
       originEffectiveEnd: string
+      originLane: number
       anchorDate: string
     },
   ) {
@@ -182,6 +189,7 @@ export function useCalendarDrag(options: {
     dragMode,
     preview,
     previewByTask,
+    pinnedLanes,
     pointerPos,
     consumeClickSuppression,
   }

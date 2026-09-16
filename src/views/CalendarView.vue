@@ -130,6 +130,7 @@ const {
   dragMode,
   preview,
   previewByTask,
+  pinnedLanes,
   pointerPos,
   consumeClickSuppression,
 } = useCalendarDrag({
@@ -141,7 +142,12 @@ const {
 
 const layouts = computed<WeekLayout[]>(() =>
   weekRows.value.map((days) =>
-    layoutWeekSegments(store.tasks, weekDateStrings(days), previewByTask.value),
+    layoutWeekSegments(
+      store.tasks,
+      weekDateStrings(days),
+      previewByTask.value,
+      pinnedLanes.value,
+    ),
   ),
 );
 
@@ -246,6 +252,7 @@ function beginDrag(
   event: PointerEvent,
   taskId: string,
   mode: CalendarDragMode,
+  lane: number,
 ) {
   const task = tasksById.value.get(taskId);
   if (!task) return;
@@ -256,6 +263,7 @@ function beginDrag(
     originStart: task.date,
     originEndStored: task.endDate,
     originEffectiveEnd: getTaskEndDate(task),
+    originLane: lane,
     anchorDate,
   });
 }
@@ -499,9 +507,13 @@ const hintStyle = computed(() => {
               :continues-after="segment.continuesAfter"
               :dragging="draggingTaskId === segment.taskId"
               :drag-mode="draggingTaskId === segment.taskId ? dragMode : null"
-              @move-start="beginDrag($event, segment.taskId, 'move')"
-              @resize-start="beginDrag($event, segment.taskId, 'resize-start')"
-              @resize-end="beginDrag($event, segment.taskId, 'resize-end')"
+              @move-start="beginDrag($event, segment.taskId, 'move', segment.lane)"
+              @resize-start="
+                beginDrag($event, segment.taskId, 'resize-start', segment.lane)
+              "
+              @resize-end="
+                beginDrag($event, segment.taskId, 'resize-end', segment.lane)
+              "
               @select="onSelectTask(segment.taskId)"
             />
           </div>

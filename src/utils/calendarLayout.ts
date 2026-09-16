@@ -30,10 +30,31 @@ function applyPreview(
   return { ...task, date: next.date, endDate: next.endDate }
 }
 
-export function layoutWeekSegments(
+function segmentGeometry(
+  task: Task,
+  weekDates: string[],
+): Omit<CalendarLaneSegment, 'taskId' | 'lane'> | null {
+  const weekStart = weekDates[0]
+  const weekEnd = weekDates[6]
+  const start = task.date
+  const end = getTaskEndDate(task)
+  const visStart = start < weekStart ? weekStart : start
+  const visEnd = end > weekEnd ? weekEnd : end
+  const startCol = weekDates.indexOf(visStart)
+  const endCol = weekDates.indexOf(visEnd)
+  if (startCol < 0 || endCol < 0) return null
+  return {
+    startCol,
+    span: endCol - startCol + 1,
+    continuesBefore: start < weekStart,
+    continuesAfter: end > weekEnd,
+  }
+}
+
+function packWeekSegments(
   tasks: Task[],
   weekDates: string[],
-  preview: Record<string, { date: string; endDate: string | null }> = {},
+  preview: Record<string, { date: string; endDate: string | null }>,
 ): WeekLayout {
   const weekStart = weekDates[0]
   const weekEnd = weekDates[6]
@@ -50,13 +71,10 @@ export function layoutWeekSegments(
   const segments: CalendarLaneSegment[] = []
 
   for (const task of overlapping) {
-    const start = task.date
-    const end = getTaskEndDate(task)
-    const visStart = start < weekStart ? weekStart : start
-    const visEnd = end > weekEnd ? weekEnd : end
-    const startCol = weekDates.indexOf(visStart)
-    const endCol = weekDates.indexOf(visEnd)
-    if (startCol < 0 || endCol < 0) continue
+    const geometry = segmentGeometry(task, weekDates)
+    if (!geometry) continue
+    const visStart = weekDates[geometry.startCol]
+    const visEnd = weekDates[geometry.startCol + geometry.span - 1]
 
     let lane = laneEnds.findIndex((occupiedEnd) => occupiedEnd < visStart)
     if (lane === -1) {
@@ -69,10 +87,7 @@ export function layoutWeekSegments(
     segments.push({
       taskId: task.id,
       lane,
-      startCol,
-      span: endCol - startCol + 1,
-      continuesBefore: start < weekStart,
-      continuesAfter: end > weekEnd,
+      ...geometry,
     })
   }
 
@@ -80,6 +95,47 @@ export function layoutWeekSegments(
     dates: weekDates,
     segments,
     laneCount: Math.max(laneEnds.length, 1),
+  }
+}
+
+export function layoutWeekSegments(
+  tasks: Task[],
+  weekDates: string[],
+  preview: Record<string, { date: string; endDate: string | null }> = {},
+  pinnedLanes: Record<string, number> = {},
+): WeekLayout {
+  const pinnedIds = Object.keys(pinnedLanes)
+  const hasPinnedPreview =
+    pinnedIds.length > 0 && pinnedIds.some((taskId) => preview[taskId])
+
+  if (!hasPinnedPreview) {
+    return packWeekSegments(tasks, weekDates, preview)
+  }
+
+  const base = packWeekSegments(tasks, weekDates, {})
+  const pinnedIdSet = new Set(pinnedIds)
+  const segments = base.segments.filter(
+    (segment) => !pinnedIdSet.has(segment.taskId),
+  )
+  let laneCount = base.laneCount
+
+  for (const task of tasks) {
+    const lane = pinnedLanes[task.id]
+    if (lane == null || !preview[task.id]) continue
+    const geometry = segmentGeometry(applyPreview(task, preview), weekDates)
+    if (!geometry) continue
+    laneCount = Math.max(laneCount, lane + 1)
+    segments.push({
+      taskId: task.id,
+      lane,
+      ...geometry,
+    })
+  }
+
+  return {
+    dates: weekDates,
+    segments,
+    laneCount,
   }
 }
 
