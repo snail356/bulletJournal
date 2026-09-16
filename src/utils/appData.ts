@@ -37,6 +37,7 @@ export const IDB_TASK_AVATARS_KEY = "taskAvatars";
 export const IDB_SIDEBAR_CAROUSEL_KEY = "sidebarCarousel";
 export const IDB_STOCK_FAVORITES_KEY = "stockFavorites";
 export const IDB_STOCK_CATALOG_KEY = "stockCatalog";
+export const IDB_STOCK_EX_HISTORY_KEY = "stockExHistory";
 export const IDB_AI_MANAGER_PROMPT_KEY = "aiManagerPrompt";
 
 const ATT_BLOB_PREFIX = "att:";
@@ -272,6 +273,14 @@ export async function saveStockCatalog(
   catalog: TwStockCatalogEntry[],
 ): Promise<void> {
   await idbSet(IDB_STOCK_CATALOG_KEY, catalog);
+}
+
+export async function loadStockExHistory(): Promise<unknown | null> {
+  return (await idbGet<unknown>(IDB_STOCK_EX_HISTORY_KEY)) ?? null;
+}
+
+export async function saveStockExHistory(payload: unknown): Promise<void> {
+  await idbSet(IDB_STOCK_EX_HISTORY_KEY, payload);
 }
 
 export async function loadAiManagerPrompt(): Promise<string | null> {

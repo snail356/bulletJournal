@@ -7,6 +7,7 @@ import type {
   TwStockMarket,
   TwStockQuote,
 } from "@/types";
+import { loadStockExHistory, saveStockExHistory } from "@/utils/appData";
 
 /** 本機走 Vite proxy，避免瀏覽器 CORS；正式站仍打官方網址 */
 function stockApi(
@@ -523,6 +524,62 @@ export async function fetchStockExHistory(): Promise<Map<string, ExHistorySummar
   return new Map();
 }
 
+function localTodayIso(): string {
+  const today = new Date();
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+}
+
+function parseCachedExHistory(raw: unknown): {
+  fetchedOn: string;
+  map: Map<string, ExHistorySummary>;
+} | null {
+  const root = asRecord(raw);
+  if (!root) return null;
+  const fetchedOn = String(root.fetchedOn ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fetchedOn) || !Array.isArray(root.summaries)) {
+    return null;
+  }
+  const map = new Map<string, ExHistorySummary>();
+  for (const item of root.summaries) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const code = String(row.code ?? "").trim();
+    if (!code || !Array.isArray(row.events)) continue;
+    const events: TwStockExEvent[] = row.events.flatMap((event) => {
+      const rec = asRecord(event);
+      if (!rec) return [];
+      const exDate = parseTwDate(String(rec.exDate ?? "")) ?? "";
+      if (!exDate) return [];
+      return [
+        {
+          exDate,
+          cashDividend: parseTwNumber(
+            rec.cashDividend == null ? "" : String(rec.cashDividend),
+          ),
+          stockDividendRatio: parseTwNumber(
+            rec.stockDividendRatio == null ? "" : String(rec.stockDividendRatio),
+          ),
+          kind: String(rec.kind ?? ""),
+          preClose: parseTwNumber(
+            rec.preClose == null ? "" : String(rec.preClose),
+          ),
+          fillDate: null,
+          fillChecked: false,
+        },
+      ];
+    });
+    map.set(code, {
+      count: Number(row.count) || 0,
+      lastExDate: typeof row.lastExDate === "string" ? row.lastExDate : null,
+      lastCash:
+        row.lastCash == null ? null : parseTwNumber(String(row.lastCash)),
+      trailingCash: Number(row.trailingCash) || 0,
+      events,
+    });
+  }
+  return map.size ? { fetchedOn, map } : null;
+}
+
 interface DailyClose {
   date: string;
   close: number;
@@ -808,13 +865,26 @@ export function overlayDividendHistory(
 }
 
 let memoryByCode = new Map<string, TwStockDividend>();
-let memoryHistoryReady = false;
-let dividendInflight: Promise<Map<string, TwStockDividend>> | null = null;
+type DividendSnapshotParts = {
+  upcoming: TwStockDividend[];
+  yields: Map<string, number>;
+  periodsByCode: Map<string, string[]>;
+};
+let snapshotParts: DividendSnapshotParts | null = null;
+let snapshotInflight: Promise<DividendSnapshotParts> | null = null;
+let historyMap: Map<string, ExHistorySummary> | null = null;
+let historyFetchedOn: string | null = null;
+let historyInflight: Promise<Map<string, ExHistorySummary>> | null = null;
 
-export function resetDividendMemory() {
+export function resetDividendMemory(options?: { includeHistory?: boolean }) {
   memoryByCode = new Map();
-  memoryHistoryReady = false;
-  dividendInflight = null;
+  snapshotParts = null;
+  snapshotInflight = null;
+  if (options?.includeHistory) {
+    historyMap = null;
+    historyFetchedOn = null;
+    historyInflight = null;
+  }
 }
 
 async function fetchUpcomingExAnnouncements(): Promise<TwStockDividend[]> {
@@ -864,22 +934,15 @@ export async function fetchStockDirectory(): Promise<TwStockQuote[]> {
   ];
 }
 
-async function loadDividendMarket(): Promise<Map<string, TwStockDividend>> {
-  const [
-    twseYield,
-    tpexYield,
-    upcomingResult,
-    twsePolicy,
-    tpexPolicy,
-    historyResult,
-  ] = await Promise.allSettled([
-    fetchJson(TWSE_YIELD_URL),
-    fetchJson(TPEX_YIELD_URL),
-    fetchUpcomingExAnnouncements(),
-    fetchJson(TWSE_POLICY_URL),
-    fetchJson(TPEX_POLICY_URL),
-    fetchStockExHistory(),
-  ]);
+async function loadDividendSnapshotParts(): Promise<NonNullable<typeof snapshotParts>> {
+  const [twseYield, tpexYield, upcomingResult, twsePolicy, tpexPolicy] =
+    await Promise.allSettled([
+      fetchJson(TWSE_YIELD_URL),
+      fetchJson(TPEX_YIELD_URL),
+      fetchUpcomingExAnnouncements(),
+      fetchJson(TWSE_POLICY_URL),
+      fetchJson(TPEX_POLICY_URL),
+    ]);
 
   const yields = new Map<string, number>();
   if (twseYield.status === "fulfilled") {
@@ -917,16 +980,93 @@ async function loadDividendMarket(): Promise<Map<string, TwStockDividend>> {
     }
   }
 
-  const historyByCode =
-    historyResult.status === "fulfilled"
-      ? historyResult.value
-      : new Map<string, ExHistorySummary>();
+  return { upcoming, yields, periodsByCode };
+}
 
-  const merged = mergeDividends(upcoming, yields, periodsByCode, historyByCode);
-  const byCode = new Map(merged.map((item) => [item.code, item]));
-  memoryByCode = byCode;
-  memoryHistoryReady = historyByCode.size > 0;
-  return byCode;
+function rebuildDividendMemory(historyByCode: Map<string, ExHistorySummary>) {
+  if (!snapshotParts) return;
+  const merged = mergeDividends(
+    snapshotParts.upcoming,
+    snapshotParts.yields,
+    snapshotParts.periodsByCode,
+    historyByCode,
+  );
+  memoryByCode = new Map(merged.map((item) => [item.code, item]));
+}
+
+function cacheExHistory(map: Map<string, ExHistorySummary>, fetchedOn: string) {
+  historyMap = map;
+  historyFetchedOn = fetchedOn;
+  void saveStockExHistory({
+    fetchedOn,
+    summaries: [...map.entries()].map(([code, item]) => ({
+      code,
+      count: item.count,
+      lastExDate: item.lastExDate,
+      lastCash: item.lastCash,
+      trailingCash: item.trailingCash,
+      events: item.events.map((event) => ({
+        ...event,
+        fillDate: null,
+        fillChecked: false,
+      })),
+    })),
+  });
+}
+
+async function refreshExHistoryFromNetwork(): Promise<Map<string, ExHistorySummary>> {
+  const parsed = await fetchStockExHistory();
+  if (parsed.size) cacheExHistory(parsed, localTodayIso());
+  return historyMap ?? parsed;
+}
+
+async function ensureExHistory(): Promise<Map<string, ExHistorySummary>> {
+  const today = localTodayIso();
+  if (historyMap?.size) {
+    if (historyFetchedOn !== today && !historyInflight) {
+      historyInflight = refreshExHistoryFromNetwork().finally(() => {
+        historyInflight = null;
+      });
+    }
+    return historyMap;
+  }
+
+  const cached = parseCachedExHistory(await loadStockExHistory());
+  if (cached?.map.size) {
+    historyMap = cached.map;
+    historyFetchedOn = cached.fetchedOn;
+    if (cached.fetchedOn !== today && !historyInflight) {
+      historyInflight = refreshExHistoryFromNetwork().finally(() => {
+        historyInflight = null;
+      });
+    }
+    return historyMap;
+  }
+
+  if (!historyInflight) {
+    historyInflight = refreshExHistoryFromNetwork().finally(() => {
+      historyInflight = null;
+    });
+  }
+  return historyInflight;
+}
+
+async function ensureDividendSnapshotParts(): Promise<NonNullable<typeof snapshotParts>> {
+  if (snapshotParts) return snapshotParts;
+  if (!snapshotInflight) {
+    snapshotInflight = loadDividendSnapshotParts()
+      .then((parts) => {
+        snapshotParts = parts;
+        rebuildDividendMemory(historyMap ?? new Map());
+        return parts;
+      })
+      .finally(() => {
+        if (!snapshotParts) snapshotInflight = null;
+      });
+  }
+  const parts = await snapshotInflight;
+  if (!parts) throw new Error("讀取配息資料失敗");
+  return parts;
 }
 
 function sliceDividends(
@@ -941,16 +1081,20 @@ export async function fetchDividendSnapshot(
 ): Promise<TwStockDividend[]> {
   const codes = [...new Set(focusCodes.map((code) => code.trim()).filter(Boolean))];
   if (!codes.length) return [];
-  if (memoryHistoryReady) return sliceDividends(memoryByCode, codes);
-  if (!dividendInflight) {
-    const pending = loadDividendMarket().finally(() => {
-      if (dividendInflight === pending && !memoryHistoryReady) {
-        dividendInflight = null;
-      }
-    });
-    dividendInflight = pending;
-  }
-  return sliceDividends(await dividendInflight, codes);
+  await ensureDividendSnapshotParts();
+  return sliceDividends(memoryByCode, codes);
+}
+
+/** 近一年除權息歷史較慢，背景補上後再套用到自選 */
+export async function fetchDividendHistoryOverlay(
+  getCodes: () => string[],
+): Promise<TwStockDividend[]> {
+  await Promise.all([ensureDividendSnapshotParts(), ensureExHistory()]);
+  rebuildDividendMemory(historyMap ?? new Map());
+  const codes = [
+    ...new Set(getCodes().map((code) => code.trim()).filter(Boolean)),
+  ];
+  return sliceDividends(memoryByCode, codes);
 }
 
 function misBaseUrl(): string {

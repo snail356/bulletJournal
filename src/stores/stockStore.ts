@@ -16,6 +16,7 @@ import {
 import {
   attachFillDates,
   fetchDividendSnapshot,
+  fetchDividendHistoryOverlay,
   fetchLiveQuotes,
   fetchMarketQuotes,
   fetchStockDirectory,
@@ -188,8 +189,12 @@ export const useStockStore = defineStore("stock", () => {
     else loading.value = true;
     error.value = "";
     const withDividends = options?.withDividends === true;
+    const favoriteCodes = () => favorites.value.map((stock) => stock.code);
     const dividendPromise = withDividends
-      ? fetchDividendSnapshot(favorites.value.map((stock) => stock.code))
+      ? fetchDividendSnapshot(favoriteCodes())
+      : null;
+    const historyPromise = withDividends
+      ? fetchDividendHistoryOverlay(favoriteCodes)
       : null;
     try {
       const quotesPromise = fetchMarketQuotes().catch(() => [] as TwStockQuote[]);
@@ -223,10 +228,16 @@ export const useStockStore = defineStore("stock", () => {
       loading.value = false;
       refreshing.value = false;
     }
-    if (!dividendPromise) return;
-    void dividendPromise.then(applyDividends).catch(() => {
-      // 配息來源較慢或失敗時保留已顯示的行情
-    });
+    if (dividendPromise) {
+      void dividendPromise.then(applyDividends).catch(() => {
+        // 配息來源較慢或失敗時保留已顯示的行情
+      });
+    }
+    if (historyPromise) {
+      void historyPromise.then(applyDividends).catch(() => {
+        // 歷史除權息較慢，不阻擋清單與配息摘要
+      });
+    }
   }
 
   function search(query: string) {
@@ -404,7 +415,7 @@ export const useStockStore = defineStore("stock", () => {
     error.value = "";
     lastUpdatedAt.value = null;
     await favoritesSaver.flush();
-    resetDividendMemory();
+    resetDividendMemory({ includeHistory: true });
   }
 
   return {
