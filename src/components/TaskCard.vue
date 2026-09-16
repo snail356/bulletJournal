@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, inject, nextTick, provide, ref, watch } from 'vue'
-import type { Attachment, ContentFormat, SubTask, Task } from '@/types'
+import { computed, inject, nextTick, provide, ref, watch } from "vue";
+import type { Attachment, ContentFormat, SubTask, Task } from "@/types";
 import {
   formatDisplayDate,
   formatShortDate,
@@ -8,127 +8,135 @@ import {
   getPostponedDays,
   getTaskEndDate,
   normalizeEndDate,
-} from '@/utils/date'
-import SubTaskItem from './SubTaskItem.vue'
-import TaskBodySection from './TaskBodySection.vue'
-import NoteBlock from './NoteBlock.vue'
-import TaskContextMenu from './TaskContextMenu.vue'
-import type { ContextMenuItem } from './TaskContextMenu.vue'
-import TaskFormModal from './TaskFormModal.vue'
-import TaskStatusDropdown from './TaskStatusDropdown.vue'
-import TaskAvatarDropdown from './TaskAvatarDropdown.vue'
-import TaskAvatarFace from './TaskAvatarFace.vue'
-import TaskLabelsDropdown from './TaskLabelsDropdown.vue'
-import ConfirmDialog from './ConfirmDialog.vue'
-import AppIcon from './AppIcon.vue'
-import InlineEditable from './InlineEditable.vue'
-import FormattedContentEditor from './FormattedContentEditor.vue'
-import { SUBTASK_DRAG_KEY, TASK_DRAG_KEY } from '@/composables/taskDrag'
-import { useReorderDrag } from '@/composables/useReorderDrag'
-import { useTaskStore } from '@/stores/taskStore'
-import { openBacklogUrl } from '@/utils/backlog'
-import { getNotesExpanded, setNotesExpanded } from '@/utils/sectionCollapseState'
+} from "@/utils/date";
+import SubTaskItem from "./SubTaskItem.vue";
+import TaskBodySection from "./TaskBodySection.vue";
+import NoteBlock from "./NoteBlock.vue";
+import TaskContextMenu from "./TaskContextMenu.vue";
+import type { ContextMenuItem } from "./TaskContextMenu.vue";
+import TaskFormModal from "./TaskFormModal.vue";
+import TaskStatusDropdown from "./TaskStatusDropdown.vue";
+import TaskAvatarDropdown from "./TaskAvatarDropdown.vue";
+import TaskAvatarFace from "./TaskAvatarFace.vue";
+import TaskLabelsDropdown from "./TaskLabelsDropdown.vue";
+import ConfirmDialog from "./ConfirmDialog.vue";
+import AppIcon from "./AppIcon.vue";
+import InlineEditable from "./InlineEditable.vue";
+import FormattedContentEditor from "./FormattedContentEditor.vue";
+import { SUBTASK_DRAG_KEY, TASK_DRAG_KEY } from "@/composables/taskDrag";
+import { useReorderDrag } from "@/composables/useReorderDrag";
+import { useTaskStore } from "@/stores/taskStore";
+import { openBacklogUrl } from "@/utils/backlog";
+import {
+  getNotesExpanded,
+  setNotesExpanded,
+} from "@/utils/sectionCollapseState";
 import {
   getSubtasksExpanded,
   setSubtasksExpanded,
-} from '@/utils/sectionCollapseState'
+} from "@/utils/sectionCollapseState";
 
 const props = defineProps<{
-  task: Task
-  migratedAway?: boolean
-}>()
+  task: Task;
+  migratedAway?: boolean;
+}>();
 
 const emit = defineEmits<{
-  preview: [attachment: Attachment]
-  deleted: [task: Task]
-}>()
+  preview: [attachment: Attachment];
+  deleted: [task: Task];
+}>();
 
-const store = useTaskStore()
-const taskDrag = inject(TASK_DRAG_KEY, null)
+const store = useTaskStore();
+const taskDrag = inject(TASK_DRAG_KEY, null);
 
-const isTaskDragging = computed(() => taskDrag?.draggingId.value === props.task.id)
-const isTaskDragOver = computed(() => taskDrag?.dragOverId.value === props.task.id)
-const avatar = computed(() => store.getTaskAvatar(props.task.avatarId))
-const isBacklogLinked = computed(() => Boolean(props.task.backlogUrl))
+const isTaskDragging = computed(
+  () => taskDrag?.draggingId.value === props.task.id,
+);
+const isTaskDragOver = computed(
+  () => taskDrag?.dragOverId.value === props.task.id,
+);
+const avatar = computed(() => store.getTaskAvatar(props.task.avatarId));
+const isBacklogLinked = computed(() => Boolean(props.task.backlogUrl));
 
 const subtaskDrag = useReorderDrag<SubTask>(
   () => props.task.subtasks,
   (fromId, toId) => store.reorderSubTasks(props.task.id, fromId, toId),
-)
-provide(SUBTASK_DRAG_KEY, subtaskDrag)
+);
+provide(SUBTASK_DRAG_KEY, subtaskDrag);
 
-const menuVisible = ref(false)
-const menuX = ref(0)
-const menuY = ref(0)
-const showEditModal = ref(false)
-const showCompleteConfirm = ref(false)
-const pendingFocusSubtaskId = ref<string | null>(null)
-const pendingFocusNoteId = ref<string | null>(null)
-const datePickerMode = ref<'start' | 'end' | 'move' | null>(null)
-const datePickerValue = ref('')
-const datePickerInput = ref<HTMLInputElement | null>(null)
-const datePickerApplying = ref(false)
-const fileInput = ref<HTMLInputElement | null>(null)
-const hoursInput = ref<HTMLInputElement | null>(null)
-const expanded = ref(store.expandAllTasks)
-const notesExpanded = ref(getNotesExpanded(props.task.id, true))
-const subtasksExpanded = ref(getSubtasksExpanded(props.task.id, true))
+const menuVisible = ref(false);
+const menuX = ref(0);
+const menuY = ref(0);
+const showEditModal = ref(false);
+const showCompleteConfirm = ref(false);
+const pendingFocusSubtaskId = ref<string | null>(null);
+const pendingFocusNoteId = ref<string | null>(null);
+const datePickerMode = ref<"start" | "end" | "move" | null>(null);
+const datePickerValue = ref("");
+const datePickerInput = ref<HTMLInputElement | null>(null);
+const datePickerApplying = ref(false);
+const fileInput = ref<HTMLInputElement | null>(null);
+const hoursInput = ref<HTMLInputElement | null>(null);
+const expanded = ref(store.expandAllTasks);
+const notesExpanded = ref(getNotesExpanded(props.task.id, true));
+const subtasksExpanded = ref(getSubtasksExpanded(props.task.id, true));
 
 watch(
   () => store.expandAllTasks,
   (v) => {
-    expanded.value = v
+    expanded.value = v;
   },
-)
+);
 
 watch(notesExpanded, (value) => {
-  setNotesExpanded(props.task.id, value)
-})
+  setNotesExpanded(props.task.id, value);
+});
 
 watch(subtasksExpanded, (value) => {
-  setSubtasksExpanded(props.task.id, value)
-})
+  setSubtasksExpanded(props.task.id, value);
+});
 
 watch(
   () => props.task.id,
   (taskId) => {
-    notesExpanded.value = getNotesExpanded(taskId, true)
-    subtasksExpanded.value = getSubtasksExpanded(taskId, true)
+    notesExpanded.value = getNotesExpanded(taskId, true);
+    subtasksExpanded.value = getSubtasksExpanded(taskId, true);
   },
-)
+);
 
 function toggleExpanded() {
-  expanded.value = !expanded.value
+  expanded.value = !expanded.value;
 }
 
 function toggleNotesExpanded() {
-  notesExpanded.value = !notesExpanded.value
+  notesExpanded.value = !notesExpanded.value;
 }
 
 function toggleSubtasksExpanded() {
-  subtasksExpanded.value = !subtasksExpanded.value
+  subtasksExpanded.value = !subtasksExpanded.value;
 }
 
 const notesPreview = computed(() => {
-  const notes = props.task.notes
-  if (!notes.length) return '尚無備註'
-  const latest = notes[notes.length - 1]
-  const text = latest.content.trim().replace(/\s+/g, ' ')
-  const snippet = text.length > 48 ? `${text.slice(0, 48)}…` : text || '（空白備註）'
-  return notes.length === 1 ? snippet : `${notes.length} 則 · ${snippet}`
-})
+  const notes = props.task.notes;
+  if (!notes.length) return "尚無備註";
+  const latest = notes[notes.length - 1];
+  const text = latest.content.trim().replace(/\s+/g, " ");
+  const snippet =
+    text.length > 48 ? `${text.slice(0, 48)}…` : text || "（空白備註）";
+  return notes.length === 1 ? snippet : `${notes.length} 則 · ${snippet}`;
+});
 
 const subtaskProgress = computed(() => {
-  const total = props.task.subtasks.length
-  const done = props.task.subtasks.filter((s) => s.completed).length
-  return { total, done }
-})
+  const total = props.task.subtasks.length;
+  const done = props.task.subtasks.filter((s) => s.completed).length;
+  return { total, done };
+});
 
 const incompleteSubtaskCount = computed(
   () => props.task.subtasks.filter((s) => !s.completed).length,
-)
+);
 
-const isMigrated = computed(() => props.migratedAway === true)
+const isMigrated = computed(() => props.migratedAway === true);
 
 const showTaskDrag = computed(
   () =>
@@ -136,335 +144,341 @@ const showTaskDrag = computed(
     !isMigrated.value &&
     props.task.date === store.selectedDate &&
     !expanded.value,
-)
+);
 
-const migratedTargetLabel = computed(() => formatDisplayDate(props.task.date))
+const migratedTargetLabel = computed(() => formatDisplayDate(props.task.date));
 
-const postponedDays = computed(() => getPostponedDays(props.task))
+const postponedDays = computed(() => getPostponedDays(props.task));
 
 const postponedLabel = computed(() => {
-  if (postponedDays.value <= 0) return ''
-  return `原排程 ${formatDisplayDate(getOriginalScheduledDate(props.task))}`
-})
+  if (postponedDays.value <= 0) return "";
+  return `原排程 ${formatDisplayDate(getOriginalScheduledDate(props.task))}`;
+});
 
-const startDateLabel = computed(() => formatShortDate(props.task.date))
-const endDateLabel = computed(() => formatShortDate(getTaskEndDate(props.task)))
+const startDateLabel = computed(() => formatShortDate(props.task.date));
+const endDateLabel = computed(() =>
+  formatShortDate(getTaskEndDate(props.task)),
+);
 
 const datePickerMin = computed(() =>
-  datePickerMode.value === 'end' ? props.task.date : undefined,
-)
+  datePickerMode.value === "end" ? props.task.date : undefined,
+);
 
-const hoursDraft = ref(formatHoursDraft(props.task.statusHours))
+const hoursDraft = ref(formatHoursDraft(props.task.statusHours));
 
 watch(
   () => props.task.statusHours,
   (hours) => {
-    hoursDraft.value = formatHoursDraft(hours)
+    hoursDraft.value = formatHoursDraft(hours);
   },
-)
+);
 
 function formatHoursDraft(hours: number | null): string {
-  return hours != null ? String(hours) : ''
+  return hours != null ? String(hours) : "";
 }
 
 function commitHours() {
-  const raw = String(hoursDraft.value ?? '').trim()
-  if (raw === '') {
-    store.setTaskStatusHours(props.task.id, null)
-    hoursDraft.value = ''
-    return
+  const raw = String(hoursDraft.value ?? "").trim();
+  if (raw === "") {
+    store.setTaskStatusHours(props.task.id, null);
+    hoursDraft.value = "";
+    return;
   }
-  const hours = Number(raw)
+  const hours = Number(raw);
   if (Number.isNaN(hours) || hours < 0) {
-    hoursDraft.value = formatHoursDraft(props.task.statusHours)
-    return
+    hoursDraft.value = formatHoursDraft(props.task.statusHours);
+    return;
   }
-  store.setTaskStatusHours(props.task.id, hours)
-  hoursDraft.value = String(hours)
+  store.setTaskStatusHours(props.task.id, hours);
+  hoursDraft.value = String(hours);
 }
 
 function onHoursKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter') {
-    e.preventDefault()
-    commitHours()
-    ;(e.target as HTMLInputElement).blur()
+  if (e.key === "Enter") {
+    e.preventDefault();
+    commitHours();
+    (e.target as HTMLInputElement).blur();
   }
 }
 
 function selectHoursInput() {
-  const input = hoursInput.value
-  if (!input) return
-  input.focus()
-  nextTick(() => input.select())
+  const input = hoursInput.value;
+  if (!input) return;
+  input.focus();
+  nextTick(() => input.select());
 }
 
 function onHoursFocus(e: FocusEvent) {
-  const input = e.target as HTMLInputElement
-  nextTick(() => input.select())
+  const input = e.target as HTMLInputElement;
+  nextTick(() => input.select());
 }
 
 function onHoursClick(e: MouseEvent) {
-  const input = e.target as HTMLInputElement
-  nextTick(() => input.select())
+  const input = e.target as HTMLInputElement;
+  nextTick(() => input.select());
 }
 
 function onStatusHoursClick(e: MouseEvent) {
-  if ((e.target as HTMLElement).closest('.hours-input')) return
-  selectHoursInput()
+  if ((e.target as HTMLElement).closest(".hours-input")) return;
+  selectHoursInput();
 }
 
 function goToCurrentDate() {
-  if (!isMigrated.value) return
-  store.setSelectedDate(props.task.date)
+  if (!isMigrated.value) return;
+  store.setSelectedDate(props.task.date);
 }
 
 function openLinkedBacklog(e: MouseEvent) {
-  e.preventDefault()
-  e.stopPropagation()
-  if (props.task.backlogUrl) openBacklogUrl(props.task.backlogUrl)
+  e.preventDefault();
+  e.stopPropagation();
+  if (props.task.backlogUrl) openBacklogUrl(props.task.backlogUrl);
 }
 
 const menuItems = computed<ContextMenuItem[]>(() => [
-  { key: 'edit', label: '編輯任務' },
-  { key: 'add-subtask', label: '新增子任務' },
-  { key: 'add-note', label: '新增備註' },
-  { key: 'paste-image', label: '貼上圖片' },
-  { key: 'duplicate', label: '複製任務' },
-  { key: 'move', label: '移動到其他日期' },
+  { key: "edit", label: "編輯任務" },
+  { key: "add-subtask", label: "新增子任務" },
+  { key: "add-note", label: "新增備註" },
+  { key: "paste-image", label: "貼上圖片" },
+  { key: "duplicate", label: "複製任務" },
+  { key: "move", label: "移動到其他日期" },
   {
-    key: 'delete',
-    label: '刪除任務',
+    key: "delete",
+    label: "刪除任務",
     danger: true,
     divider: true,
-    confirmTitle: '刪除任務',
+    confirmTitle: "刪除任務",
     confirmMessage: `確定要刪除「${props.task.title}」嗎？此操作將一併刪除所有子任務、備註與附件。`,
   },
-])
+]);
 
 function openMenu(e: MouseEvent) {
-  menuX.value = e.clientX
-  menuY.value = e.clientY
-  menuVisible.value = true
+  menuX.value = e.clientX;
+  menuY.value = e.clientY;
+  menuVisible.value = true;
 }
 
 function onContextMenu(e: MouseEvent) {
-  if (isMigrated.value) return
-  const target = e.target as HTMLElement | null
+  if (isMigrated.value) return;
+  const target = e.target as HTMLElement | null;
   // 輸入區保留瀏覽器原生選單（複製／貼上），不開主任務選單
   if (
     target?.closest(
       'textarea, input, [contenteditable="true"], .inline-editable.editing, .body-section, .note, .subtask',
     )
   ) {
-    return
+    return;
   }
-  e.preventDefault()
-  openMenu(e)
+  e.preventDefault();
+  openMenu(e);
 }
 
 function saveTitle(title: string) {
-  if (isMigrated.value) return
-  store.updateTask(props.task.id, { title })
+  if (isMigrated.value) return;
+  store.updateTask(props.task.id, { title });
 }
 
 function addSubtaskInline() {
   // 新增子任務時自動展開，避免使用者看不到剛建立的項目
-  subtasksExpanded.value = true
-  const sub = store.createSubTask(props.task.id, '')
+  subtasksExpanded.value = true;
+  const sub = store.createSubTask(props.task.id, "");
   if (sub) {
-    pendingFocusSubtaskId.value = sub.id
+    pendingFocusSubtaskId.value = sub.id;
     nextTick(() => {
-      pendingFocusSubtaskId.value = null
-    })
+      pendingFocusSubtaskId.value = null;
+    });
   }
 }
 
 function addNoteInline() {
-  notesExpanded.value = true
-  const note = store.createNote(props.task.id, '')
-  if (!note) return
-  pendingFocusNoteId.value = note.id
+  notesExpanded.value = true;
+  const note = store.createNote(props.task.id, "");
+  if (!note) return;
+  pendingFocusNoteId.value = note.id;
   nextTick(() => {
-    pendingFocusNoteId.value = null
-  })
+    pendingFocusNoteId.value = null;
+  });
 }
 
 function onComposerCommit(content: string, contentType: ContentFormat) {
-  if (!content.trim()) return
-  store.createNote(props.task.id, content, 'yellow', contentType)
-  notesExpanded.value = true
+  if (!content.trim()) return;
+  store.createNote(props.task.id, content, "yellow", contentType);
+  notesExpanded.value = true;
 }
 
 async function onComposerPasteImage(file: File) {
-  const note = store.createNote(props.task.id, '')
-  if (!note) return
-  notesExpanded.value = true
-  await store.addAttachment('note', note.id, file)
+  const note = store.createNote(props.task.id, "");
+  if (!note) return;
+  notesExpanded.value = true;
+  await store.addAttachment("note", note.id, file);
 }
 
 function onCompleteChange(e: Event) {
-  const input = e.target as HTMLInputElement
+  const input = e.target as HTMLInputElement;
   if (input.checked) {
     if (incompleteSubtaskCount.value > 0) {
-      showCompleteConfirm.value = true
-      return
+      showCompleteConfirm.value = true;
+      return;
     }
-    store.toggleTask(props.task.id)
+    store.toggleTask(props.task.id);
   } else {
-    store.toggleTask(props.task.id)
+    store.toggleTask(props.task.id);
   }
 }
 
 function confirmCompleteWithSubtasks() {
-  store.completeTaskWithSubtasks(props.task.id)
+  store.completeTaskWithSubtasks(props.task.id);
 }
 
 function onMenuSelect(key: string) {
-  menuVisible.value = false
+  menuVisible.value = false;
   switch (key) {
-    case 'edit':
-      showEditModal.value = true
-      break
-    case 'add-subtask':
-      addSubtaskInline()
-      break
-    case 'add-note':
-      addNoteInline()
-      break
-    case 'paste-image':
-      onContextPaste()
-      break
-    case 'duplicate':
-      store.duplicateTask(props.task.id)
-      break
-    case 'move':
-      openDatePicker('move')
-      break
-    case 'delete':
-      emit('deleted', props.task)
-      break
+    case "edit":
+      showEditModal.value = true;
+      break;
+    case "add-subtask":
+      addSubtaskInline();
+      break;
+    case "add-note":
+      addNoteInline();
+      break;
+    case "paste-image":
+      onContextPaste();
+      break;
+    case "duplicate":
+      store.duplicateTask(props.task.id);
+      break;
+    case "move":
+      openDatePicker("move");
+      break;
+    case "delete":
+      emit("deleted", props.task);
+      break;
   }
 }
 
-function openDatePicker(mode: 'start' | 'end' | 'move') {
-  datePickerMode.value = mode
-  datePickerApplying.value = false
-  if (mode === 'end') {
-    datePickerValue.value = getTaskEndDate(props.task)
+function openDatePicker(mode: "start" | "end" | "move") {
+  datePickerMode.value = mode;
+  datePickerApplying.value = false;
+  if (mode === "end") {
+    datePickerValue.value = getTaskEndDate(props.task);
   } else {
-    datePickerValue.value = props.task.date
+    datePickerValue.value = props.task.date;
   }
   nextTick(() => {
-    const el = datePickerInput.value
-    if (!el) return
-    el.focus({ preventScroll: true })
+    const el = datePickerInput.value;
+    if (!el) return;
+    el.focus({ preventScroll: true });
     try {
-      el.showPicker?.()
+      el.showPicker?.();
     } catch {
       /* 部分瀏覽器不支援或需使用者手勢，略過即可 */
     }
-  })
+  });
 }
 
 function closeDatePicker() {
-  datePickerMode.value = null
-  datePickerApplying.value = false
+  datePickerMode.value = null;
+  datePickerApplying.value = false;
 }
 
 function applySelectedDate(value: string) {
   if (!value || !datePickerMode.value) {
-    closeDatePicker()
-    return
+    closeDatePicker();
+    return;
   }
 
-  if (datePickerMode.value === 'move') {
-    store.moveTask(props.task.id, value)
-  } else if (datePickerMode.value === 'start') {
+  if (datePickerMode.value === "move") {
+    store.moveTask(props.task.id, value);
+  } else if (datePickerMode.value === "start") {
     store.setTaskDateRange(
       props.task.id,
       value,
       normalizeEndDate(value, props.task.endDate),
-    )
+    );
   } else {
     store.setTaskDateRange(
       props.task.id,
       props.task.date,
       normalizeEndDate(props.task.date, value),
-    )
+    );
   }
-  closeDatePicker()
+  closeDatePicker();
 }
 
 function onDatePickerChange(e: Event) {
-  if (!datePickerMode.value) return
-  const value = (e.target as HTMLInputElement).value
-  datePickerApplying.value = true
-  applySelectedDate(value)
+  if (!datePickerMode.value) return;
+  const value = (e.target as HTMLInputElement).value;
+  datePickerApplying.value = true;
+  applySelectedDate(value);
 }
 
 function onDatePickerBlur() {
-  if (!datePickerMode.value) return
+  if (!datePickerMode.value) return;
   // 原生日曆彈層互動時可能短暫失焦，稍等再決定是否取消
   window.setTimeout(() => {
-    if (!datePickerMode.value || datePickerApplying.value) return
-    if (document.activeElement === datePickerInput.value) return
-    closeDatePicker()
-  }, 150)
+    if (!datePickerMode.value || datePickerApplying.value) return;
+    if (document.activeElement === datePickerInput.value) return;
+    closeDatePicker();
+  }, 150);
 }
 
 function onDatePickerKeydown(e: KeyboardEvent) {
-  if (!datePickerMode.value) return
-  if (e.key === 'Escape') {
-    e.preventDefault()
-    closeDatePicker()
+  if (!datePickerMode.value) return;
+  if (e.key === "Escape") {
+    e.preventDefault();
+    closeDatePicker();
   }
 }
 
 function onStatusChange(status: string) {
-  store.applyTaskStatus(props.task.id, status)
+  store.applyTaskStatus(props.task.id, status);
 }
 
 function onLabelsChange(labels: string[]) {
-  store.updateTask(props.task.id, { labels })
+  store.updateTask(props.task.id, { labels });
 }
 
-
 async function onPaste(e: ClipboardEvent) {
-  const target = e.target as HTMLElement
-  if (target.closest('.subtask') || target.closest('.note') || target.closest('.body-section')) return
+  const target = e.target as HTMLElement;
+  if (
+    target.closest(".subtask") ||
+    target.closest(".note") ||
+    target.closest(".body-section")
+  )
+    return;
 
-  const items = e.clipboardData?.items
-  if (!items) return
+  const items = e.clipboardData?.items;
+  if (!items) return;
   for (const item of items) {
-    if (item.type.startsWith('image/')) {
-      e.preventDefault()
-      const file = item.getAsFile()
-      if (file) await store.addAttachment('task', props.task.id, file)
+    if (item.type.startsWith("image/")) {
+      e.preventDefault();
+      const file = item.getAsFile();
+      if (file) await store.addAttachment("task", props.task.id, file);
     }
   }
 }
 
 async function onFileChange(e: Event) {
-  const input = e.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (file) await store.addAttachment('task', props.task.id, file)
-  input.value = ''
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  if (file) await store.addAttachment("task", props.task.id, file);
+  input.value = "";
 }
 
 async function onContextPaste() {
   try {
-    const items = await navigator.clipboard.read()
+    const items = await navigator.clipboard.read();
     for (const item of items) {
-      const type = item.types.find((t) => t.startsWith('image/'))
+      const type = item.types.find((t) => t.startsWith("image/"));
       if (type) {
-        const blob = await item.getType(type)
-        const file = new File([blob], `paste-${Date.now()}.png`, { type })
-        await store.addAttachment('task', props.task.id, file)
-        break
+        const blob = await item.getType(type);
+        const file = new File([blob], `paste-${Date.now()}.png`, { type });
+        await store.addAttachment("task", props.task.id, file);
+        break;
       }
     }
   } catch {
-    fileInput.value?.click()
+    fileInput.value?.click();
   }
 }
 </script>
@@ -484,7 +498,10 @@ async function onContextPaste() {
     @dragover="!isMigrated && taskDrag?.onDragOver($event, task.id)"
     @drop="!isMigrated && taskDrag?.onDrop($event, task.id)"
   >
-    <header class="header" :class="{ 'has-actions': !isMigrated, 'has-drag': showTaskDrag }">
+    <header
+      class="header"
+      :class="{ 'has-actions': !isMigrated, 'has-drag': showTaskDrag }"
+    >
       <span
         v-if="showTaskDrag"
         class="drag-handle"
@@ -497,9 +514,18 @@ async function onContextPaste() {
       </span>
 
       <label v-if="!isMigrated" class="check-wrap">
-        <input type="checkbox" :checked="task.completed" @change="onCompleteChange" />
+        <input
+          type="checkbox"
+          :checked="task.completed"
+          @change="onCompleteChange"
+        />
         <span class="check" :class="{ checked: task.completed }">
-          <AppIcon v-if="task.completed" name="check" size="xs" class="check-icon" />
+          <AppIcon
+            v-if="task.completed"
+            name="check"
+            size="xs"
+            class="check-icon"
+          />
         </span>
       </label>
 
@@ -516,7 +542,9 @@ async function onContextPaste() {
         <span v-else-if="avatar" class="task-avatar" :title="avatar.name">
           <TaskAvatarFace :avatar="avatar" size="sm" />
         </span>
-        <h3 v-if="isMigrated && !isBacklogLinked" class="title">{{ task.title }}</h3>
+        <h3 v-if="isMigrated && !isBacklogLinked" class="title">
+          {{ task.title }}
+        </h3>
         <button
           v-else-if="isBacklogLinked"
           type="button"
@@ -525,7 +553,11 @@ async function onContextPaste() {
           @click.stop="openLinkedBacklog"
         >
           <span class="title-text">{{ task.title }}</span>
-          <AppIcon name="up-right-from-square" size="xs" class="backlog-link-icon" />
+          <AppIcon
+            name="up-right-from-square"
+            size="xs"
+            class="backlog-link-icon"
+          />
         </button>
         <InlineEditable
           v-else
@@ -537,7 +569,9 @@ async function onContextPaste() {
       </div>
 
       <div v-if="!isMigrated" class="header-actions">
-        <button type="button" class="expand-btn"
+        <button
+          type="button"
+          class="expand-btn"
           :aria-expanded="expanded"
           @click="toggleExpanded"
         >
@@ -561,11 +595,17 @@ async function onContextPaste() {
           <div class="meta-primary">
             <div class="status-row">
               <div class="date-field">
-                <div class="date-range" :title="`${task.date} ～ ${getTaskEndDate(task)}`">
+                <div
+                  class="date-range"
+                  :title="`${task.date} ～ ${getTaskEndDate(task)}`"
+                >
                   <button
                     type="button"
                     class="date-part"
-                    :class="{ active: datePickerMode === 'start' || datePickerMode === 'move' }"
+                    :class="{
+                      active:
+                        datePickerMode === 'start' || datePickerMode === 'move',
+                    }"
                     title="重新選擇開始日期"
                     @mousedown.prevent
                     @click.stop="openDatePicker('start')"
@@ -665,7 +705,10 @@ async function onContextPaste() {
             :aria-expanded="subtasksExpanded"
             @click="toggleSubtasksExpanded"
           >
-            <AppIcon :name="subtasksExpanded ? 'chevron-down' : 'chevron-right'" size="xs" />
+            <AppIcon
+              :name="subtasksExpanded ? 'chevron-down' : 'chevron-right'"
+              size="xs"
+            />
             <p class="section-title">
               子任務
               <span v-if="subtaskProgress.total" class="section-count">
@@ -771,12 +814,18 @@ async function onContextPaste() {
       @close="showCompleteConfirm = false"
     />
 
-    <input ref="fileInput" type="file" accept="image/*" hidden @change="onFileChange" />
+    <input
+      ref="fileInput"
+      type="file"
+      accept="image/*"
+      hidden
+      @change="onFileChange"
+    />
   </article>
 </template>
 
 <style scoped lang="scss">
-@use '@/styles/variables' as *;
+@use "@/styles/variables" as *;
 
 .task-card {
   width: 100%;
@@ -786,7 +835,10 @@ async function onContextPaste() {
   box-shadow: $shadow;
   padding: 16px 18px;
   border: 1px solid $border;
-  transition: opacity 0.2s, transform 0.15s, box-shadow 0.15s;
+  transition:
+    opacity 0.2s,
+    transform 0.15s,
+    box-shadow 0.15s;
 
   &.dragging {
     opacity: 0.45;
@@ -794,7 +846,9 @@ async function onContextPaste() {
 
   &.drag-over {
     transform: translateY(2px);
-    box-shadow: $shadow, 0 -2px 0 0 $primary inset;
+    box-shadow:
+      $shadow,
+      0 -2px 0 0 $primary inset;
   }
 
   &.completed {
@@ -826,8 +880,8 @@ async function onContextPaste() {
   display: grid;
   grid-template-columns: auto auto minmax(0, 1fr) auto;
   grid-template-areas:
-    'drag check title actions'
-    '. meta meta meta';
+    "drag check title actions"
+    ". . meta meta";
   align-items: center;
   gap: 6px 8px;
 }
@@ -835,15 +889,15 @@ async function onContextPaste() {
 .header:not(.has-drag) {
   grid-template-columns: auto minmax(0, 1fr) auto;
   grid-template-areas:
-    'check title actions'
-    'meta meta meta';
+    "check title actions"
+    ". meta meta";
 }
 
 .header:not(.has-actions) {
   grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas:
-    'check title'
-    '. meta';
+    "check title"
+    ". meta";
 }
 
 .drag-handle {
@@ -986,7 +1040,7 @@ async function onContextPaste() {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 6px 10px;
   width: 100%;
 }
 
@@ -1268,9 +1322,9 @@ async function onContextPaste() {
   .header.has-actions {
     grid-template-columns: auto auto 1fr;
     grid-template-areas:
-      'drag check actions'
-      'title title title'
-      '. meta meta';
+      "drag check actions"
+      "title title title"
+      "meta meta meta";
   }
 
   .body {
