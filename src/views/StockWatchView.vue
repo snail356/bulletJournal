@@ -165,7 +165,7 @@ onUnmounted(() => {
           @keydown="onSearchKeydown"
         />
         <div v-if="searchOpen" class="search-menu" role="listbox">
-          <p v-if="store.loading && !matches.length" class="search-empty">行情載入中…</p>
+          <p v-if="!store.catalog.length && (store.loading || store.refreshing)" class="search-empty">股票清單載入中…</p>
           <p v-else-if="!matches.length" class="search-empty">找不到符合的台股</p>
           <button
             v-for="(stock, index) in matches"
@@ -197,7 +197,7 @@ onUnmounted(() => {
     <p v-if="store.error" class="error">{{ store.error }}</p>
 
     <div v-if="store.loading && !store.favoriteCards.length" class="empty">
-      正在載入台股行情…
+      正在載入台股清單…
     </div>
 
     <div v-else-if="!store.favoriteCards.length" class="empty">

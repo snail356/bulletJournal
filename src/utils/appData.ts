@@ -3,6 +3,7 @@ import type {
   DailyReflection,
   FavoriteStock,
   Label,
+  TwStockCatalogEntry,
   SidebarCarouselImage,
   SidebarCarouselState,
   StatusItem,
@@ -35,6 +36,7 @@ export const IDB_TOOLBOX_LISTS_KEY = "toolboxLists";
 export const IDB_TASK_AVATARS_KEY = "taskAvatars";
 export const IDB_SIDEBAR_CAROUSEL_KEY = "sidebarCarousel";
 export const IDB_STOCK_FAVORITES_KEY = "stockFavorites";
+export const IDB_STOCK_CATALOG_KEY = "stockCatalog";
 export const IDB_AI_MANAGER_PROMPT_KEY = "aiManagerPrompt";
 
 const ATT_BLOB_PREFIX = "att:";
@@ -260,6 +262,16 @@ export async function saveStockFavorites(
   favorites: FavoriteStock[],
 ): Promise<void> {
   await idbSet(IDB_STOCK_FAVORITES_KEY, favorites);
+}
+
+export async function loadStockCatalog(): Promise<TwStockCatalogEntry[] | null> {
+  return (await idbGet<TwStockCatalogEntry[]>(IDB_STOCK_CATALOG_KEY)) ?? null;
+}
+
+export async function saveStockCatalog(
+  catalog: TwStockCatalogEntry[],
+): Promise<void> {
+  await idbSet(IDB_STOCK_CATALOG_KEY, catalog);
 }
 
 export async function loadAiManagerPrompt(): Promise<string | null> {

@@ -3,11 +3,14 @@ import { defineStore } from "pinia";
 import type {
   FavoriteStock,
   TwStockDividend,
+  TwStockMarket,
   TwStockQuote,
 } from "@/types";
 import {
   createDebouncedSaver,
+  loadStockCatalog,
   loadStockFavorites,
+  saveStockCatalog,
   saveStockFavorites,
 } from "@/utils/appData";
 import {
@@ -15,10 +18,14 @@ import {
   fetchDividendSnapshot,
   fetchLiveQuotes,
   fetchMarketQuotes,
+  fetchStockDirectory,
   keepFillDates,
+  mergeStockCatalog,
   normalizeFavoriteStocks,
+  normalizeStockCatalog,
   resetDividendMemory,
   searchTwStocks,
+  stockCatalogQuote,
 } from "@/utils/twStock";
 
 const PRICE_POLL_MS = 10_000;
@@ -60,8 +67,17 @@ export const useStockStore = defineStore("stock", () => {
     if (initialized) return;
     if (initPromise) return initPromise;
     initPromise = (async () => {
-      const stored = await loadStockFavorites();
+      const [stored, storedCatalog] = await Promise.all([
+        loadStockFavorites(),
+        loadStockCatalog(),
+      ]);
       favorites.value = normalizeFavoriteStocks(stored ?? []);
+      const cached = normalizeStockCatalog(storedCatalog ?? []);
+      if (cached.length) {
+        catalog.value = cached.map((item) =>
+          stockCatalogQuote(item.code, item.name, item.market),
+        );
+      }
       initialized = true;
       favoritesSaver.enable();
     })();
@@ -72,25 +88,45 @@ export const useStockStore = defineStore("stock", () => {
     await favoritesSaver.flush();
   }
 
-  function applyQuotes(quotes: TwStockQuote[]) {
-    const nextQuotes: Record<string, TwStockQuote> = {};
-    for (const quote of quotes) {
-      nextQuotes[quote.code] = quote;
-    }
-    quotesByCode.value = nextQuotes;
-    catalog.value = quotes;
+  function persistCatalog(stocks: TwStockQuote[]) {
+    if (!stocks.length) return;
+    void saveStockCatalog(
+      stocks.map(({ code, name, market }) => ({ code, name, market })),
+    );
+  }
 
+  function syncFavoriteMeta(
+    byCode: Record<string, { name: string; market: TwStockMarket }>,
+  ) {
     let favoritesChanged = false;
     favorites.value = favorites.value.map((stock) => {
-      const quote = nextQuotes[stock.code];
-      if (!quote) return stock;
-      if (quote.name === stock.name && quote.market === stock.market) {
+      const meta = byCode[stock.code];
+      if (!meta) return stock;
+      if (meta.name === stock.name && meta.market === stock.market) {
         return stock;
       }
       favoritesChanged = true;
-      return { ...stock, name: quote.name, market: quote.market };
+      return { ...stock, name: meta.name, market: meta.market };
     });
     if (favoritesChanged) persistFavorites();
+  }
+
+  function applyMarketData(directory: TwStockQuote[], quotes: TwStockQuote[]) {
+    const merged = mergeStockCatalog(catalog.value, [...directory, ...quotes]);
+    catalog.value = merged;
+    if (quotes.length) {
+      const nextQuotes = { ...quotesByCode.value };
+      for (const quote of quotes) {
+        nextQuotes[quote.code] = quote;
+      }
+      quotesByCode.value = nextQuotes;
+    }
+    const meta: Record<string, { name: string; market: TwStockMarket }> = {};
+    for (const stock of merged) {
+      meta[stock.code] = stock;
+    }
+    syncFavoriteMeta(meta);
+    persistCatalog(merged);
   }
 
   function applyDividends(dividends: TwStockDividend[]) {
@@ -113,29 +149,42 @@ export const useStockStore = defineStore("stock", () => {
   ) {
     if (!live.length) return;
     const next = { ...quotesByCode.value };
+    const catalogByCode = new Map(
+      catalog.value.map((stock) => [stock.code, stock]),
+    );
     for (const item of live) {
       const current = next[item.code];
-      if (!current || item.price == null) continue;
+      if (item.price == null && !current) continue;
+      const catalogItem = catalogByCode.get(item.code);
+      const favorite = favorites.value.find((stock) => stock.code === item.code);
+      const fallback = current ?? catalogItem;
       next[item.code] = {
-        ...current,
-        price: item.price,
-        priceText: item.priceText,
-        change: item.change,
-        changePercent: item.changePercent,
-        open: item.open ?? current.open,
-        high: item.high ?? current.high,
-        low: item.low ?? current.low,
-        volume: item.volume ?? current.volume,
-        tradeDate: item.tradeDate ?? current.tradeDate,
+        code: item.code,
+        name: fallback?.name ?? favorite?.name ?? item.code,
+        market: fallback?.market ?? favorite?.market ?? "twse",
+        price: item.price ?? current?.price ?? null,
+        priceText:
+          item.price != null
+            ? item.priceText
+            : (current?.priceText ?? "—"),
+        change: item.change ?? current?.change ?? null,
+        changePercent: item.changePercent ?? current?.changePercent ?? null,
+        open: item.open ?? current?.open ?? null,
+        high: item.high ?? current?.high ?? null,
+        low: item.low ?? current?.low ?? null,
+        volume: item.volume ?? current?.volume ?? null,
+        tradeDate: item.tradeDate ?? current?.tradeDate ?? null,
       };
     }
     quotesByCode.value = next;
   }
 
   async function refresh(options?: { withDividends?: boolean }) {
+    await init();
     if (loading.value || refreshing.value) return;
-    const hasData = Object.keys(quotesByCode.value).length > 0;
-    if (hasData) refreshing.value = true;
+    const hasCatalog = catalog.value.length > 0;
+    const hasQuotes = Object.keys(quotesByCode.value).length > 0;
+    if (hasCatalog || hasQuotes) refreshing.value = true;
     else loading.value = true;
     error.value = "";
     const withDividends = options?.withDividends === true;
@@ -143,11 +192,21 @@ export const useStockStore = defineStore("stock", () => {
       ? fetchDividendSnapshot(favorites.value.map((stock) => stock.code))
       : null;
     try {
-      const quotes = await fetchMarketQuotes();
-      if (!quotes.length) {
-        throw new Error("目前無法取得台股行情，請稍後再試");
+      const quotesPromise = fetchMarketQuotes().catch(() => [] as TwStockQuote[]);
+      const directoryPromise = fetchStockDirectory().catch(
+        () => [] as TwStockQuote[],
+      );
+      void directoryPromise.then((directory) => {
+        if (directory.length) applyMarketData(directory, []);
+      });
+      const [quotes, directory] = await Promise.all([
+        quotesPromise,
+        directoryPromise,
+      ]);
+      applyMarketData(directory, quotes);
+      if (!catalog.value.length) {
+        throw new Error("目前無法取得台股清單，請稍後再試");
       }
-      applyQuotes(quotes);
       try {
         const live = await fetchLiveQuotes(favorites.value);
         applyLiveQuotes(live);
@@ -171,7 +230,9 @@ export const useStockStore = defineStore("stock", () => {
   }
 
   function search(query: string) {
-    return searchTwStocks(catalog.value, query);
+    return searchTwStocks(catalog.value, query).map(
+      (stock) => quotesByCode.value[stock.code] ?? stock,
+    );
   }
 
   function isFavorite(code: string) {

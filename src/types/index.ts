@@ -248,6 +248,8 @@ export interface TwStockQuote {
   tradeDate: string | null;
 }
 
+export type TwStockCatalogEntry = Pick<TwStockQuote, "code" | "name" | "market">;
+
 export interface TwStockExEvent {
   /** 除權息日 YYYY-MM-DD */
   exDate: string;

@@ -1,6 +1,7 @@
 import type {
   DividendFrequency,
   FavoriteStock,
+  TwStockCatalogEntry,
   TwStockDividend,
   TwStockExEvent,
   TwStockMarket,
@@ -26,6 +27,7 @@ function stockApi(
 }
 
 const TWSE_QUOTES_URL = stockApi("twse", "/v1/exchangeReport/STOCK_DAY_ALL");
+const TWSE_COMPANY_URL = stockApi("twse", "/v1/opendata/t187ap03_L");
 const TWSE_YIELD_URL = stockApi("twse", "/v1/exchangeReport/BWIBBU_ALL");
 const TWSE_EX_URL = stockApi("twse", "/v1/exchangeReport/TWT48U_ALL");
 const TWSE_EX_RWD_URL = stockApi(
@@ -33,6 +35,7 @@ const TWSE_EX_RWD_URL = stockApi(
   "/rwd/zh/exRight/TWT48U?response=json",
 );
 const TPEX_QUOTES_URL = stockApi("tpex", "/openapi/v1/tpex_mainboard_quotes");
+const TPEX_COMPANY_URL = stockApi("tpex", "/openapi/v1/mopsfin_t187ap03_O");
 const TPEX_YIELD_URL = stockApi(
   "tpex",
   "/openapi/v1/tpex_mainboard_peratio_analysis",
@@ -125,6 +128,61 @@ function formatPrice(value: number | null): string {
   });
 }
 
+export function stockCatalogQuote(
+  code: string,
+  name: string,
+  market: TwStockMarket,
+): TwStockQuote {
+  return {
+    code,
+    name,
+    market,
+    price: null,
+    priceText: "—",
+    change: null,
+    changePercent: null,
+    open: null,
+    high: null,
+    low: null,
+    volume: null,
+    tradeDate: null,
+  };
+}
+
+export function mergeStockCatalog(
+  base: TwStockQuote[],
+  extra: TwStockQuote[],
+): TwStockQuote[] {
+  const map = new Map<string, TwStockQuote>();
+  for (const item of base) {
+    if (item.code) map.set(item.code, item);
+  }
+  for (const item of extra) {
+    if (!item.code) continue;
+    const current = map.get(item.code);
+    if (!current) {
+      map.set(item.code, item);
+      continue;
+    }
+    map.set(item.code, {
+      ...current,
+      ...item,
+      name: item.name || current.name,
+      market: item.market || current.market,
+      price: item.price ?? current.price,
+      priceText: item.price != null ? item.priceText : current.priceText,
+      change: item.change ?? current.change,
+      changePercent: item.changePercent ?? current.changePercent,
+      open: item.open ?? current.open,
+      high: item.high ?? current.high,
+      low: item.low ?? current.low,
+      volume: item.volume ?? current.volume,
+      tradeDate: item.tradeDate ?? current.tradeDate,
+    });
+  }
+  return [...map.values()];
+}
+
 function changePercent(price: number | null, change: number | null): number | null {
   if (price == null || change == null) return null;
   const prev = price - change;
@@ -206,6 +264,24 @@ function parseTwseQuotes(payload: unknown): TwStockQuote[] {
         tradeDate: parseTwDate(rowText(row, ["Date", "日期"])),
       },
     ];
+  });
+}
+
+export function parseStockDirectory(
+  payload: unknown,
+  market: TwStockMarket,
+): TwStockQuote[] {
+  return asRows(payload).flatMap((row) => {
+    const code = rowText(row, ["公司代號", "SecuritiesCompanyCode", "Code"]);
+    const name = rowText(row, [
+      "公司簡稱",
+      "CompanyAbbreviation",
+      "公司名稱",
+      "CompanyName",
+      "Name",
+    ]);
+    if (!code || !name) return [];
+    return [stockCatalogQuote(code, name, market)];
   });
 }
 
@@ -772,6 +848,22 @@ export async function fetchMarketQuotes(): Promise<TwStockQuote[]> {
   ];
 }
 
+/** 上市櫃公司名冊，不依賴當日行情，開盤前也能搜尋 */
+export async function fetchStockDirectory(): Promise<TwStockQuote[]> {
+  const [twseCompanies, tpexCompanies] = await Promise.allSettled([
+    fetchJson(TWSE_COMPANY_URL, 30_000),
+    fetchJson(TPEX_COMPANY_URL, 30_000),
+  ]);
+  return [
+    ...(twseCompanies.status === "fulfilled"
+      ? parseStockDirectory(twseCompanies.value, "twse")
+      : []),
+    ...(tpexCompanies.status === "fulfilled"
+      ? parseStockDirectory(tpexCompanies.value, "tpex")
+      : []),
+  ];
+}
+
 async function loadDividendMarket(): Promise<Map<string, TwStockDividend>> {
   const [
     twseYield,
@@ -1071,6 +1163,23 @@ export function isExDateToday(exDate: string | null): boolean {
   const target = new Date(`${exDate}T00:00:00`);
   if (Number.isNaN(target.getTime())) return false;
   return target.getTime() === today.getTime();
+}
+
+export function normalizeStockCatalog(raw: unknown): TwStockCatalogEntry[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const list: TwStockCatalogEntry[] = [];
+  for (const item of raw) {
+    const row = asRecord(item);
+    if (!row) continue;
+    const code = String(row.code ?? "").trim();
+    const name = String(row.name ?? "").trim();
+    const market = row.market === "tpex" ? "tpex" : "twse";
+    if (!code || !name || seen.has(code)) continue;
+    seen.add(code);
+    list.push({ code, name, market });
+  }
+  return list;
 }
 
 export function normalizeFavoriteStocks(raw: unknown): FavoriteStock[] {
