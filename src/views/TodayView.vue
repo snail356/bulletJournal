@@ -27,10 +27,8 @@ const taskViews = computed(() => store.getTasksByDate(store.selectedDate))
 const activeTasks = computed(() =>
   taskViews.value.filter((v) => !v.migratedAway).map((v) => v.task),
 )
-/** 僅該日開始的任務可拖曳排序；跨日訪客可編輯但不參與排序 */
-const reorderableTasks = computed(() =>
-  activeTasks.value.filter((t) => t.date === store.selectedDate),
-)
+/** 當日可見的未遷移任務均可拖曳排序（含跨日任務） */
+const reorderableTasks = computed(() => activeTasks.value)
 const dateLabel = computed(() => formatDisplayDate(store.selectedDate))
 const progress = computed(() => store.todayProgress)
 

@@ -139,11 +139,7 @@ const incompleteSubtaskCount = computed(
 const isMigrated = computed(() => props.migratedAway === true);
 
 const showTaskDrag = computed(
-  () =>
-    Boolean(taskDrag) &&
-    !isMigrated.value &&
-    props.task.date === store.selectedDate &&
-    !expanded.value,
+  () => Boolean(taskDrag) && !isMigrated.value && !expanded.value,
 );
 
 const migratedTargetLabel = computed(() => formatDisplayDate(props.task.date));
@@ -909,6 +905,8 @@ async function onContextPaste() {
   line-height: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 16px;
   height: 20px;
   flex-shrink: 0;
   user-select: none;

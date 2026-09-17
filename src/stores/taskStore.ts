@@ -561,28 +561,16 @@ export const useTaskStore = defineStore("task", () => {
 
   const todayProgress = computed(() => calcProgress(selectedDate.value));
 
-  /** 該日開始的任務維持陣列順序；跨日訪客依開始日排在後面；未完成在前 */
-  function sortActiveTasksForDate(date: string, overlapping: Task[]): Task[] {
-    const natives = overlapping.filter((t) => t.date === date);
-    const visitors = overlapping
-      .filter((t) => t.date !== date)
-      .sort(
-        (a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id),
-      );
-    const pending = [
-      ...natives.filter((t) => !t.completed),
-      ...visitors.filter((t) => !t.completed),
-    ];
-    const done = [
-      ...natives.filter((t) => t.completed),
-      ...visitors.filter((t) => t.completed),
-    ];
+  /** 重疊當日的任務維持陣列相對順序；未完成在前 */
+  function sortActiveTasksForDate(overlapping: Task[]): Task[] {
+    const pending = overlapping.filter((t) => !t.completed);
+    const done = overlapping.filter((t) => t.completed);
     return [...pending, ...done];
   }
 
   function getTasksByDate(date: string): TaskDayView[] {
     const overlapping = tasks.value.filter((t) => taskOverlapsDate(t, date));
-    const active = sortActiveTasksForDate(date, overlapping);
+    const active = sortActiveTasksForDate(overlapping);
     const activeIds = new Set(active.map((t) => t.id));
     const migrated = tasks.value.filter(
       (t) => !activeIds.has(t.id) && isMigratedAwayFromDate(t, date),
@@ -1470,7 +1458,7 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function reorderTasks(date: string, fromId: string, toId: string) {
-    const dayTasks = tasks.value.filter((t) => t.date === date);
+    const dayTasks = tasks.value.filter((t) => taskOverlapsDate(t, date));
     if (
       !dayTasks.some((t) => t.id === fromId) ||
       !dayTasks.some((t) => t.id === toId)
@@ -1479,8 +1467,10 @@ export const useTaskStore = defineStore("task", () => {
     }
     const reordered = reorderInGroup(dayTasks, fromId, toId);
     if (!reordered) return;
-    const others = tasks.value.filter((t) => t.date !== date);
-    tasks.value = [...others, ...reordered];
+    let index = 0;
+    tasks.value = tasks.value.map((task) =>
+      taskOverlapsDate(task, date) ? reordered[index++] : task,
+    );
   }
 
   function reorderSubTasks(taskId: string, fromId: string, toId: string) {
