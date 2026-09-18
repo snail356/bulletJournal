@@ -6,6 +6,7 @@ import AppIcon from './AppIcon.vue'
 import FormattedContentEditor from './FormattedContentEditor.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { resolveContentType } from '@/utils/detectContentType'
+import { getClipboardMarkdown } from '@/utils/htmlToMarkdown'
 import { getBodyExpanded, setBodyExpanded } from '@/utils/sectionCollapseState'
 
 const props = defineProps<{
@@ -89,15 +90,13 @@ async function onPaste(e: ClipboardEvent) {
 
   if (expanded.value) return
 
-  const text = e.clipboardData?.getData('text/plain') ?? ''
+  const text = getClipboardMarkdown(e)
   if (!text.trim()) return
-
-  const contentType = resolveContentType(text)
-  if (contentType === 'text') return
 
   e.preventDefault()
   e.stopPropagation()
-  commitContent(text.replace(/\n$/, ''), contentType)
+  commitContent(text.replace(/\n$/, ''), resolveContentType(text))
+  expanded.value = true
 }
 
 function triggerUpload() {

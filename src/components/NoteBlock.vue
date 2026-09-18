@@ -8,6 +8,7 @@ import DeleteIconButton from './DeleteIconButton.vue'
 import FormattedContentEditor from './FormattedContentEditor.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { resolveContentType } from '@/utils/detectContentType'
+import { getClipboardMarkdown } from '@/utils/htmlToMarkdown'
 import { NOTE_COLOR_BG, NOTE_COLOR_DOT, NOTE_COLOR_OPTIONS } from '@/utils/noteColors'
 import { getNoteCollapsed, setNoteCollapsed } from '@/utils/sectionCollapseState'
 
@@ -147,17 +148,14 @@ async function onPaste(e: ClipboardEvent) {
 
   if (!collapsed.value) return
 
-  const text = e.clipboardData?.getData('text/plain') ?? ''
+  const text = getClipboardMarkdown(e)
   if (!text.trim()) return
-
-  const contentType = resolveContentType(text)
-  if (contentType === 'text') return
 
   e.preventDefault()
   e.stopPropagation()
   store.updateNote(props.taskId, props.note.id, {
     content: text.replace(/\n$/, ''),
-    contentType,
+    contentType: resolveContentType(text),
   })
   collapsed.value = shouldStartCollapsed(text)
 }

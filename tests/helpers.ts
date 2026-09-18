@@ -8,6 +8,20 @@ export function createPasteEvent(text: string): ClipboardEvent {
   })
 }
 
+export function createHtmlPasteEvent(
+  html: string,
+  plain = '',
+): ClipboardEvent {
+  const clipboardData = new DataTransfer()
+  clipboardData.setData('text/html', html)
+  clipboardData.setData('text/plain', plain)
+  return new ClipboardEvent('paste', {
+    bubbles: true,
+    cancelable: true,
+    clipboardData,
+  })
+}
+
 export function createImagePasteEvent(file?: File): ClipboardEvent {
   const clipboardData = new DataTransfer()
   clipboardData.items.add(file ?? new File(['png'], 'shot.png', { type: 'image/png' }))

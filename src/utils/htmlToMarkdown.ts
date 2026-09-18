@@ -66,11 +66,18 @@ function serializeNode(node: Node): string {
   }
 }
 
+const HTML_MARKUP_RE =
+  /<(strong|b|em|i|code|pre|h[1-6]|ul|ol|li|a|blockquote)\b/i
+
+export function clipboardHasHtmlMarkup(html: string): boolean {
+  return Boolean(html.trim() && HTML_MARKUP_RE.test(html))
+}
+
 /** 從 ClipboardEvent 取出可貼上的文字，優先保留 HTML 樣式轉成 Markdown */
 export function getClipboardMarkdown(e: ClipboardEvent): string {
   const html = e.clipboardData?.getData('text/html') ?? ''
   const plain = e.clipboardData?.getData('text/plain') ?? ''
-  if (html.trim() && /<(strong|b|em|i|code|pre|h[1-6]|ul|ol|li|a)\b/i.test(html)) {
+  if (clipboardHasHtmlMarkup(html)) {
     const converted = htmlToMarkdown(html)
     if (converted.trim()) return converted
   }

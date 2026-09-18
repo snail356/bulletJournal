@@ -297,6 +297,10 @@ function addNoteInline() {
 
 function onComposerCommit(content: string, contentType: ContentFormat) {
   if (!content.trim()) return;
+  const last = props.task.notes[props.task.notes.length - 1];
+  if (last && last.content === content && last.contentType === contentType) {
+    return;
+  }
   store.createNote(props.task.id, content, "yellow", contentType);
   notesExpanded.value = true;
 }

@@ -5,6 +5,7 @@ import FormattedContentEditor from '@/components/FormattedContentEditor.vue'
 import {
   SAMPLE_CODE,
   SAMPLE_MARKDOWN,
+  createHtmlPasteEvent,
   createImagePasteEvent,
   createPasteEvent,
 } from './helpers'
@@ -102,6 +103,59 @@ describe('FormattedContentEditor', () => {
     await nextTick()
 
     expect(wrapper.emitted('commit')?.[0]).toEqual([SAMPLE_CODE, 'code'])
+    wrapper.unmount()
+  })
+
+  it('預覽中貼上純文字也會寫入，避免沒有輸入框導致貼上消失', async () => {
+    const wrapper = mountEditor({
+      content: SAMPLE_MARKDOWN,
+      contentType: 'markdown',
+    })
+    await wrapper.get('.formatted-content-editor').element.dispatchEvent(
+      createPasteEvent('從另一則任務複製的段落'),
+    )
+    await nextTick()
+
+    expect(wrapper.emitted('commit')?.[0]).toEqual([
+      '從另一則任務複製的段落',
+      'text',
+    ])
+    wrapper.unmount()
+  })
+
+  it('預覽中貼上渲染後的 HTML 會轉回 markdown', async () => {
+    const wrapper = mountEditor({
+      content: '',
+      contentType: 'text',
+      previewUntilEdit: true,
+    })
+    await wrapper.get('.formatted-content-editor').element.dispatchEvent(
+      createHtmlPasteEvent(
+        '<h1>進度</h1><ul><li>已完成登入</li></ul>',
+        '進度\n已完成登入',
+      ),
+    )
+    await nextTick()
+
+    const commit = wrapper.emitted('commit')?.[0]
+    expect(commit?.[1]).toBe('markdown')
+    expect(String(commit?.[0])).toContain('# 進度')
+    expect(String(commit?.[0])).toContain('- 已完成登入')
+    wrapper.unmount()
+  })
+
+  it('編輯中貼上格式化文字後失焦不重複提交', async () => {
+    const wrapper = mountEditor()
+    const el = textarea(wrapper).element
+    el.value = SAMPLE_MARKDOWN
+    el.dispatchEvent(new Event('input', { bubbles: true }))
+    el.dispatchEvent(createPasteEvent(SAMPLE_MARKDOWN))
+    await nextTick()
+    await nextTick()
+    await textarea(wrapper).trigger('blur')
+
+    expect(wrapper.emitted('commit')).toHaveLength(1)
+    expect(wrapper.emitted('commit')?.[0]).toEqual([SAMPLE_MARKDOWN, 'markdown'])
     wrapper.unmount()
   })
 

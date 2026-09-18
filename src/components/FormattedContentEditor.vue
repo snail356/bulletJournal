@@ -5,6 +5,10 @@ import CodeSnippet from './CodeSnippet.vue'
 import MarkdownContent from './MarkdownContent.vue'
 import AppIcon from './AppIcon.vue'
 import { resolveContentType } from '@/utils/detectContentType'
+import {
+  clipboardHasHtmlMarkup,
+  getClipboardMarkdown,
+} from '@/utils/htmlToMarkdown'
 
 const props = withDefaults(
   defineProps<{
@@ -52,6 +56,23 @@ const showTextPreview = computed(
 )
 const showEditingHint = computed(
   () => editingFormatted.value || (props.previewUntilEdit && editingText.value),
+)
+
+const lastEmitted = ref<{
+  content: string
+  contentType: ContentFormat
+} | null>(null)
+
+watch(
+  () => [props.content, props.contentType] as const,
+  ([content, contentType]) => {
+    if (
+      lastEmitted.value?.content === content &&
+      lastEmitted.value.contentType === contentType
+    ) {
+      lastEmitted.value = null
+    }
+  },
 )
 
 watch(
@@ -102,6 +123,18 @@ function normalize(text: string) {
   return text.replace(/\n$/, '')
 }
 
+function emitCommit(next: string, contentType: ContentFormat) {
+  if (next === props.content && contentType === props.contentType) return
+  if (
+    lastEmitted.value?.content === next &&
+    lastEmitted.value.contentType === contentType
+  ) {
+    return
+  }
+  lastEmitted.value = { content: next, contentType }
+  emit('commit', next, contentType)
+}
+
 function commitDraft() {
   const next = normalize(draft.value)
   const contentType = resolveContentType(next)
@@ -109,8 +142,7 @@ function commitDraft() {
   editingText.value = false
   draft.value = next
   emit('editing-change', false)
-  if (next === props.content && contentType === props.contentType) return
-  emit('commit', next, contentType)
+  emitCommit(next, contentType)
 }
 
 function convertToText() {
@@ -142,17 +174,37 @@ async function startEditing() {
   requestAnimationFrame(() => placeCaretAtEnd(el))
 }
 
-function applyPastedContent(text: string) {
+function applyPastedContent(text: string, force = false) {
   const next = normalize(text)
   const contentType = resolveContentType(next)
-  if (contentType === 'text') return false
+  if (!force && contentType === 'text') return false
 
   draft.value = next
   editingFormatted.value = false
   editingText.value = false
   emit('editing-change', false)
-  emit('commit', next, contentType)
+  emitCommit(next, contentType)
   return true
+}
+
+function insertTextAtCursor(text: string): string {
+  const el = textareaRef.value
+  if (!el) {
+    draft.value = text
+    return text
+  }
+  const start = el.selectionStart
+  const end = el.selectionEnd
+  const next = `${el.value.slice(0, start)}${text}${el.value.slice(end)}`
+  draft.value = next
+  nextTick(() => {
+    const textarea = textareaRef.value
+    if (!textarea) return
+    autoResize(textarea)
+    const cursor = start + text.length
+    textarea.setSelectionRange(cursor, cursor)
+  })
+  return next
 }
 
 async function onPaste(e: ClipboardEvent) {
@@ -169,18 +221,27 @@ async function onPaste(e: ClipboardEvent) {
     }
   }
 
-  const text = e.clipboardData?.getData('text/plain') ?? ''
+  const html = e.clipboardData?.getData('text/html') ?? ''
+  const text = getClipboardMarkdown(e)
   if (!text.trim()) return
-
-  const contentType = resolveContentType(text)
-  if (contentType === 'text') return
 
   if (!showEditor.value) {
     e.preventDefault()
     e.stopPropagation()
-    applyPastedContent(text)
+    applyPastedContent(text, true)
     return
   }
+
+  if (clipboardHasHtmlMarkup(html)) {
+    e.preventDefault()
+    e.stopPropagation()
+    const combined = insertTextAtCursor(text)
+    applyPastedContent(combined)
+    return
+  }
+
+  const contentType = resolveContentType(text)
+  if (contentType === 'text') return
 
   e.stopPropagation()
   nextTick(() => {
