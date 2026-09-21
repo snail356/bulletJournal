@@ -1,6 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { beforeEach, describe, expect, it } from 'vitest'
 import {
   backlogDateToYmd,
+  formatBacklogImportNotice,
   isBacklogIssueClosed,
   issueMilestoneLabel,
   mapBacklogIssueToCreatePayload,
@@ -12,6 +14,7 @@ import {
   filterMilestoneSourceProjects,
   type BacklogIssue,
 } from '@/utils/backlog'
+import { useTaskStore } from '@/stores/taskStore'
 import {
   buildBacklogIssueUrl,
   isAllowedBacklogHost,
@@ -180,5 +183,94 @@ describe('舊任務相容', () => {
     expect(normalized.backlogIssueId).toBeNull()
     expect(normalized.backlogIssueKey).toBeNull()
     expect(normalized.backlogUrl).toBeNull()
+  })
+})
+
+describe('formatBacklogImportNotice', () => {
+  it('組合新增與重複載入結果', () => {
+    expect(
+      formatBacklogImportNotice(
+        { created: 2, brought: 1, alreadyOnDate: 1, skippedCompleted: 1, skippedNoSpace: 0 },
+        '2026-09-21',
+      ),
+    ).toBe(
+      '已新增 2 項主任務到 2026-09-21，已將 1 項既有任務顯示於 2026-09-21，略過 1 項已在當日，略過 1 項已完成',
+    )
+  })
+
+  it('沒有可套用項目時給出空結果說明', () => {
+    expect(
+      formatBacklogImportNotice(
+        { created: 0, brought: 0, alreadyOnDate: 0, skippedCompleted: 0, skippedNoSpace: 0 },
+        '2026-09-21',
+      ),
+    ).toBe('沒有可套用的項目')
+  })
+})
+
+describe('importBacklogIssues 重複載入', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('已存在任務只擴張日期並顯示於選取日，不新建、不覆寫標題', () => {
+    const store = useTaskStore()
+    store.selectedDate = '2026-09-21'
+    store.createTask({
+      date: '2026-09-10',
+      title: 'PROJ-1 本機標題',
+      endDate: '2026-09-12',
+      backlogIssueId: 1,
+      backlogIssueKey: 'PROJ-1',
+    })
+
+    const result = store.importBacklogIssues([
+      issue({ id: 1, issueKey: 'PROJ-1', summary: 'Backlog 新標題', dueDate: '2026-09-30T00:00:00Z' }),
+    ])
+
+    expect(store.tasks).toHaveLength(1)
+    expect(store.tasks[0].title).toBe('PROJ-1 本機標題')
+    expect(store.tasks[0].date).toBe('2026-09-10')
+    expect(store.tasks[0].endDate).toBe('2026-09-21')
+    expect(result).toMatchObject({ created: 0, brought: 1, alreadyOnDate: 0, skippedCompleted: 0 })
+    expect(store.isBacklogIssueOnSelectedDate(1)).toBe(true)
+    expect(store.getTasksByDate('2026-09-21').some((view) => view.task.backlogIssueId === 1)).toBe(true)
+  })
+
+  it('已在當日的既有任務略過', () => {
+    const store = useTaskStore()
+    store.selectedDate = '2026-09-21'
+    store.createTask({
+      date: '2026-09-21',
+      title: 'PROJ-2 今日',
+      backlogIssueId: 2,
+      backlogIssueKey: 'PROJ-2',
+    })
+
+    const result = store.importBacklogIssues([issue({ id: 2, issueKey: 'PROJ-2', summary: '今日' })])
+    expect(store.tasks).toHaveLength(1)
+    expect(store.tasks[0].endDate).toBeNull()
+    expect(result.alreadyOnDate).toBe(1)
+    expect(result.brought).toBe(0)
+  })
+
+  it('已完成的既有任務略過', () => {
+    const store = useTaskStore()
+    store.selectedDate = '2026-09-21'
+    const task = store.createTask({
+      date: '2026-09-10',
+      title: 'PROJ-3 完成',
+      backlogIssueId: 3,
+      backlogIssueKey: 'PROJ-3',
+    })
+    store.toggleTask(task.id)
+
+    const result = store.importBacklogIssues([issue({ id: 3, issueKey: 'PROJ-3', summary: '完成' })])
+    expect(store.tasks).toHaveLength(1)
+    expect(store.tasks[0].date).toBe('2026-09-10')
+    expect(store.tasks[0].endDate).toBeNull()
+    expect(result.skippedCompleted).toBe(1)
+    expect(result.brought).toBe(0)
+    expect(store.isBacklogLinkedTaskCompleted(3)).toBe(true)
   })
 })

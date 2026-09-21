@@ -213,6 +213,24 @@ export function partitionBacklogIssues<T extends { id: number }>(
   return { fresh, skipped }
 }
 
+export interface BacklogImportResult {
+  created: number
+  brought: number
+  alreadyOnDate: number
+  skippedCompleted: number
+  skippedNoSpace: number
+}
+
+export function formatBacklogImportNotice(result: BacklogImportResult, date: string): string {
+  const parts: string[] = []
+  if (result.created) parts.push(`已新增 ${result.created} 項主任務到 ${date}`)
+  if (result.brought) parts.push(`已將 ${result.brought} 項既有任務顯示於 ${date}`)
+  if (result.alreadyOnDate) parts.push(`略過 ${result.alreadyOnDate} 項已在當日`)
+  if (result.skippedCompleted) parts.push(`略過 ${result.skippedCompleted} 項已完成`)
+  if (result.skippedNoSpace) parts.push(`略過 ${result.skippedNoSpace} 項（尚未連線）`)
+  return parts.join('，') || '沒有可套用的項目'
+}
+
 export function openBacklogUrl(url: string): void {
   const trimmed = url.trim()
   if (!trimmed) return

@@ -34,6 +34,7 @@ import { createAttachmentFromFile } from "@/utils/attachment";
 import { resolveContentType } from "@/utils/detectContentType";
 import {
   addDays,
+  bringTaskRangeToDate,
   daysBetween,
   getTaskEndDate,
   normalizeEndDate,
@@ -118,6 +119,7 @@ import {
   mapBacklogIssueToCreatePayload,
   normalizeBacklogLink,
   partitionBacklogIssues,
+  type BacklogImportResult,
   type BacklogIssue,
 } from "@/utils/backlog";
 
@@ -982,24 +984,79 @@ export const useTaskStore = defineStore("task", () => {
     return task;
   }
 
-  function importBacklogIssues(issues: BacklogIssue[]): {
-    created: number;
-    skipped: number;
-  } {
+  function findTaskByBacklogIssueId(issueId: number): Task | undefined {
+    return tasks.value.find((task) => task.backlogIssueId === issueId);
+  }
+
+  function importBacklogIssues(issues: BacklogIssue[]): BacklogImportResult {
     const space = getConfiguredSpace();
-    if (!space) return { created: 0, skipped: issues.length };
-    const { fresh, skipped } = partitionBacklogIssues(
+    const { fresh, skipped: existingIssues } = partitionBacklogIssues(
       issues,
       importedBacklogIssueIds.value,
     );
-    for (const issue of fresh) {
-      createTask(mapBacklogIssueToCreatePayload(issue, selectedDate.value, space.origin));
+    let created = 0;
+    let skippedNoSpace = 0;
+    if (space) {
+      for (const issue of fresh) {
+        createTask(
+          mapBacklogIssueToCreatePayload(issue, selectedDate.value, space.origin),
+        );
+        created += 1;
+      }
+    } else {
+      skippedNoSpace = fresh.length;
     }
-    return { created: fresh.length, skipped: skipped.length };
+
+    let brought = 0;
+    let alreadyOnDate = 0;
+    let skippedCompleted = 0;
+    for (const issue of existingIssues) {
+      const task = findTaskByBacklogIssueId(issue.id);
+      if (!task) {
+        if (space) {
+          createTask(
+            mapBacklogIssueToCreatePayload(issue, selectedDate.value, space.origin),
+          );
+          created += 1;
+        } else {
+          skippedNoSpace += 1;
+        }
+        continue;
+      }
+      if (task.completed) {
+        skippedCompleted += 1;
+        continue;
+      }
+      const result = bringTaskRangeToDate(task, selectedDate.value);
+      if (result === "already") {
+        alreadyOnDate += 1;
+      } else {
+        touchTask(task);
+        brought += 1;
+      }
+    }
+
+    return {
+      created,
+      brought,
+      alreadyOnDate,
+      skippedCompleted,
+      skippedNoSpace,
+    };
   }
 
   function isBacklogIssueImported(issueId: number): boolean {
     return importedBacklogIssueIds.value.has(issueId);
+  }
+
+  function isBacklogIssueOnSelectedDate(issueId: number): boolean {
+    const task = findTaskByBacklogIssueId(issueId);
+    if (!task) return false;
+    return taskOverlapsDate(task, selectedDate.value);
+  }
+
+  function isBacklogLinkedTaskCompleted(issueId: number): boolean {
+    return findTaskByBacklogIssueId(issueId)?.completed === true;
   }
 
   function updateTask(id: string, payload: Partial<Omit<Task, "id">>) {
@@ -2203,7 +2260,10 @@ export const useTaskStore = defineStore("task", () => {
     todayProgress,
     createTask,
     importBacklogIssues,
+    findTaskByBacklogIssueId,
     isBacklogIssueImported,
+    isBacklogIssueOnSelectedDate,
+    isBacklogLinkedTaskCompleted,
     updateTask,
     setTaskDateRange,
     deleteTask,

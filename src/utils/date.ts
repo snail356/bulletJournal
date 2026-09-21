@@ -113,6 +113,24 @@ export function taskOverlapsDate(
   return task.date <= date && getTaskEndDate(task) >= date
 }
 
+export type BringTaskRangeResult = 'already' | 'extended'
+
+/** 擴張既有任務的日期區間以涵蓋 targetDate，不平移整段排程、不新建任務 */
+export function bringTaskRangeToDate<T extends { date: string; endDate: string | null }>(
+  task: T,
+  targetDate: string,
+): BringTaskRangeResult {
+  if (taskOverlapsDate(task, targetDate)) return 'already'
+  if (targetDate < task.date) {
+    const oldEnd = getTaskEndDate(task)
+    task.date = targetDate
+    task.endDate = normalizeEndDate(targetDate, oldEnd)
+  } else {
+    task.endDate = normalizeEndDate(task.date, targetDate)
+  }
+  return 'extended'
+}
+
 export function taskOverlapsRange(
   task: { date: string; endDate?: string | null },
   rangeStart: string,

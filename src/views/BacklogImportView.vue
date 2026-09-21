@@ -12,6 +12,7 @@ import {
   filterAllowedBacklogProjects,
   filterMilestoneSourceProjects,
   formatBacklogError,
+  formatBacklogImportNotice,
   hasBacklogCredentials,
   issueMilestoneLabel,
   isBacklogIssueClosed,
@@ -144,8 +145,31 @@ function milestoneOptionLabel(item: BacklogMilestone): string {
   return project ? `${item.name}（${project.projectKey}）` : item.name
 }
 
+function issueCompleted(issueId: number) {
+  return store.isBacklogLinkedTaskCompleted(issueId)
+}
+
+function issueImported(issueId: number) {
+  return store.isBacklogIssueImported(issueId)
+}
+
+function issueOnSelectedDate(issueId: number) {
+  return store.isBacklogIssueOnSelectedDate(issueId)
+}
+
+function issueSelectable(issueId: number) {
+  return !issueCompleted(issueId)
+}
+
+function issueTag(issueId: number): string {
+  if (issueCompleted(issueId)) return '已完成'
+  if (issueOnSelectedDate(issueId)) return '已在今日'
+  if (issueImported(issueId)) return '可重複載入'
+  return ''
+}
+
 const selectableIssues = computed(() =>
-  visibleIssues.value.filter((issue) => !store.isBacklogIssueImported(issue.id)),
+  visibleIssues.value.filter((issue) => issueSelectable(issue.id)),
 )
 
 const selectedCount = computed(() => selectedIds.value.size)
@@ -167,8 +191,8 @@ function isSelected(id: number) {
   return selectedIds.value.has(id)
 }
 
-function toggleIssue(id: number, imported: boolean) {
-  if (imported) return
+function toggleIssue(id: number, selectable: boolean) {
+  if (!selectable) return
   const next = new Set(selectedIds.value)
   if (next.has(id)) next.delete(id)
   else next.add(id)
@@ -367,10 +391,7 @@ function importSelected() {
   importing.value = true
   const result = store.importBacklogIssues(picked)
   selectedIds.value = new Set()
-  notice.value =
-    result.skipped > 0
-      ? `已新增 ${result.created} 項主任務，略過 ${result.skipped} 項已匯入`
-      : `已新增 ${result.created} 項主任務到 ${store.selectedDate}`
+  notice.value = formatBacklogImportNotice(result, store.selectedDate)
   importing.value = false
 }
 
@@ -403,8 +424,8 @@ onMounted(() => {
       <div>
         <h1>Backlog</h1>
         <p class="subtitle">
-          預設顯示指派給我的任務，可再以專案／milestone／狀態篩選。勾選後會新增為
-          {{ store.selectedDate }} 的主任務。
+          預設顯示指派給我的任務，可再以專案／milestone／狀態篩選。未匯入的會新增為
+          {{ store.selectedDate }} 的主任務；已匯入可勾選重複載入，只指向既有任務並顯示在今日。
         </p>
       </div>
       <div class="header-actions">
@@ -522,7 +543,7 @@ onMounted(() => {
               :disabled="!selectableIssues.length"
               @change="toggleSelectAll"
             />
-            全選可匯入
+            全選可加入
           </label>
           <button
             type="button"
@@ -530,7 +551,7 @@ onMounted(() => {
             :disabled="!selectedCount || importing"
             @click="importSelected"
           >
-            將選取項目新增為主任務（{{ selectedCount }}）
+            加入今日任務（{{ selectedCount }}）
           </button>
         </div>
 
@@ -571,20 +592,20 @@ onMounted(() => {
             <tr
               v-for="issue in visibleIssues"
               :key="issue.id"
-              :class="{ imported: store.isBacklogIssueImported(issue.id) }"
+              :class="{ imported: issueCompleted(issue.id) }"
             >
               <td class="check-col">
                 <input
                   type="checkbox"
                   :checked="isSelected(issue.id)"
-                  :disabled="store.isBacklogIssueImported(issue.id)"
-                  @change="toggleIssue(issue.id, store.isBacklogIssueImported(issue.id))"
+                  :disabled="!issueSelectable(issue.id)"
+                  @change="toggleIssue(issue.id, issueSelectable(issue.id))"
                 />
               </td>
               <td class="key">{{ issue.issueKey }}</td>
               <td class="summary">
                 {{ issue.summary }}
-                <span v-if="store.isBacklogIssueImported(issue.id)" class="imported-tag">已匯入</span>
+                <span v-if="issueTag(issue.id)" class="imported-tag">{{ issueTag(issue.id) }}</span>
               </td>
               <td>{{ issueMilestoneLabel(issue) }}</td>
               <td>{{ issue.status.name }}</td>
