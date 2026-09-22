@@ -1023,12 +1023,19 @@ export const useTaskStore = defineStore("task", () => {
         }
         continue;
       }
-      if (task.completed) {
-        skippedCompleted += 1;
-        continue;
+      const wasCompleted = task.completed;
+      if (wasCompleted) {
+        task.completed = false;
+        if (isCompletedStatus(task.status)) {
+          task.status = getDefaultStatusId();
+        }
       }
       const result = bringTaskRangeToDate(task, selectedDate.value);
-      if (result === "already") {
+      if (wasCompleted) {
+        touchTask(task);
+        reorderCompletedToBottom(selectedDate.value);
+        brought += 1;
+      } else if (result === "already") {
         alreadyOnDate += 1;
       } else {
         touchTask(task);

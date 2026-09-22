@@ -254,7 +254,7 @@ describe('importBacklogIssues 重複載入', () => {
     expect(result.brought).toBe(0)
   })
 
-  it('已完成的既有任務略過', () => {
+  it('已完成的既有任務可再次加入並改為進行中', () => {
     const store = useTaskStore()
     store.selectedDate = '2026-09-21'
     const task = store.createTask({
@@ -267,10 +267,12 @@ describe('importBacklogIssues 重複載入', () => {
 
     const result = store.importBacklogIssues([issue({ id: 3, issueKey: 'PROJ-3', summary: '完成' })])
     expect(store.tasks).toHaveLength(1)
+    expect(store.tasks[0].completed).toBe(false)
     expect(store.tasks[0].date).toBe('2026-09-10')
-    expect(store.tasks[0].endDate).toBeNull()
-    expect(result.skippedCompleted).toBe(1)
-    expect(result.brought).toBe(0)
-    expect(store.isBacklogLinkedTaskCompleted(3)).toBe(true)
+    expect(store.tasks[0].endDate).toBe('2026-09-21')
+    expect(result.skippedCompleted).toBe(0)
+    expect(result.brought).toBe(1)
+    expect(store.isBacklogLinkedTaskCompleted(3)).toBe(false)
+    expect(store.isBacklogIssueOnSelectedDate(3)).toBe(true)
   })
 })

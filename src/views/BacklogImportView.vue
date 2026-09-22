@@ -157,10 +157,6 @@ function issueOnSelectedDate(issueId: number) {
   return store.isBacklogIssueOnSelectedDate(issueId)
 }
 
-function issueSelectable(issueId: number) {
-  return !issueCompleted(issueId)
-}
-
 function issueTag(issueId: number): string {
   if (issueCompleted(issueId)) return '已完成'
   if (issueOnSelectedDate(issueId)) return '已在今日'
@@ -168,9 +164,7 @@ function issueTag(issueId: number): string {
   return ''
 }
 
-const selectableIssues = computed(() =>
-  visibleIssues.value.filter((issue) => issueSelectable(issue.id)),
-)
+const selectableIssues = computed(() => visibleIssues.value)
 
 const selectedCount = computed(() => selectedIds.value.size)
 const allVisibleSelected = computed(
@@ -191,8 +185,7 @@ function isSelected(id: number) {
   return selectedIds.value.has(id)
 }
 
-function toggleIssue(id: number, selectable: boolean) {
-  if (!selectable) return
+function toggleIssue(id: number) {
   const next = new Set(selectedIds.value)
   if (next.has(id)) next.delete(id)
   else next.add(id)
@@ -425,7 +418,7 @@ onMounted(() => {
         <h1>Backlog</h1>
         <p class="subtitle">
           預設顯示指派給我的任務，可再以專案／milestone／狀態篩選。未匯入的會新增為
-          {{ store.selectedDate }} 的主任務；已匯入可勾選重複載入，只指向既有任務並顯示在今日。
+          {{ store.selectedDate }} 的主任務；已匯入可勾選重複載入；清單中「已完成」仍可勾選加入，任務會改為進行中並顯示在今日。
         </p>
       </div>
       <div class="header-actions">
@@ -592,14 +585,13 @@ onMounted(() => {
             <tr
               v-for="issue in visibleIssues"
               :key="issue.id"
-              :class="{ imported: issueCompleted(issue.id) }"
+              :class="{ completed: issueCompleted(issue.id) }"
             >
               <td class="check-col">
                 <input
                   type="checkbox"
                   :checked="isSelected(issue.id)"
-                  :disabled="!issueSelectable(issue.id)"
-                  @change="toggleIssue(issue.id, issueSelectable(issue.id))"
+                  @change="toggleIssue(issue.id)"
                 />
               </td>
               <td class="key">{{ issue.issueKey }}</td>
@@ -822,8 +814,9 @@ th {
   min-width: 0;
 }
 
-.imported {
+.completed {
   opacity: 0.65;
+  color: $text-muted;
 }
 
 .imported-tag {
