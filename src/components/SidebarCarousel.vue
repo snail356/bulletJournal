@@ -34,6 +34,7 @@ const currentImage = computed(() =>
   <div class="sidebar-carousel">
     <img
       v-if="currentImage"
+      :key="currentImage.id"
       :src="currentImage.imageUrl"
       :alt="currentImage.fileName"
       class="carousel-image"

@@ -200,8 +200,10 @@ export interface SidebarCarouselState {
   /** 間隔輪播時，幾小時換下一張 */
   intervalHours: number;
   images: SidebarCarouselImage[];
-  /** 手動選中的顯示圖片；未設定時依輪播規則自動切換 */
+  /** 手動指定現在顯示的圖片；之後仍依輪播間隔往後換 */
   selectedImageId: string | null;
+  /** 手動選圖或調整間隔的起算時間 */
+  selectedAt: string | null;
 }
 
 /** 工具箱與思考清單（遇到方向決策時可快速對照） */

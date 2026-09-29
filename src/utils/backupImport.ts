@@ -672,6 +672,7 @@ function hydrateCarousel(
     intervalHours:
       typeof raw.intervalHours === "number" ? raw.intervalHours : defaultSidebarCarouselState.intervalHours,
     selectedImageId: raw.selectedImageId ?? null,
+    selectedAt: typeof raw.selectedAt === "string" ? raw.selectedAt : null,
     images: asArray<BackupFileCarousel["images"][number]>(raw.images)
       .map((image) => {
         const imageUrl =

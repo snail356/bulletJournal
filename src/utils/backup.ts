@@ -80,6 +80,7 @@ export interface BackupFileCarousel {
   mode: SidebarCarouselState["mode"];
   intervalHours: number;
   selectedImageId: string | null;
+  selectedAt?: string | null;
   images: BackupFileCarouselImage[];
 }
 
@@ -714,6 +715,7 @@ function buildBackupPayload(
     intervalHours: 6,
     images: [],
     selectedImageId: null,
+    selectedAt: null,
   };
   return {
     version: BACKUP_VERSION,
@@ -753,6 +755,7 @@ function buildBackupPayload(
       mode: carousel.mode,
       intervalHours: carousel.intervalHours,
       selectedImageId: carousel.selectedImageId,
+      selectedAt: carousel.selectedAt,
       images: carousel.images.map((image) => ({
         id: image.id,
         fileName: image.fileName,
@@ -784,6 +787,7 @@ export async function downloadBackupZip(
     intervalHours: 6,
     images: [],
     selectedImageId: null,
+    selectedAt: null,
   };
   const stockFavorites = source.stockFavorites ?? [];
   const commandCategories = source.commandCategories ?? [];

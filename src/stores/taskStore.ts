@@ -91,6 +91,7 @@ import {
   clampCarouselIntervalHours,
   defaultSidebarCarouselState,
   fileToCarouselDataUrl,
+  getSidebarCarouselCurrentImage,
   normalizeSidebarCarouselState,
   SIDEBAR_CAROUSEL_MAX_IMAGES,
 } from "@/utils/sidebarCarousel";
@@ -1849,15 +1850,25 @@ export const useTaskStore = defineStore("task", () => {
     sidebarCarousel.value = { ...sidebarCarousel.value, enabled };
   }
 
+  function anchorSidebarCarousel(patch: Partial<SidebarCarouselState>) {
+    const current = getSidebarCarouselCurrentImage(sidebarCarousel.value);
+    sidebarCarousel.value = {
+      ...sidebarCarousel.value,
+      ...patch,
+      selectedImageId: current?.id ?? null,
+      selectedAt: current ? new Date().toISOString() : null,
+    };
+  }
+
   function setSidebarCarouselMode(mode: SidebarCarouselMode) {
-    sidebarCarousel.value = { ...sidebarCarousel.value, mode };
+    if (mode === sidebarCarousel.value.mode) return;
+    anchorSidebarCarousel({ mode });
   }
 
   function setSidebarCarouselIntervalHours(hours: number) {
-    sidebarCarousel.value = {
-      ...sidebarCarousel.value,
-      intervalHours: clampCarouselIntervalHours(hours),
-    };
+    const intervalHours = clampCarouselIntervalHours(hours);
+    if (intervalHours === sidebarCarousel.value.intervalHours) return;
+    anchorSidebarCarousel({ intervalHours });
   }
 
   async function addSidebarCarouselImages(files: File[]) {
@@ -1892,16 +1903,21 @@ export const useTaskStore = defineStore("task", () => {
 
   function setSidebarCarouselSelectedImage(id: string) {
     if (!sidebarCarousel.value.images.some((item) => item.id === id)) return;
-    sidebarCarousel.value = { ...sidebarCarousel.value, selectedImageId: id };
+    sidebarCarousel.value = {
+      ...sidebarCarousel.value,
+      selectedImageId: id,
+      selectedAt: new Date().toISOString(),
+    };
   }
 
   function deleteSidebarCarouselImage(id: string) {
     const nextImages = sidebarCarousel.value.images.filter((item) => item.id !== id);
+    const cleared = sidebarCarousel.value.selectedImageId === id;
     sidebarCarousel.value = {
       ...sidebarCarousel.value,
       images: nextImages,
-      selectedImageId:
-        sidebarCarousel.value.selectedImageId === id ? null : sidebarCarousel.value.selectedImageId,
+      selectedImageId: cleared ? null : sidebarCarousel.value.selectedImageId,
+      selectedAt: cleared ? null : sidebarCarousel.value.selectedAt,
     };
   }
 

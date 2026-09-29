@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import AppIcon from '@/components/AppIcon.vue'
 import AppSwitch from '@/components/AppSwitch.vue'
 import DeleteIconButton from '@/components/DeleteIconButton.vue'
@@ -10,12 +10,15 @@ import {
   SIDEBAR_CAROUSEL_MAX_IMAGES,
   SIDEBAR_CAROUSEL_MIN_HOURS,
   getSidebarCarouselCurrentImage,
+  getSidebarCarouselNextSwitchAt,
 } from '@/utils/sidebarCarousel'
 import type { SidebarCarouselMode } from '@/types'
 
 const store = useTaskStore()
 const uploadError = ref('')
 const uploading = ref(false)
+const now = ref(Date.now())
+let timer = 0
 const { draggingId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd } =
   useSimpleReorderDrag(
     () => store.sidebarCarousel.images,
@@ -26,8 +29,41 @@ const remaining = computed(
   () => SIDEBAR_CAROUSEL_MAX_IMAGES - store.sidebarCarousel.images.length,
 )
 const currentImage = computed(() =>
-  getSidebarCarouselCurrentImage(store.sidebarCarousel),
+  getSidebarCarouselCurrentImage(store.sidebarCarousel, now.value),
 )
+const nextSwitchText = computed(() => {
+  const at = getSidebarCarouselNextSwitchAt(store.sidebarCarousel, now.value)
+  if (at == null) return ''
+  return formatNextSwitch(at, now.value)
+})
+
+onMounted(() => {
+  now.value = Date.now()
+  timer = window.setInterval(() => {
+    now.value = Date.now()
+  }, 15_000)
+  document.addEventListener('visibilitychange', onVisibility)
+})
+
+onUnmounted(() => {
+  window.clearInterval(timer)
+  document.removeEventListener('visibilitychange', onVisibility)
+})
+
+function onVisibility() {
+  if (document.visibilityState === 'visible') now.value = Date.now()
+}
+
+function formatNextSwitch(atMs: number, nowMs: number): string {
+  const target = new Date(atMs)
+  const current = new Date(nowMs)
+  const time = `${String(target.getHours()).padStart(2, '0')}:${String(target.getMinutes()).padStart(2, '0')}`
+  const dayStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+  const dayOffset = Math.round((dayStart(target) - dayStart(current)) / 86_400_000)
+  if (dayOffset <= 0) return `今天 ${time}`
+  if (dayOffset === 1) return `明天 ${time}`
+  return `${target.getMonth() + 1}/${target.getDate()} ${time}`
+}
 
 function onIntervalHoursChange(event: Event) {
   const value = Number((event.target as HTMLInputElement).value)
@@ -117,6 +153,13 @@ async function onUpload(event: Event) {
       />
       <span class="hint">可填 {{ SIDEBAR_CAROUSEL_MIN_HOURS }}–{{ SIDEBAR_CAROUSEL_MAX_HOURS }} 小時</span>
     </label>
+
+    <p v-if="store.sidebarCarousel.images.length === 1" class="schedule-hint">
+      再上傳至少一張，才會依時間換圖。
+    </p>
+    <p v-else-if="nextSwitchText" class="schedule-hint">
+      下次換圖：{{ nextSwitchText }}。點選圖片會先顯示該張，並從現在重新計時。
+    </p>
 
     <div class="toolbar">
       <label class="upload-btn" :class="{ disabled: remaining <= 0 || uploading }">
@@ -284,10 +327,16 @@ async function onUpload(event: Event) {
   }
 }
 
-.hint {
+.hint,
+.schedule-hint {
   font-size: 12px;
   font-weight: 500;
   color: $text-muted;
+}
+
+.schedule-hint {
+  margin: 0 0 16px;
+  line-height: 1.5;
 }
 
 .toolbar {
