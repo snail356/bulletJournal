@@ -20,7 +20,6 @@ const emit = defineEmits<{
   moveStart: [event: PointerEvent]
   resizeStart: [event: PointerEvent]
   resizeEnd: [event: PointerEvent]
-  select: []
 }>()
 
 const store = useTaskStore()
@@ -53,7 +52,6 @@ const cursor = computed(() => {
     }"
     :title="`${task.title}（${dateRange} · ${duration} 天）`"
     @pointerdown="emit('moveStart', $event)"
-    @click.stop="emit('select')"
   >
     <button
       v-if="!continuesBefore"

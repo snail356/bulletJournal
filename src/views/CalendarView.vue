@@ -138,6 +138,9 @@ const {
   onCommit(taskId, next) {
     store.setTaskDateRange(taskId, next.date, next.endDate);
   },
+  onActivate(taskId) {
+    router.push(`/tasks/${taskId}`);
+  },
 });
 
 const layouts = computed<WeekLayout[]>(() =>
@@ -514,7 +517,6 @@ const hintStyle = computed(() => {
               @resize-end="
                 beginDrag($event, segment.taskId, 'resize-end', segment.lane)
               "
-              @select="onSelectTask(segment.taskId)"
             />
           </div>
         </div>

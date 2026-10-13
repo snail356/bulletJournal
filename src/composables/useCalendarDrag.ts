@@ -59,11 +59,13 @@ function computePreview(
 export function useCalendarDrag(options: {
   hitTestDate: (x: number, y: number) => string | null
   onCommit: (taskId: string, preview: CalendarDragPreview) => void
+  onActivate?: (taskId: string) => void
 }) {
   const session = ref<DragSession | null>(null)
   const preview = ref<CalendarDragPreview | null>(null)
   const pointerPos = ref<{ x: number; y: number } | null>(null)
   const ignoreNextClick = ref(false)
+  let captureTarget: HTMLElement | null = null
 
   const draggingTaskId = computed(() => session.value?.taskId ?? null)
   const dragMode = computed(() => session.value?.mode ?? null)
@@ -92,9 +94,10 @@ export function useCalendarDrag(options: {
   ) {
     if (event.button !== 0) return
     event.stopPropagation()
-    ;(event.currentTarget as HTMLElement | null)?.setPointerCapture?.(
-      event.pointerId,
-    )
+    // 點下就 setPointerCapture 會讓 pointerup 目標變成區塊本身，
+    // 點在標題或頭像上時瀏覽器不會發出 click。真正拖過門檻才擷取。
+    captureTarget =
+      event.currentTarget instanceof HTMLElement ? event.currentTarget : null
     session.value = {
       ...payload,
       pointerId: event.pointerId,
@@ -121,6 +124,7 @@ export function useCalendarDrag(options: {
       const dy = event.clientY - current.startY
       if (dx * dx + dy * dy < DRAG_THRESHOLD_PX * DRAG_THRESHOLD_PX) return
       current.moved = true
+      captureTarget?.setPointerCapture?.(event.pointerId)
       event.preventDefault()
     }
 
@@ -129,9 +133,20 @@ export function useCalendarDrag(options: {
     preview.value = computePreview(current, date)
   }
 
+  function releaseCapture(pointerId: number) {
+    const el = captureTarget
+    captureTarget = null
+    if (el?.hasPointerCapture?.(pointerId)) el.releasePointerCapture(pointerId)
+  }
+
   function finish(commit: boolean) {
     const current = session.value
     const next = preview.value
+    const activateId =
+      commit && current && !current.moved && current.mode === 'move'
+        ? current.taskId
+        : null
+    if (current) releaseCapture(current.pointerId)
     if (current?.moved) ignoreNextClick.value = true
     session.value = null
     preview.value = null
@@ -146,6 +161,7 @@ export function useCalendarDrag(options: {
     ) {
       options.onCommit(current.taskId, next)
     }
+    if (activateId) options.onActivate?.(activateId)
   }
 
   function consumeClickSuppression(): boolean {
