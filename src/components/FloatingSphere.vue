@@ -30,7 +30,6 @@ const popKind = ref<PopKind | null>(null);
 const activeQuote = ref<Quote | null>(null);
 const chimeText = ref("");
 const popoverRef = ref<HTMLElement | null>(null);
-const aiPanelRef = ref<{ rootRef: HTMLElement | null } | null>(null);
 const aiOpen = ref(false);
 const popoverStyle = ref<Record<string, string>>({});
 const position = ref<Point>({ x: 0, y: 0 });
@@ -287,13 +286,9 @@ function clearHourChime() {
   chimeTimer = null;
 }
 
-function openPopElement(): HTMLElement | null {
-  if (aiOpen.value) return aiPanelRef.value?.rootRef ?? null;
-  return popoverRef.value;
-}
-
 function syncOpenPop() {
-  updatePopPosition(openPopElement());
+  if (!popKind.value) return;
+  updatePopPosition(popoverRef.value);
 }
 
 function updatePopPosition(popover: HTMLElement | null) {
@@ -456,10 +451,9 @@ onUnmounted(() => {
 
     <SphereAiPanel
       v-if="aiOpen"
-      ref="aiPanelRef"
-      :position-style="popoverStyle"
+      :anchor-x="position.x"
+      :anchor-y="position.y"
       @close="closeAiPanel"
-      @layout="syncOpenPop"
     />
   </Teleport>
 </template>
