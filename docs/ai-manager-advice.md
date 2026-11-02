@@ -59,6 +59,8 @@
 
 ## 環境變數設定
 
+API Key 只放在伺服器。瀏覽器打 `/api/gemini`，由本機開發中介層或 Vercel Function 轉送，Key 不會進前端 bundle。
+
 1. 到 [Google AI Studio](https://aistudio.google.com/) 建立 API Key  
 2. 在專案根目錄複製範例檔：
 
@@ -69,13 +71,22 @@ cp .env.example .env
 3. 編輯 `.env`：
 
 ```env
-VITE_GEMINI_API_KEY=你的_API_Key
-VITE_GEMINI_MODEL=gemini-3.5-flash
+GEMINI_API_KEY=你的_API_Key
+GEMINI_MODEL=gemini-3.5-flash
 ```
 
-4. **必須重新啟動** `npm run dev`（Vite 只在啟動時讀取 env）
+4. **必須重新啟動** `npm run dev`（開發伺服器只在啟動時讀取 env）
 
-`VITE_GEMINI_MODEL` 可省略，預設為 `gemini-3.5-flash`。
+`GEMINI_MODEL` 可省略，預設為 `gemini-3.5-flash`。不要使用 `VITE_` 前綴。
+
+### 發佈到 Vercel
+
+前端與 `api/gemini.ts` 是同一個專案，一次部署兩者都會上線。在 Vercel 的 Environment Variables 設定：
+
+- `GEMINI_API_KEY`（必填）
+- `GEMINI_MODEL`（可省略）
+
+設定後要重新部署。Vite 在建置時才讀得到的是 `VITE_` 變數；這兩個沒有前綴，只會進伺服器。
 
 目前產生設定：
 
@@ -121,15 +132,14 @@ Gemini Plus／Google AI 訂閱**不包含** Developer API；API 有獨立免費�
 
 ## 注意事項
 
-- Vite 的 `VITE_*` 會打包進前端 bundle。**勿把含真實 Key 的 build 公開部署到網際網路**。Side project 本機使用即可；若要公開上線，應改為後端代理。
-- `.env` 已列入 `.gitignore`，請勿把 Key commit 進版控。
-- API Key 暴露在瀏覽器 DevTools／Network 中，僅適合個人本機開發情境。
+- `.env` 已列入 `.gitignore`，請勿把 Key commit 進版控，也不要在 Vercel 建立 `VITE_GEMINI_API_KEY`。
+- 網站若公開，訪客仍可呼叫 `/api/gemini` 消耗配額，只是拿不到 Key 本身。這是個人部署的取捨，沒有另外的登入保護。
 
 ## 疑難排解
 
 | 狀況 | 建議 |
 |------|------|
-| 提示尚未設定 Key | 檢查 `.env` 是否有 `VITE_GEMINI_API_KEY`，並重啟 dev server |
+| 提示尚未設定 Key | 本機檢查 `.env` 的 `GEMINI_API_KEY` 並重啟 dev server；Vercel 檢查同名環境變數後重新部署 |
 | HTTP 403 | Key 無效、專案未啟用 API，或權限不足 |
 | HTTP 429 | 達到速率／配額限制，稍後再試或至 Google AI Studio 查看用量 |
 | 未回傳內容 | 模型忙碌或被安全過濾擋下，可重試或更換模型 |
@@ -138,7 +148,9 @@ Gemini Plus／Google AI 訂閱**不包含** Developer API；API 有獨立免費�
 
 ## 相關程式
 
-- [`src/utils/gemini.ts`](../src/utils/gemini.ts)：組合 Prompt、呼叫 API 及清理回傳文字
+- [`api/gemini.ts`](../api/gemini.ts)：Vercel 上的 Gemini 代理，持有 API Key
+- [`server/geminiProxy.ts`](../server/geminiProxy.ts)：檢查請求並轉送 Gemini
+- [`src/utils/gemini.ts`](../src/utils/gemini.ts)：組合 Prompt、呼叫 `/api/gemini` 及清理回傳文字
 - [`src/utils/sphereAi.ts`](../src/utils/sphereAi.ts)：光球提問所用的進度與未完成代辦摘要
 - [`src/components/SphereAiPanel.vue`](../src/components/SphereAiPanel.vue)：光球右鍵的詢問面板
 - [`src/utils/storage.ts`](../src/utils/storage.ts)：用量與自訂 Prompt 的 localStorage key

@@ -32,7 +32,7 @@ import {
   type BackupPrefs,
 } from '@/utils/backupPrefs'
 import { todayString } from '@/utils/date'
-import { getGeminiModel, hasGeminiApiKey } from '@/utils/gemini'
+import { loadGeminiServerStatus, type GeminiServerStatus } from '@/utils/gemini'
 import { useSimpleReorderDrag } from '@/composables/useReorderDrag'
 import BacklogSettingsPanel from '@/components/BacklogSettingsPanel.vue'
 import { type NavFeatureId } from '@/utils/navFeatures'
@@ -71,7 +71,9 @@ const confirmDanger = ref(false)
 const confirmLabel = ref('確定')
 let confirmAction: (() => void) | null = null
 
-const geminiKeyConfigured = computed(() => hasGeminiApiKey())
+const geminiStatus = ref<GeminiServerStatus | null>(null)
+const geminiKeyConfigured = computed(() => geminiStatus.value?.configured === true)
+const geminiModelLabel = computed(() => geminiStatus.value?.model ?? '讀取中…')
 const geminiLastCalled = computed(() => {
   const iso = store.geminiUsage.lastCalledAt
   if (!iso) return '尚無'
@@ -340,6 +342,9 @@ function refreshBackupPrefs() {
 onMounted(() => {
   window.addEventListener(BACKUP_UPDATED_EVENT, refreshBackupPrefs)
   void syncBackupFolderState().then(refreshBackupPrefs)
+  void loadGeminiServerStatus().then((status) => {
+    geminiStatus.value = status
+  })
 })
 
 onUnmounted(() => {
@@ -608,12 +613,12 @@ onUnmounted(() => {
         <div class="settings-card">
           <h2>Gemini 本機呼叫用量</h2>
           <p class="desc">
-            AI 主管建議使用環境變數中的 API Key。此處顯示本機累計成功呼叫次數（非 Google 帳單）。
+            API Key 只放在伺服器，瀏覽器看不到。此處顯示本機累計成功呼叫次數（非 Google 帳單）。
             詳見 <code>docs/ai-manager-advice.md</code>。
           </p>
           <ul class="info">
-            <li>API Key：{{ geminiKeyConfigured ? '已設定（環境變數）' : '未設定' }}</li>
-            <li>模型：{{ getGeminiModel() }}</li>
+            <li>API Key：{{ geminiKeyConfigured ? '已由伺服器設定' : '伺服器未設定' }}</li>
+            <li>模型：{{ geminiModelLabel }}</li>
             <li>累計成功呼叫：{{ store.geminiUsage.totalSuccessCalls }} 次</li>
             <li>最後呼叫：{{ geminiLastCalled }}</li>
             <li v-if="store.geminiUsage.lastError">

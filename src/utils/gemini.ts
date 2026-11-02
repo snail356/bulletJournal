@@ -4,21 +4,34 @@ import {
   type SphereAiTurn,
 } from '@/utils/sphereAi'
 
-const DEFAULT_MODEL = 'gemini-3.5-flash'
-
-export function getGeminiApiKey(): string {
-  return (import.meta.env.VITE_GEMINI_API_KEY as string | undefined)?.trim() ?? ''
+export interface GeminiServerStatus {
+  configured: boolean
+  model: string
 }
 
-export function getGeminiModel(): string {
-  return (
-    (import.meta.env.VITE_GEMINI_MODEL as string | undefined)?.trim() ||
-    DEFAULT_MODEL
-  )
+const FALLBACK_STATUS: GeminiServerStatus = {
+  configured: false,
+  model: 'gemini-3.5-flash',
 }
 
-export function hasGeminiApiKey(): boolean {
-  return getGeminiApiKey().length > 0
+let statusRequest: Promise<GeminiServerStatus> | null = null
+
+/** 只問伺服器是否已設定 Key 與模型名稱，不取得 Key */
+export function loadGeminiServerStatus(): Promise<GeminiServerStatus> {
+  statusRequest ??= fetch('/api/gemini')
+    .then(async (response) => {
+      if (!response.ok) return FALLBACK_STATUS
+      const data = (await response.json()) as Partial<GeminiServerStatus>
+      return {
+        configured: data.configured === true,
+        model:
+          typeof data.model === 'string' && data.model.trim()
+            ? data.model.trim()
+            : FALLBACK_STATUS.model,
+      }
+    })
+    .catch(() => FALLBACK_STATUS)
+  return statusRequest
 }
 
 /** 清掉 API 回傳或舊資料中多餘空白，避免 Markdown 渲染後版面鬆散 */
@@ -111,88 +124,39 @@ function buildPrompt(
   ].join('\n')
 }
 
-interface GeminiGenerateResponse {
-  candidates?: Array<{
-    content?: {
-      parts?: Array<{ text?: string }>
-    }
-  }>
-  error?: {
-    message?: string
-    status?: string
-  }
-}
-
 async function generateGeminiText(options: {
   systemInstruction: string
   userText?: string
   contents?: Array<{ role: 'user' | 'model'; text: string }>
   temperature: number
 }): Promise<string> {
-  const apiKey = getGeminiApiKey()
-  if (!apiKey) {
-    throw new Error(
-      '尚未設定 VITE_GEMINI_API_KEY。請參考 docs/ai-manager-advice.md 完成設定後重啟開發伺服器。',
-    )
-  }
-
-  const model = getGeminiModel()
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`
   const contents = options.contents ?? [
     { role: 'user' as const, text: options.userText ?? '' },
   ]
-
-  const response = await fetch(url, {
+  const response = await fetch('/api/gemini', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey,
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: options.systemInstruction }],
-      },
-      contents: contents.map((item) => ({
-        role: item.role,
-        parts: [{ text: item.text }],
-      })),
-      generationConfig: {
-        temperature: options.temperature,
-        maxOutputTokens: 4096,
-        thinkingConfig: {
-          thinkingLevel: 'low',
-        },
-      },
+      systemInstruction: options.systemInstruction,
+      contents,
+      temperature: options.temperature,
     }),
   })
 
-  let data: GeminiGenerateResponse
+  let data: { text?: string; error?: string } | null = null
   try {
-    data = (await response.json()) as GeminiGenerateResponse
+    data = (await response.json()) as { text?: string; error?: string }
   } catch {
-    throw new Error(`Gemini API 回應無法解析（HTTP ${response.status}）`)
+    data = null
   }
 
   if (!response.ok) {
-    const apiMessage = data.error?.message
-    if (response.status === 403) {
-      throw new Error(apiMessage || 'API Key 無權限或未啟用 Gemini API（HTTP 403）')
-    }
-    if (response.status === 429) {
-      throw new Error(apiMessage || '已達 Gemini API 配額或速率限制（HTTP 429）')
-    }
-    throw new Error(
-      apiMessage || `Gemini API 呼叫失敗（HTTP ${response.status}）`,
-    )
+    throw new Error(data?.error || `Gemini 呼叫失敗（HTTP ${response.status}）`)
   }
 
-  const text = data.candidates?.[0]?.content?.parts
-    ?.map((part) => part.text ?? '')
-    .join('')
-    .trim()
-
+  const text = data?.text?.trim() ?? ''
   if (!text) {
-    throw new Error('Gemini 未回傳可用的建議內容，請稍後再試')
+    throw new Error(data?.error || 'Gemini 未回傳可用的建議內容，請稍後再試')
   }
 
   return normalizeAiAdviceText(text)

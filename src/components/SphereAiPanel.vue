@@ -2,7 +2,6 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import MarkdownContent from '@/components/MarkdownContent.vue'
 import { useTaskStore } from '@/stores/taskStore'
-import { hasGeminiApiKey } from '@/utils/gemini'
 import {
   SPHERE_AI_QUESTION_LIMIT,
   SPHERE_AI_QUESTIONS,
@@ -60,11 +59,6 @@ async function scrollThread() {
 async function requestAsk(text = question.value) {
   const trimmed = text.trim()
   if (!trimmed || store.sphereAiLoading) return
-  if (!hasGeminiApiKey()) {
-    error.value =
-      '尚未設定 VITE_GEMINI_API_KEY。請參考 docs/ai-manager-advice.md，於 .env 設定後重啟 npm run dev。'
-    return
-  }
   error.value = ''
   const history = completedTurns()
   messages.value.push({ id: nextId++, role: 'user', text: trimmed })

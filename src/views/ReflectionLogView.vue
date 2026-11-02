@@ -8,7 +8,7 @@ import BackToTopButton from '@/components/BackToTopButton.vue'
 import DeleteIconButton from '@/components/DeleteIconButton.vue'
 import { useTaskStore } from '@/stores/taskStore'
 import { formatDisplayDate, todayString } from '@/utils/date'
-import { getGeminiModel, hasGeminiApiKey, normalizeAiAdviceText } from '@/utils/gemini'
+import { loadGeminiServerStatus, normalizeAiAdviceText } from '@/utils/gemini'
 import type { DailyReflection } from '@/types'
 
 const store = useTaskStore()
@@ -17,6 +17,10 @@ const detailScrollRef = ref<HTMLElement | null>(null)
 
 const aiConfirmVisible = ref(false)
 const aiError = ref('')
+const geminiModelName = ref('gemini-3.5-flash')
+void loadGeminiServerStatus().then((status) => {
+  geminiModelName.value = status.model
+})
 
 const reflections = computed(() => store.dailyReflectionsSorted)
 
@@ -53,7 +57,7 @@ const aiConfirmMessage = computed(() => {
     ``,
     `目前本機累計成功呼叫：${usage.totalSuccessCalls} 次`,
     `最後呼叫時間：${last}`,
-    `模型：${getGeminiModel()}`,
+    `模型：${geminiModelName.value}`,
     ``,
     `用量為本機計數，非 Google 帳單全貌。確認後才會真正發送請求。`,
   ].join('\n')
@@ -129,11 +133,13 @@ function formatDateTime(iso: string): string {
   return `${y}-${m}-${d} ${hh}:${mm}`
 }
 
-function requestAiAdvice() {
+async function requestAiAdvice() {
   aiError.value = ''
-  if (!hasGeminiApiKey()) {
+  const status = await loadGeminiServerStatus()
+  geminiModelName.value = status.model
+  if (!status.configured) {
     aiError.value =
-      '尚未設定 VITE_GEMINI_API_KEY。請參考 docs/ai-manager-advice.md，於 .env 設定後重啟 npm run dev。'
+      '伺服器尚未設定 GEMINI_API_KEY。請參考 docs/ai-manager-advice.md。'
     return
   }
   aiConfirmVisible.value = true
