@@ -23,11 +23,13 @@
 
 不會在「完成提交」時自動呼叫。
 
+右鍵藍色光球會打開可連續追問的對話框，送出時不跳用量確認窗。每一問附上今天的任務進度、未完成代辦（今天與逾期；主任務已完成則整筆不算）與今日回顧，並帶上這次面板裡最近 6 輪問答。成功後仍記入同一個本機計數。關掉面板後對話清空，不寫進回顧日誌。設計見 [光球右鍵詢問 AI](adr/0001-floating-sphere-ai.md)。
+
 產生期間，按鈕與內容區會顯示動態載入提示；同一時間不會重複發送請求。
 
 ## Prompt 與 Context 組成
 
-每次呼叫 API 都是獨立的單次請求，不會自動帶入其他日期的日誌或先前對話。API 的 `systemInstruction` 固定要求模型扮演務實的 AI 主管並使用繁體中文；使用者訊息中的 context 再依序由以下內容組成：
+回顧日誌的 AI 主管每次呼叫都是獨立的單次請求，不會自動帶入其他日期的日誌或先前對話。光球對話框則會在同一次面板內附上最近 6 輪問答。API 的 `systemInstruction` 固定要求模型扮演務實的 AI 主管並使用繁體中文；使用者訊息中的 context 再依序由以下內容組成：
 
 1. **自訂 Prompt（選填）**
    - 在「設定 → AI 主管 Prompt」輸入並儲存
@@ -137,6 +139,8 @@ Gemini Plus／Google AI 訂閱**不包含** Developer API；API 有獨立免費�
 ## 相關程式
 
 - [`src/utils/gemini.ts`](../src/utils/gemini.ts)：組合 Prompt、呼叫 API 及清理回傳文字
+- [`src/utils/sphereAi.ts`](../src/utils/sphereAi.ts)：光球提問所用的進度與未完成代辦摘要
+- [`src/components/SphereAiPanel.vue`](../src/components/SphereAiPanel.vue)：光球右鍵的詢問面板
 - [`src/utils/storage.ts`](../src/utils/storage.ts)：用量與自訂 Prompt 的 localStorage key
 - [`src/stores/taskStore.ts`](../src/stores/taskStore.ts)：管理自訂 Prompt、寫入建議及記錄用量
 - [`src/views/ReflectionLogView.vue`](../src/views/ReflectionLogView.vue)：確認呼叫、載入狀態及安全渲染 Markdown

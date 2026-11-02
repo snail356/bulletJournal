@@ -1,4 +1,8 @@
 import type { DailyReflection, StatusItem, Task } from '@/types'
+import {
+  buildSphereConversation,
+  type SphereAiTurn,
+} from '@/utils/sphereAi'
 
 const DEFAULT_MODEL = 'gemini-3.5-flash'
 
@@ -119,12 +123,12 @@ interface GeminiGenerateResponse {
   }
 }
 
-export async function generateAiManagerAdvice(
-  reflection: DailyReflection,
-  customPrompt = '',
-  dayTasks: Task[] = [],
-  statusItems: StatusItem[] = [],
-): Promise<string> {
+async function generateGeminiText(options: {
+  systemInstruction: string
+  userText?: string
+  contents?: Array<{ role: 'user' | 'model'; text: string }>
+  temperature: number
+}): Promise<string> {
   const apiKey = getGeminiApiKey()
   if (!apiKey) {
     throw new Error(
@@ -134,6 +138,9 @@ export async function generateAiManagerAdvice(
 
   const model = getGeminiModel()
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`
+  const contents = options.contents ?? [
+    { role: 'user' as const, text: options.userText ?? '' },
+  ]
 
   const response = await fetch(url, {
     method: 'POST',
@@ -143,29 +150,14 @@ export async function generateAiManagerAdvice(
     },
     body: JSON.stringify({
       systemInstruction: {
-        parts: [
-          {
-            text: '你是務實、具體、可執行的 AI 主管，回覆一律使用繁體中文。請同時參考當日任務與回顧內容提出建議。',
-          },
-        ],
+        parts: [{ text: options.systemInstruction }],
       },
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: buildPrompt(
-                reflection,
-                customPrompt,
-                dayTasks,
-                statusItems,
-              ),
-            },
-          ],
-        },
-      ],
+      contents: contents.map((item) => ({
+        role: item.role,
+        parts: [{ text: item.text }],
+      })),
       generationConfig: {
-        temperature: 0.6,
+        temperature: options.temperature,
         maxOutputTokens: 4096,
         thinkingConfig: {
           thinkingLevel: 'low',
@@ -204,4 +196,42 @@ export async function generateAiManagerAdvice(
   }
 
   return normalizeAiAdviceText(text)
+}
+
+export async function generateAiManagerAdvice(
+  reflection: DailyReflection,
+  customPrompt = '',
+  dayTasks: Task[] = [],
+  statusItems: StatusItem[] = [],
+): Promise<string> {
+  return generateGeminiText({
+    systemInstruction:
+      '你是務實、具體、可執行的 AI 主管，回覆一律使用繁體中文。請同時參考當日任務與回顧內容提出建議。',
+    userText: buildPrompt(reflection, customPrompt, dayTasks, statusItems),
+    temperature: 0.6,
+  })
+}
+
+/** 依最新筆記本摘要與最近幾輪問答回答；不套用回顧日誌的固定總評格式 */
+export async function askJournalQuestion(
+  question: string,
+  context: string,
+  history: SphereAiTurn[] = [],
+): Promise<string> {
+  const trimmed = question.trim()
+  if (!trimmed) {
+    throw new Error('請先輸入問題')
+  }
+
+  return generateGeminiText({
+    systemInstruction: [
+      '你是這本子彈筆記的助理。',
+      '只根據最新一則訊息裡的筆記本資料與先前對話回答，不要捏造資料裡沒有的任務。',
+      '若先前對話與最新筆記本資料衝突，以最新筆記本資料為準。',
+      '回覆使用繁體中文與 Markdown，簡潔並可執行。',
+      '若問題超出提供的資料，直接說明缺少什麼。',
+    ].join(''),
+    contents: buildSphereConversation(trimmed, context, history),
+    temperature: 0.4,
+  })
 }

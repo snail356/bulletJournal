@@ -41,7 +41,8 @@ import {
   taskOverlapsDate,
   todayString,
 } from "@/utils/date";
-import { generateAiManagerAdvice as requestAiManagerAdvice } from "@/utils/gemini";
+import { askJournalQuestion, generateAiManagerAdvice as requestAiManagerAdvice } from "@/utils/gemini";
+import { buildSphereAiContext, type SphereAiTurn } from "@/utils/sphereAi";
 import { generateId } from "@/utils/id";
 import {
   clearAppData,
@@ -312,6 +313,7 @@ export const useTaskStore = defineStore("task", () => {
   );
   const aiManagerPrompt = ref("");
   const aiAdviceLoading = ref(false);
+  const sphereAiLoading = ref(false);
   const reflectionModalVisible = ref(false);
   /** 彈窗正在編輯的日誌日期（prompt 為昨日；手動新增為當日） */
   const reflectionModalDate = ref(addDays(todayString(), -1));
@@ -915,6 +917,50 @@ export const useTaskStore = defineStore("task", () => {
       throw error;
     } finally {
       aiAdviceLoading.value = false;
+    }
+  }
+
+  async function askSphereQuestion(
+    question: string,
+    history: SphereAiTurn[] = [],
+  ): Promise<string> {
+    const trimmed = question.trim();
+    if (!trimmed) {
+      throw new Error("請先輸入問題");
+    }
+    if (sphereAiLoading.value) {
+      throw new Error("上一個問題還在詢問中");
+    }
+
+    sphereAiLoading.value = true;
+    geminiUsage.value.lastError = null;
+    persistGeminiUsage();
+
+    try {
+      const today = todayString();
+      const answer = await askJournalQuestion(
+        trimmed,
+        buildSphereAiContext({
+          today,
+          tasks: tasks.value,
+          statusItems: statusItems.value,
+          reflection: getReflectionByDate(today) ?? null,
+        }),
+        history,
+      );
+      geminiUsage.value.totalSuccessCalls += 1;
+      geminiUsage.value.lastCalledAt = new Date().toISOString();
+      geminiUsage.value.lastError = null;
+      persistGeminiUsage();
+      return answer;
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "詢問 AI 失敗";
+      geminiUsage.value.lastError = message;
+      persistGeminiUsage();
+      throw error;
+    } finally {
+      sphereAiLoading.value = false;
     }
   }
 
@@ -2245,6 +2291,7 @@ export const useTaskStore = defineStore("task", () => {
     geminiUsage,
     aiManagerPrompt,
     aiAdviceLoading,
+    sphereAiLoading,
     toolboxLists,
     toolboxListsSorted,
     navFeatureVisibility,
@@ -2278,6 +2325,7 @@ export const useTaskStore = defineStore("task", () => {
     submitDailyReflection,
     deleteDailyReflection,
     generateAiManagerAdvice,
+    askSphereQuestion,
     setAiManagerPrompt,
     tasksForSelectedDate,
     todayProgress,

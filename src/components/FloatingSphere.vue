@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, useId } from "vue";
 import { pickRandomQuote, type Quote } from "@/data/quotes";
 import { msUntilNextHour, pickHourChime } from "@/data/hourChimes";
+import SphereAiPanel from "@/components/SphereAiPanel.vue";
 import {
   FLOATING_SPHERE_POSITION_KEY,
   loadFromStorage,
@@ -29,6 +30,8 @@ const popKind = ref<PopKind | null>(null);
 const activeQuote = ref<Quote | null>(null);
 const chimeText = ref("");
 const popoverRef = ref<HTMLElement | null>(null);
+const aiPanelRef = ref<{ rootRef: HTMLElement | null } | null>(null);
+const aiOpen = ref(false);
 const popoverStyle = ref<Record<string, string>>({});
 const position = ref<Point>({ x: 0, y: 0 });
 
@@ -160,7 +163,14 @@ function onSphereClick() {
     suppressNextClick = false;
     return;
   }
+  closeAiPanel();
   void showRandomQuote();
+}
+
+function onSphereContextMenu(e: MouseEvent) {
+  e.preventDefault();
+  if (isDragging.value) return;
+  void openAiPanel();
 }
 
 function bindDragListeners() {
@@ -199,7 +209,7 @@ function onDragPointerMove(e: PointerEvent) {
     dragSession.originX + dx,
     dragSession.originY + dy,
   );
-  if (popKind.value) updatePopPosition();
+  syncOpenPop();
 }
 
 function onDragPointerUp(e: PointerEvent) {
@@ -215,11 +225,23 @@ function onDragPointerUp(e: PointerEvent) {
 
 async function openPop() {
   await nextTick();
-  updatePopPosition();
+  syncOpenPop();
+}
+
+function closeAiPanel() {
+  aiOpen.value = false;
+}
+
+async function openAiPanel() {
+  hidePop();
+  aiOpen.value = true;
+  await nextTick();
+  syncOpenPop();
 }
 
 async function showRandomQuote() {
   clearChimeHide();
+  closeAiPanel();
   popKind.value = "quote";
   activeQuote.value = pickRandomQuote(activeQuote.value?.id);
   chimeText.value = "";
@@ -227,6 +249,7 @@ async function showRandomQuote() {
 }
 
 async function showHourChime() {
+  if (aiOpen.value) return;
   clearChimeHide();
   popKind.value = "chime";
   activeQuote.value = null;
@@ -264,18 +287,30 @@ function clearHourChime() {
   chimeTimer = null;
 }
 
-function updatePopPosition() {
+function openPopElement(): HTMLElement | null {
+  if (aiOpen.value) return aiPanelRef.value?.rootRef ?? null;
+  return popoverRef.value;
+}
+
+function syncOpenPop() {
+  updatePopPosition(openPopElement());
+}
+
+function updatePopPosition(popover: HTMLElement | null) {
   const trigger = rootRef.value?.getBoundingClientRect();
-  const popover = popoverRef.value;
   if (!trigger || !popover) return;
 
   const width = popover.offsetWidth;
   const height = popover.offsetHeight;
+  const gap = 12;
+  const spaceAbove = trigger.top - gap - 8;
+  const spaceBelow = window.innerHeight - trigger.bottom - gap - 8;
+  const placeAbove = spaceAbove >= height || spaceAbove >= spaceBelow;
   let left = trigger.right - width;
   left = Math.max(8, Math.min(left, window.innerWidth - width - 8));
 
-  let top = trigger.top - height - 12;
-  if (top < 8) top = trigger.bottom + 12;
+  let top = placeAbove ? trigger.top - height - gap : trigger.bottom + gap;
+  top = Math.max(8, Math.min(top, window.innerHeight - height - 8));
 
   popoverStyle.value = { left: `${left}px`, top: `${top}px` };
 }
@@ -290,12 +325,14 @@ function onDocumentPointerDown(e: PointerEvent) {
 }
 
 function onKeydown(e: KeyboardEvent) {
-  if (e.key === "Escape") hidePop();
+  if (e.key !== "Escape") return;
+  hidePop();
+  closeAiPanel();
 }
 
 function onResize() {
   position.value = clampPosition(position.value.x, position.value.y);
-  if (popKind.value) updatePopPosition();
+  syncOpenPop();
 }
 
 onMounted(async () => {
@@ -328,9 +365,11 @@ onUnmounted(() => {
       :style="sphereStyle"
       role="button"
       tabindex="0"
-      aria-label="顯示一句引言，可拖曳移動"
+      aria-label="左鍵顯示引言，右鍵詢問 AI，可拖曳移動"
+      title="左鍵引言，右鍵詢問 AI"
       @pointerdown="onSpherePointerDown"
       @click="onSphereClick"
+      @contextmenu="onSphereContextMenu"
       @keydown.enter.prevent="onSphereClick"
       @keydown.space.prevent="onSphereClick"
     >
@@ -414,6 +453,14 @@ onUnmounted(() => {
         <p v-else class="quote-text">{{ chimeText }}</p>
       </aside>
     </Transition>
+
+    <SphereAiPanel
+      v-if="aiOpen"
+      ref="aiPanelRef"
+      :position-style="popoverStyle"
+      @close="closeAiPanel"
+      @layout="syncOpenPop"
+    />
   </Teleport>
 </template>
 
