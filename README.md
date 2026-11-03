@@ -20,6 +20,18 @@ npm install
 npm run dev
 ```
 
+## 測試
+
+單元測試使用 Vitest。外部 HTTP（例如 Gemini）在測試裡以 mock `fetch` 取代，不打真實 API。
+
+```bash
+npm test
+npm run test:watch
+npm run test:coverage
+```
+
+Coverage 會印在終端機，HTML 報表在 `coverage/index.html`。目前不設覆蓋率門檻。
+
 ## 頁面
 
 | 路由 | 說明 |
