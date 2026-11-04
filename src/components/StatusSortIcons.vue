@@ -192,8 +192,8 @@ onUnmounted(() => {
   z-index: 1400;
   max-width: 220px;
   padding: 6px 10px;
-  background: $text;
-  color: white;
+  background: $toast-bg;
+  color: $toast-text;
   font-size: 12px;
   line-height: 1.4;
   border-radius: 6px;

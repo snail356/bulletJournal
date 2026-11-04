@@ -642,7 +642,7 @@ onUnmounted(() => {
   z-index: 50;
   width: min(320px, calc(100vw - 24px));
   padding: 14px 16px 12px;
-  background: rgba(255, 255, 255, 0.94);
+  background: with-alpha($surface, 0.94);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(103, 232, 249, 0.35);
   border-radius: $radius;

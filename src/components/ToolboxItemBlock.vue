@@ -301,7 +301,7 @@ function onPaste(e: ClipboardEvent) {
 
     &:hover {
       color: $primary;
-      background: rgba(255, 255, 255, 0.8);
+      background: with-alpha($surface, 0.8);
     }
   }
 }

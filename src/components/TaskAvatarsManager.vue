@@ -240,8 +240,8 @@ input[type='text'] {
     transform: translateX(-50%);
     padding: 4px 8px;
     border-radius: 6px;
-    background: $text;
-    color: white;
+    background: $toast-bg;
+    color: $toast-text;
     font-size: 11px;
     font-weight: 600;
     white-space: nowrap;

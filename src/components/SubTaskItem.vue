@@ -416,7 +416,7 @@ function formatTag(type: ContentFormat): string | null {
   gap: 2px;
   opacity: 0;
   pointer-events: none;
-  background: rgba(255, 255, 255, 0.9);
+  background: with-alpha($surface, 0.9);
   border-radius: 6px;
   padding: 2px;
   transition: opacity 0.15s;

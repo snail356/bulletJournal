@@ -481,7 +481,7 @@ defineExpose({ rootRef });
   max-height: calc(100vh - 16px);
   overflow: hidden;
   padding: 14px 14px 12px;
-  background: rgba(255, 255, 255, 0.96);
+  background: with-alpha($surface, 0.96);
   backdrop-filter: blur(12px);
   border: 1px solid rgba(103, 232, 249, 0.35);
   border-radius: $radius;
