@@ -1235,7 +1235,7 @@ export const useTaskStore = defineStore("task", () => {
       task.status = getDefaultStatusId();
     }
     touchTask(task);
-    reorderCompletedToBottom(task.date);
+    reorderCompletedToBottom(visibleDateFor(task));
   }
 
   function completeTaskWithSubtasks(taskId: string) {
@@ -1251,7 +1251,7 @@ export const useTaskStore = defineStore("task", () => {
     task.completed = true;
     task.status = getCompletedStatusId() ?? task.status;
     touchTask(task);
-    reorderCompletedToBottom(task.date);
+    reorderCompletedToBottom(visibleDateFor(task));
   }
 
   function createSubTask(taskId: string, title: string): SubTask | null {
@@ -1495,37 +1495,53 @@ export const useTaskStore = defineStore("task", () => {
     }
   }
 
-  /** 將任務移至該日清單最上方（已完成任務仍維持在底部） */
-  function moveTaskToPendingTop(taskId: string) {
-    const task = findTask(taskId);
-    if (!task || task.completed) return;
-    const date = task.date;
-    const others = tasks.value.filter((t) => t.date !== date);
-    const dayTasks = tasks.value.filter((t) => t.date === date);
-    const rest = dayTasks.filter((t) => t.id !== taskId);
-    const pending = rest.filter((t) => !t.completed);
-    const done = rest.filter((t) => t.completed);
-    tasks.value = [...others, task, ...pending, ...done];
+  function overlappingForDate(date: string): Task[] {
+    return tasks.value.filter((t) => taskOverlapsDate(t, date));
   }
 
-  /** 將任務移至該日「未完成任務」的最下方（仍在已完成任務之上） */
-  function moveTaskToPendingBottom(taskId: string) {
+  /** 只重排該日可見任務在陣列中的既有欄位，避免打亂其他日期的相對順序 */
+  function applyOverlappingOrder(date: string, ordered: Task[]) {
+    let index = 0;
+    tasks.value = tasks.value.map((task) =>
+      taskOverlapsDate(task, date) ? ordered[index++] : task,
+    );
+  }
+
+  /** 優先用目前檢視日；任務若不重疊該日則退回開始日 */
+  function visibleDateFor(task: Task, date?: string): string {
+    const target = date ?? selectedDate.value;
+    return taskOverlapsDate(task, target) ? target : task.date;
+  }
+
+  /** 將任務移至該日可見清單最上方（已完成任務仍維持在底部） */
+  function moveTaskToPendingTop(taskId: string, date?: string) {
     const task = findTask(taskId);
     if (!task || task.completed) return;
-    const date = task.date;
-    const others = tasks.value.filter((t) => t.date !== date);
-    const dayTasks = tasks.value.filter((t) => t.date === date);
-    const rest = dayTasks.filter((t) => t.id !== taskId);
-    const pending = rest.filter((t) => !t.completed);
-    const done = rest.filter((t) => t.completed);
-    tasks.value = [...others, ...pending, task, ...done];
+    const targetDate = visibleDateFor(task, date);
+    const rest = overlappingForDate(targetDate).filter((t) => t.id !== taskId);
+    applyOverlappingOrder(targetDate, [
+      task,
+      ...rest.filter((t) => !t.completed),
+      ...rest.filter((t) => t.completed),
+    ]);
+  }
+
+  /** 將任務移至該日可見清單「未完成任務」的最下方（仍在已完成任務之上） */
+  function moveTaskToPendingBottom(taskId: string, date?: string) {
+    const task = findTask(taskId);
+    if (!task || task.completed) return;
+    const targetDate = visibleDateFor(task, date);
+    const rest = overlappingForDate(targetDate).filter((t) => t.id !== taskId);
+    applyOverlappingOrder(targetDate, [
+      ...rest.filter((t) => !t.completed),
+      task,
+      ...rest.filter((t) => t.completed),
+    ]);
   }
 
   function reorderCompletedToBottom(date?: string) {
     if (date) {
-      const dayTasks = tasks.value.filter((t) => t.date === date);
-      const others = tasks.value.filter((t) => t.date !== date);
-      tasks.value = [...others, ...sortByCompleted(dayTasks)];
+      applyOverlappingOrder(date, sortByCompleted(overlappingForDate(date)));
       return;
     }
     const grouped = new Map<string, Task[]>();
@@ -1569,7 +1585,7 @@ export const useTaskStore = defineStore("task", () => {
   }
 
   function reorderTasks(date: string, fromId: string, toId: string) {
-    const dayTasks = tasks.value.filter((t) => taskOverlapsDate(t, date));
+    const dayTasks = overlappingForDate(date);
     if (
       !dayTasks.some((t) => t.id === fromId) ||
       !dayTasks.some((t) => t.id === toId)
@@ -1578,10 +1594,7 @@ export const useTaskStore = defineStore("task", () => {
     }
     const reordered = reorderInGroup(dayTasks, fromId, toId);
     if (!reordered) return;
-    let index = 0;
-    tasks.value = tasks.value.map((task) =>
-      taskOverlapsDate(task, date) ? reordered[index++] : task,
-    );
+    applyOverlappingOrder(date, reordered);
   }
 
   function reorderSubTasks(taskId: string, fromId: string, toId: string) {
@@ -1623,14 +1636,15 @@ export const useTaskStore = defineStore("task", () => {
     const item = getStatusItem(status);
     const completed = isCompletedStatus(status);
     updateTask(taskId, { status, completed });
+    const date = visibleDateFor(task);
     if (completed) {
-      reorderCompletedToBottom(task.date);
+      reorderCompletedToBottom(date);
       return;
     }
     if (item.sortOnSelect === "top") {
-      moveTaskToPendingTop(taskId);
+      moveTaskToPendingTop(taskId, date);
     } else if (item.sortOnSelect === "bottom") {
-      moveTaskToPendingBottom(taskId);
+      moveTaskToPendingBottom(taskId, date);
     }
   }
 
