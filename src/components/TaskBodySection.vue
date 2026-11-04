@@ -291,8 +291,8 @@ function formatTag(type: ContentFormat): string | null {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #6b7280;
-  background: #e5e7eb;
+  color: $text-muted;
+  background: $border;
   vertical-align: middle;
 }
 

@@ -166,7 +166,7 @@ function onKeydown(event: KeyboardEvent, index: number) {
   }
 
   &:focus-visible {
-    outline: 2px solid rgba($primary, 0.35);
+    outline: 2px solid with-alpha($primary, 0.35);
     outline-offset: -2px;
     border-radius: $radius-sm $radius-sm 0 0;
   }

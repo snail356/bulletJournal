@@ -939,7 +939,7 @@ async function onContextPaste() {
 .check {
   width: 20px;
   height: 20px;
-  border: 2px solid #d1d5db;
+  border: 2px solid $border-strong;
   border-radius: 6px;
   display: flex;
   align-items: center;
@@ -1122,7 +1122,7 @@ async function onContextPaste() {
   cursor: text;
 
   &:hover {
-    border-color: #d1d5db;
+    border-color: $border-strong;
   }
 
   &:focus-within {
@@ -1182,9 +1182,9 @@ async function onContextPaste() {
   border-radius: $radius-sm;
   font-size: 12px;
   font-weight: 600;
-  color: #b45309;
-  background: #fffbeb;
-  border: 1px solid #fde68a;
+  color: $warning-text;
+  background: $warning-bg;
+  border: 1px solid $warning-border;
   white-space: nowrap;
   cursor: default;
 }

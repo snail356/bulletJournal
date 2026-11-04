@@ -188,7 +188,7 @@ onUnmounted(() => document.removeEventListener('pointerup', resetBackdropPointer
   position: fixed;
   inset: 0;
   z-index: 1200;
-  background: rgba(0, 0, 0, 0.4);
+  background: $overlay;
   display: flex;
   align-items: center;
   justify-content: center;

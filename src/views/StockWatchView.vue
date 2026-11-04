@@ -653,8 +653,8 @@ onUnmounted(() => {
   }
 
   &.freq-none {
-    background: #f3f4f6;
-    color: #6b7280;
+    background: $bg;
+    color: $text-muted;
   }
 }
 
@@ -676,16 +676,16 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  color: #9ca3af;
+  color: $text-muted;
 
   &:hover {
-    color: #6b7280;
+    color: $text;
     background: $bg;
   }
 
   &.pinned {
     color: #f59e0b;
-    background: #fffbeb;
+    background: $warning-bg;
   }
 }
 

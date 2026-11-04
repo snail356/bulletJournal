@@ -150,7 +150,7 @@ function cancel() {
   position: fixed;
   inset: 0;
   z-index: 1650;
-  background: rgba(0, 0, 0, 0.4);
+  background: $overlay;
   display: flex;
   align-items: center;
   justify-content: center;

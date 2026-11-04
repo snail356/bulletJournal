@@ -1,16 +1,30 @@
-$primary: #7c3aed;
-$primary-light: #ede9fe;
-$primary-dark: #6d28d9;
-$bg: #f4f5f7;
-$surface: #ffffff;
-$text: #1f2937;
-$text-muted: #6b7280;
-$border: #e5e7eb;
-$shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 4px 12px rgba(0, 0, 0, 0.04);
-$shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.1);
+$primary: var(--primary);
+$primary-light: var(--primary-light);
+$primary-dark: var(--primary-dark);
+$bg: var(--bg);
+$surface: var(--surface);
+$text: var(--text);
+$text-muted: var(--text-muted);
+$border: var(--border);
+$border-strong: var(--border-strong);
+$shadow: var(--shadow);
+$shadow-lg: var(--shadow-lg);
+$code-bg: var(--code-bg);
+$code-text: var(--code-text);
+$toast-bg: var(--toast-bg);
+$toast-text: var(--toast-text);
+$overlay: var(--overlay);
+$track: var(--track);
+$warning-bg: var(--warning-bg);
+$warning-text: var(--warning-text);
+$warning-border: var(--warning-border);
 $radius: 12px;
 $radius-sm: 8px;
 $sidebar-width: 260px;
 $breakpoint-md: 768px;
 $breakpoint-sm: 640px;
 $breakpoint-xs: 480px;
+
+@function with-alpha($color, $alpha) {
+  @return color-mix(in srgb, #{$color} #{$alpha * 100%}, transparent);
+}

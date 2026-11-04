@@ -132,7 +132,7 @@ function confirm() {
   position: fixed;
   inset: 0;
   z-index: 1600;
-  background: rgba(0, 0, 0, 0.4);
+  background: $overlay;
   display: flex;
   align-items: center;
   justify-content: center;

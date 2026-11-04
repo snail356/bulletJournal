@@ -24,7 +24,7 @@ const selectedItems = computed(() =>
 
 const triggerStyle = computed(() => {
   if (!selectedItems.value.length) {
-    return { color: '#9ca3af', background: '#f3f4f6' }
+    return { color: 'var(--text-muted)', background: 'var(--label-bg-gray)' }
   }
   const first = selectedItems.value[0]
   return {

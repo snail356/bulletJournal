@@ -120,7 +120,7 @@ onUnmounted(() => {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 2px solid white;
+  border: 2px solid $surface;
   box-shadow: 0 0 0 1px $border;
   cursor: pointer;
   flex-shrink: 0;
@@ -136,7 +136,7 @@ onUnmounted(() => {
   z-index: 1400;
   display: flex;
   gap: 6px;
-  background: white;
+  background: $surface;
   padding: 6px 8px;
   border-radius: 6px;
   box-shadow: $shadow;
@@ -147,7 +147,7 @@ onUnmounted(() => {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 2px solid white;
+  border: 2px solid $surface;
   box-shadow: 0 0 0 1px $border;
   cursor: pointer;
   flex-shrink: 0;

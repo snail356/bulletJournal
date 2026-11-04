@@ -14,6 +14,7 @@ const GEMINI_USAGE_KEY = "bullet-journal-gemini-usage";
 const NAV_FEATURES_KEY = "bullet-journal-nav-features";
 const NAV_FEATURE_ORDER_KEY = "bullet-journal-nav-feature-order";
 const AURORA_MODE_KEY = "bullet-journal-aurora-mode";
+const THEME_KEY = "bullet-journal-theme";
 const FLOATING_SPHERE_POSITION_KEY = "bullet-journal-floating-sphere-position";
 const BACKUP_PREFS_KEY = "bullet-journal-backup-prefs";
 const BACKLOG_PREFS_KEY = "bullet-journal-backlog-prefs";
@@ -100,6 +101,7 @@ export {
   NAV_FEATURES_KEY,
   NAV_FEATURE_ORDER_KEY,
   AURORA_MODE_KEY,
+  THEME_KEY,
   FLOATING_SPHERE_POSITION_KEY,
   BACKUP_PREFS_KEY,
   BACKLOG_PREFS_KEY,

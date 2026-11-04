@@ -64,7 +64,7 @@ function onToggle() {
   width: 36px;
   height: 20px;
   border-radius: 10px;
-  background: #d1d5db;
+  background: $track;
   transition: background 0.2s;
   flex-shrink: 0;
 

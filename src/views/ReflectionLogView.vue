@@ -362,7 +362,7 @@ async function confirmAiAdvice() {
   &.active {
     border-color: $primary;
     background: $primary-light;
-    box-shadow: 0 0 0 2px rgba($primary, 0.15);
+    box-shadow: 0 0 0 2px with-alpha($primary, 0.15);
   }
 }
 
@@ -457,7 +457,7 @@ async function confirmAiAdvice() {
   border-radius: $radius-sm;
 
   &:hover {
-    background: rgba(0, 0, 0, 0.05);
+    background: with-alpha($text, 0.05);
     color: $primary;
   }
 }

@@ -404,7 +404,7 @@ newStatusColor.value = nextStatusColor()
 
   &:hover {
     color: $primary;
-    background: rgba(0, 0, 0, 0.05);
+    background: with-alpha($text, 0.05);
   }
 }
 </style>

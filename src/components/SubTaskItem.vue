@@ -351,7 +351,7 @@ function formatTag(type: ContentFormat): string | null {
 .check {
   width: 16px;
   height: 16px;
-  border: 2px solid #d1d5db;
+  border: 2px solid $border-strong;
   border-radius: 4px;
   display: flex;
   align-items: center;
@@ -387,7 +387,7 @@ function formatTag(type: ContentFormat): string | null {
   margin-right: -92px;
   padding: 6px 8px;
   border-left: 2px solid $border;
-  background: rgba(0, 0, 0, 0.03);
+  background: with-alpha($text, 0.04);
   border-radius: 0 $radius-sm $radius-sm 0;
   overflow: visible;
 
@@ -461,8 +461,8 @@ function formatTag(type: ContentFormat): string | null {
   line-height: 1;
   padding: 2px 3px;
   border-radius: 3px;
-  color: #e5e7eb;
-  background: #1f2937;
+  color: $code-text;
+  background: $code-bg;
 }
 
 @media (max-width: $breakpoint-sm) {

@@ -72,8 +72,8 @@ async function copyCode() {
   margin: 0;
   padding: 12px 40px 12px 12px;
   border-radius: $radius-sm;
-  background: #1f2937;
-  color: #e5e7eb;
+  background: $code-bg;
+  color: $code-text;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 12px;
   line-height: 1.55;

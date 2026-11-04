@@ -283,7 +283,7 @@ function previewItems(list: ToolboxList): string {
   gap: 6px;
 
   &:hover {
-    border-color: #d1d5db;
+    border-color: $border-strong;
   }
 
   &.active {

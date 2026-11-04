@@ -24,7 +24,7 @@ const offset = computed(
           cy="50"
           r="42"
           fill="none"
-          stroke="#e5e7eb"
+          stroke="var(--border)"
           stroke-width="8"
         />
         <circle
@@ -32,7 +32,7 @@ const offset = computed(
           cy="50"
           r="42"
           fill="none"
-          stroke="#7c3aed"
+          stroke="var(--primary)"
           stroke-width="8"
           stroke-linecap="round"
           :stroke-dasharray="`${circumference} ${circumference}`"

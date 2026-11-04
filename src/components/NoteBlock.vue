@@ -350,8 +350,8 @@ function formatTag(type: ContentFormat): string | null {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   padding: 1px 5px;
   border-radius: 4px;
-  color: #e5e7eb;
-  background: #1f2937;
+  color: $code-text;
+  background: $code-bg;
 }
 
 .actions-anchor {
@@ -368,7 +368,7 @@ function formatTag(type: ContentFormat): string | null {
   display: flex;
   gap: 2px;
   align-items: center;
-  background: rgba(255, 255, 255, 0.85);
+  background: with-alpha($surface, 0.85);
   border-radius: 6px;
   padding: 2px;
   opacity: 0;
@@ -386,7 +386,7 @@ function formatTag(type: ContentFormat): string | null {
     flex-shrink: 0;
 
     &:hover {
-      background: white;
+      background: $surface;
     }
   }
 }

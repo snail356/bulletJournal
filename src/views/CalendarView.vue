@@ -759,7 +759,7 @@ const hintStyle = computed(() => {
   }
 
   &.outside {
-    background: #fafafa;
+    background: with-alpha($text, 0.04);
 
     .day-num {
       color: $text-muted;

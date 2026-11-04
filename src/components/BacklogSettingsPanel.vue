@@ -179,7 +179,7 @@ function clear() {
 
     &:focus {
       border-color: $primary;
-      box-shadow: 0 0 0 2px rgba($primary, 0.12);
+      box-shadow: 0 0 0 2px with-alpha($primary, 0.12);
     }
   }
 }

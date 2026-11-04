@@ -1,23 +1,23 @@
 import type { Note } from '@/types'
 
 export const NOTE_COLOR_BG: Record<Note['color'], string> = {
-  yellow: '#fef9c3',
-  red: '#fee2e2',
-  purple: '#ede9fe',
-  orange: '#ffedd5',
-  green: '#dcfce7',
-  blue: '#dbeafe',
-  gray: '#f3f4f6',
+  yellow: 'var(--note-yellow-bg)',
+  red: 'var(--note-red-bg)',
+  purple: 'var(--note-purple-bg)',
+  orange: 'var(--note-orange-bg)',
+  green: 'var(--note-green-bg)',
+  blue: 'var(--note-blue-bg)',
+  gray: 'var(--note-gray-bg)',
 }
 
 export const NOTE_COLOR_DOT: Record<Note['color'], string> = {
-  yellow: '#facc15',
-  red: '#f87171',
-  purple: '#c4b5fd',
-  orange: '#fdba74',
-  green: '#86efac',
-  blue: '#93c5fd',
-  gray: '#d1d5db',
+  yellow: 'var(--note-yellow-dot)',
+  red: 'var(--note-red-dot)',
+  purple: 'var(--note-purple-dot)',
+  orange: 'var(--note-orange-dot)',
+  green: 'var(--note-green-dot)',
+  blue: 'var(--note-blue-dot)',
+  gray: 'var(--note-gray-dot)',
 }
 
 export const NOTE_COLOR_OPTIONS = (Object.keys(NOTE_COLOR_DOT) as Note['color'][]).map(

@@ -73,7 +73,7 @@ function confirm() {
   position: fixed;
   inset: 0;
   z-index: 1400;
-  background: rgba(0, 0, 0, 0.35);
+  background: $overlay;
   display: flex;
   align-items: center;
   justify-content: center;

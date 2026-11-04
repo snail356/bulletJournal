@@ -121,13 +121,13 @@ onUnmounted(() => {
 
   &:hover:not(.disabled) {
     color: $text;
-    background: rgba(0, 0, 0, 0.05);
+    background: with-alpha($text, 0.05);
   }
 
   &.danger:hover:not(.disabled),
   &.danger:focus-visible:not(.disabled) {
     color: #ef4444;
-    background: #fee2e2;
+    background: with-alpha(#ef4444, 0.18);
   }
 
   &.overlay {

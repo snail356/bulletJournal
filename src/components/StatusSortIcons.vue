@@ -178,7 +178,7 @@ onUnmounted(() => {
   &:hover,
   &.open {
     color: $text;
-    background: rgba(0, 0, 0, 0.05);
+    background: with-alpha($text, 0.05);
   }
 
   &.active {

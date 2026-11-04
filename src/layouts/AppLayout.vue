@@ -154,8 +154,8 @@ onUnmounted(() => {
   left: 50%;
   transform: translateX(-50%);
   z-index: 3000;
-  background: #1f2937;
-  color: white;
+  background: $toast-bg;
+  color: $toast-text;
   padding: 12px 16px;
   border-radius: $radius-sm;
   box-shadow: $shadow-lg;

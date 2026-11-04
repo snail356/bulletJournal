@@ -6,7 +6,10 @@ import SidebarCarousel from "./SidebarCarousel.vue";
 import TodayProgress from "./TodayProgress.vue";
 import AppIcon from "./AppIcon.vue";
 import { useTaskStore } from "@/stores/taskStore";
+import { useTheme } from "@/composables/useTheme";
 import { todayString } from "@/utils/date";
+
+const { isDark, toggleTheme } = useTheme();
 
 const route = useRoute();
 const router = useRouter();
@@ -109,6 +112,15 @@ function onResize() {
             <p>工作狀態紀錄</p>
           </div>
         </div>
+        <button
+          type="button"
+          class="theme-toggle"
+          :aria-label="isDark ? '切換為日間模式' : '切換為黑夜模式'"
+          :title="isDark ? '切換為日間模式' : '切換為黑夜模式'"
+          @click="toggleTheme"
+        >
+          <AppIcon :name="isDark ? 'sun' : 'moon'" />
+        </button>
       </div>
 
       <nav
@@ -208,6 +220,7 @@ function onResize() {
   display: flex;
   align-items: center;
   gap: 4px;
+  margin-bottom: 28px;
 }
 
 .menu-toggle {
@@ -226,11 +239,28 @@ function onResize() {
   }
 }
 
+.theme-toggle {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin-left: auto;
+  border-radius: 8px;
+  color: $text-muted;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: $primary-light;
+    color: $primary;
+  }
+}
+
 .brand {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 28px;
+  min-width: 0;
   padding: 0 8px;
 
   h1 {
@@ -284,7 +314,7 @@ function onResize() {
 .migration-btn {
   width: 100%;
   text-align: left;
-  border: 1px dashed rgba($primary, 0.35);
+  border: 1px dashed with-alpha($primary, 0.35);
   margin-top: 4px;
 
   &:hover {
@@ -352,8 +382,11 @@ function onResize() {
     display: flex;
   }
 
-  .brand {
+  .brand-row {
     margin-bottom: 0;
+  }
+
+  .brand {
     padding: 0;
     min-width: 0;
 
@@ -433,7 +466,7 @@ function onResize() {
     justify-content: center;
 
     &:hover {
-      background: rgba($primary, 0.12);
+      background: with-alpha($primary, 0.12);
       color: $primary;
     }
   }
@@ -478,7 +511,7 @@ function onResize() {
   position: fixed;
   inset: 0;
   z-index: 1190;
-  background: rgba(17, 24, 39, 0.4);
+  background: $overlay;
 }
 
 body.nav-menu-open {

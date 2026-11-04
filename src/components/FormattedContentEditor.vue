@@ -374,7 +374,7 @@ defineExpose({ startEditing })
   }
 
   &:hover {
-    border-color: #d1d5db;
+    border-color: $border-strong;
   }
 
   &:focus {
@@ -387,12 +387,12 @@ defineExpose({ startEditing })
   &.is-code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 12px;
-    background: #1f2937;
-    color: #e5e7eb;
-    border-color: #374151;
+    background: $code-bg;
+    color: $code-text;
+    border-color: $border;
 
     &::placeholder {
-      color: #9ca3af;
+      color: $text-muted;
     }
 
     &:focus {
@@ -427,7 +427,7 @@ defineExpose({ startEditing })
     border-radius: 6px;
     color: $text-muted;
     border: 1px solid $border;
-    background: rgba($surface, 0.95);
+    background: with-alpha($surface, 0.95);
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
 
     &:hover {
@@ -451,7 +451,7 @@ defineExpose({ startEditing })
     border-color: transparent;
 
     &:hover {
-      border-color: #d1d5db;
+      border-color: $border-strong;
     }
 
     &:focus {
@@ -459,14 +459,14 @@ defineExpose({ startEditing })
     }
 
     &.is-code {
-      background: #1f2937;
-      color: #e5e7eb;
-      border-color: #374151;
+      background: $code-bg;
+      color: $code-text;
+      border-color: $border;
 
       &:hover,
       &:focus {
-        background: #1f2937;
-        border-color: #374151;
+        background: $code-bg;
+        border-color: $border;
       }
     }
   }
@@ -494,15 +494,15 @@ defineExpose({ startEditing })
   &.is-code {
     padding: 8px 10px;
     border-radius: $radius-sm;
-    background: #1f2937;
-    color: #e5e7eb;
-    border: 1px solid #374151;
+    background: $code-bg;
+    color: $code-text;
+    border: 1px solid $border;
 
     &:hover,
     &:focus {
-      background: #1f2937;
-      color: #e5e7eb;
-      border-color: #374151;
+      background: $code-bg;
+      color: $code-text;
+      border-color: $border;
       box-shadow: none;
     }
   }

@@ -87,7 +87,7 @@ onUnmounted(() => document.removeEventListener('mousedown', onClickOutside))
   line-height: 1;
 
   &:hover {
-    box-shadow: 0 0 0 2px rgba($primary, 0.25);
+    box-shadow: 0 0 0 2px with-alpha($primary, 0.25);
   }
 }
 

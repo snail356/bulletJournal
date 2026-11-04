@@ -17,15 +17,17 @@ export const LABEL_COLOR_OPTIONS = LABEL_COLORS.map((color) => ({
 }))
 
 export const LABEL_BG: Record<LabelColor, string> = {
-  '#7c3aed': '#ede9fe',
-  '#3b82f6': '#dbeafe',
-  '#f97316': '#ffedd5',
-  '#22c55e': '#dcfce7',
-  '#ef4444': '#fee2e2',
-  '#6b7280': '#f3f4f6',
+  '#7c3aed': 'var(--label-bg-violet)',
+  '#3b82f6': 'var(--label-bg-blue)',
+  '#f97316': 'var(--label-bg-orange)',
+  '#22c55e': 'var(--label-bg-green)',
+  '#ef4444': 'var(--label-bg-red)',
+  '#6b7280': 'var(--label-bg-gray)',
 }
+
+export const LABEL_BG_FALLBACK = 'var(--label-bg-gray)'
 
 export function getLabelBgForColor(color: string): string {
   const match = LABEL_COLORS.find((item) => item === color)
-  return match ? LABEL_BG[match] : '#f3f4f6'
+  return match ? LABEL_BG[match] : LABEL_BG_FALLBACK
 }

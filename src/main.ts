@@ -7,6 +7,9 @@ import { useStockStore } from './stores/stockStore'
 import { useTaskStore } from './stores/taskStore'
 import './plugins/fontawesome'
 import './styles/global.scss'
+import { applyTheme, loadTheme } from './utils/theme'
+
+applyTheme(loadTheme())
 
 const app = createApp(App)
 const pinia = createPinia()

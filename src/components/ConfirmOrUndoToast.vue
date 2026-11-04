@@ -54,8 +54,8 @@ function undo() {
   left: 50%;
   transform: translateX(-50%);
   z-index: 3000;
-  background: #1f2937;
-  color: white;
+  background: $toast-bg;
+  color: $toast-text;
   padding: 12px 16px;
   border-radius: $radius-sm;
   display: flex;
@@ -65,11 +65,11 @@ function undo() {
   font-size: 13px;
 
   button {
-    color: #a78bfa;
+    color: $primary;
     font-weight: 600;
 
     &:hover {
-      color: #c4b5fd;
+      color: $primary-dark;
     }
   }
 }

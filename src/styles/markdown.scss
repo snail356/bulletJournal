@@ -67,7 +67,7 @@
   code {
     padding: 2px 5px;
     border-radius: 4px;
-    background: rgba($primary, 0.1);
+    background: with-alpha($primary, 0.1);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 12px;
   }
@@ -76,8 +76,8 @@
     margin: 10px 0;
     padding: 12px;
     border-radius: $radius-sm;
-    background: #1f2937;
-    color: #e5e7eb;
+    background: $code-bg;
+    color: $code-text;
     overflow-x: auto;
 
     code {
@@ -110,6 +110,6 @@
   }
 
   tr:nth-child(even) td {
-    background: rgba(0, 0, 0, 0.02);
+    background: with-alpha($text, 0.04);
   }
 }
