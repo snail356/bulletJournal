@@ -1,0 +1,28 @@
+---
+description: 改邏輯時補 Vitest 並跑 npm test
+alwaysApply: true
+---
+
+# 單元測試
+
+改 `src/utils`、`src/stores`、`server/` 或可抽離的 composable 邏輯時，必須在 `tests/` 新增或更新對應的 `*.spec.ts`，框架用 Vitest（不要改 Jest）。
+
+## 要寫什麼
+
+- 含正常流程、邊界與失敗路徑
+- `fetch`、Gemini、Backlog、台股、IndexedDB 一律 mock，不打真實服務
+- 測試名稱用繁體中文；import 用 `@/`（見 `tests/tsconfig.json`）
+
+## 做完要跑
+
+```bash
+npm test
+```
+
+改測試基礎設施時可再跑 `npm run test:coverage`。不設覆蓋率門檻。
+
+## 不必測
+
+- 純樣式、文案
+- 沒改行為的 Vue 畫面
+- 整份巨型 store（例如 `taskStore`），除非這次改到其中可單測的純函式

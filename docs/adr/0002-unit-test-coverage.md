@@ -20,3 +20,5 @@
 執行測試：`npm test`  
 監看模式：`npm run test:watch`  
 Coverage：`npm run test:coverage`（HTML 在 `coverage/index.html`）
+
+之後 AI 應依 `.cursor/rules/unit-tests.mdc` 在改邏輯時補測並跑 `npm test`。
