@@ -36,8 +36,13 @@ import { loadGeminiServerStatus, type GeminiServerStatus } from '@/utils/gemini'
 import { useSimpleReorderDrag } from '@/composables/useReorderDrag'
 import BacklogSettingsPanel from '@/components/BacklogSettingsPanel.vue'
 import { type NavFeatureId } from '@/utils/navFeatures'
+import { useTheme } from '@/composables/useTheme'
+import { useAccent } from '@/composables/useAccent'
+import { ACCENT_OPTIONS, type AccentId } from '@/utils/accent'
 
 const store = useTaskStore()
+const { isDark, setTheme } = useTheme()
+const { accent, setAccent } = useAccent()
 const stockStore = useStockStore()
 const commandStore = useCommandStore()
 const { draggingId, dragOverId, onDragStart, onDragOver, onDrop, onDragEnd } =
@@ -292,9 +297,18 @@ function toggleNavFeature(id: NavFeatureId, enabled: boolean) {
   store.setNavFeatureEnabled(id, enabled)
 }
 
+function setDarkMode(enabled: boolean) {
+  setTheme(enabled ? 'dark' : 'light')
+}
+
+function selectAccent(id: AccentId) {
+  setAccent(id)
+}
+
 const activeTab = ref('features')
 const settingsTabs: AppTabItem[] = [
   { id: 'features', label: '功能頁面', icon: 'list-check' },
+  { id: 'appearance', label: '外觀', icon: 'sun' },
   { id: 'labels', label: '標籤管理', icon: 'tags' },
   { id: 'avatars', label: '任務頭像', icon: 'user' },
   { id: 'carousel', label: '側邊圖片', icon: 'image' },
@@ -403,6 +417,43 @@ onUnmounted(() => {
               />
             </li>
           </ul>
+        </div>
+      </template>
+
+      <template #appearance>
+        <div class="settings-card">
+          <h2>外觀</h2>
+          <p class="desc">
+            主色只影響按鈕、選單與開關。任務標籤與狀態顏色不變。黑夜模式也可從側邊欄切換。
+          </p>
+          <div class="appearance-row">
+            <div class="appearance-copy">
+              <span class="appearance-name">黑夜模式</span>
+              <span class="appearance-desc">側邊欄的日月按鈕會同步</span>
+            </div>
+            <AppSwitch
+              :model-value="isDark"
+              @update:model-value="setDarkMode"
+            />
+          </div>
+          <div class="accent-block">
+            <span class="appearance-name">主色</span>
+            <div class="accent-swatches" role="radiogroup" aria-label="主色">
+              <button
+                v-for="option in ACCENT_OPTIONS"
+                :key="option.id"
+                type="button"
+                class="accent-swatch"
+                role="radio"
+                :aria-checked="accent === option.id"
+                :aria-label="option.label"
+                :title="option.label"
+                :class="{ active: accent === option.id }"
+                :style="{ background: option.swatch }"
+                @click="selectAccent(option.id)"
+              />
+            </div>
+          </div>
         </div>
       </template>
 
@@ -690,6 +741,64 @@ onUnmounted(() => {
     font-size: 16px;
     font-weight: 600;
     margin-bottom: 8px;
+  }
+}
+
+.appearance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid $border;
+}
+
+.appearance-copy,
+.accent-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.accent-block {
+  padding-top: 16px;
+  gap: 10px;
+}
+
+.appearance-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: $text;
+}
+
+.appearance-desc {
+  font-size: 12px;
+  color: $text-muted;
+  line-height: 1.4;
+}
+
+.accent-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.accent-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid $surface;
+  box-shadow: 0 0 0 1px $border;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    transform: scale(1.08);
+  }
+
+  &.active {
+    box-shadow: 0 0 0 2px $primary;
   }
 }
 

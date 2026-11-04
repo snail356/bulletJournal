@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { saveAccent } from '@/utils/accent'
 import { THEME_KEY } from '@/utils/storage'
 import {
   applyTheme,
@@ -83,5 +84,13 @@ describe('applyTheme', () => {
     document.head.innerHTML = ''
     expect(() => applyTheme('dark')).not.toThrow()
     expect(document.documentElement.dataset.theme).toBe('dark')
+  })
+
+  it('日間 theme-color 跟著已選主色', () => {
+    saveAccent('teal')
+    applyTheme('light')
+    expect(
+      document.querySelector('meta[name="theme-color"]')?.getAttribute('content'),
+    ).toBe('#0d9488')
   })
 })

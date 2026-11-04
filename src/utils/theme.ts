@@ -1,3 +1,4 @@
+import { accentSwatch, applyAccent, loadAccent } from "@/utils/accent";
 import { loadFromStorage, saveToStorage, THEME_KEY } from "@/utils/storage";
 
 export type Theme = "light" | "dark";
@@ -17,15 +18,17 @@ export function loadTheme(): Theme {
   return parseTheme(loadFromStorage<unknown>(THEME_KEY, "light"));
 }
 
+export function browserThemeColor(theme: Theme): string {
+  return theme === "dark" ? DARK_THEME_COLOR : accentSwatch(loadAccent());
+}
+
 export function applyTheme(theme: Theme): void {
   const root = document.documentElement;
   root.dataset.theme = theme;
+  applyAccent(loadAccent());
   const meta = document.querySelector('meta[name="theme-color"]');
   if (meta) {
-    meta.setAttribute(
-      "content",
-      theme === "dark" ? DARK_THEME_COLOR : LIGHT_THEME_COLOR,
-    );
+    meta.setAttribute("content", browserThemeColor(theme));
   }
 }
 

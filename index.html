@@ -16,15 +16,35 @@
     <link rel="apple-touch-icon" href="%BASE_URL%favicon.svg" />
     <title>Bullet Journal</title>
     <script>
-      try {
-        var stored = JSON.parse(
-          localStorage.getItem("bullet-journal-theme") || '"light"',
-        );
-        document.documentElement.dataset.theme =
-          stored === "dark" ? "dark" : "light";
-      } catch (e) {
-        document.documentElement.dataset.theme = "light";
-      }
+      (function () {
+        var accents = {
+          violet: 1,
+          blue: 1,
+          teal: 1,
+          green: 1,
+          orange: 1,
+          rose: 1,
+        };
+        try {
+          var stored = JSON.parse(
+            localStorage.getItem("bullet-journal-theme") || '"light"',
+          );
+          document.documentElement.dataset.theme =
+            stored === "dark" ? "dark" : "light";
+        } catch (e) {
+          document.documentElement.dataset.theme = "light";
+        }
+        try {
+          var accent = JSON.parse(
+            localStorage.getItem("bullet-journal-accent") || '"violet"',
+          );
+          document.documentElement.dataset.accent = accents[accent]
+            ? accent
+            : "violet";
+        } catch (e2) {
+          document.documentElement.dataset.accent = "violet";
+        }
+      })();
     </script>
   </head>
   <body>

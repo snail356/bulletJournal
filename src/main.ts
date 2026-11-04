@@ -7,9 +7,11 @@ import { useStockStore } from './stores/stockStore'
 import { useTaskStore } from './stores/taskStore'
 import './plugins/fontawesome'
 import './styles/global.scss'
+import { applyAccent, loadAccent } from './utils/accent'
 import { applyTheme, loadTheme } from './utils/theme'
 
 applyTheme(loadTheme())
+applyAccent(loadAccent())
 
 const app = createApp(App)
 const pinia = createPinia()
