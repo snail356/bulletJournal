@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import AppSidebar from '@/components/AppSidebar.vue'
 import FloatingSphere from '@/components/FloatingSphere.vue'
+import PomodoroTimer from '@/components/PomodoroTimer.vue'
 import MigrationReviewModal from '@/components/MigrationReviewModal.vue'
 import ReflectionModal from '@/components/ReflectionModal.vue'
 import { useCommandStore } from '@/stores/commandStore'
@@ -101,6 +102,7 @@ onUnmounted(() => {
     </main>
 
     <FloatingSphere />
+    <PomodoroTimer />
 
     <MigrationReviewModal
       :visible="store.migrationReviewVisible"

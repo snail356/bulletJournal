@@ -17,6 +17,7 @@ const AURORA_MODE_KEY = "bullet-journal-aurora-mode";
 const THEME_KEY = "bullet-journal-theme";
 const ACCENT_KEY = "bullet-journal-accent";
 const FLOATING_SPHERE_POSITION_KEY = "bullet-journal-floating-sphere-position";
+const POMODORO_STATE_KEY = "bullet-journal-pomodoro-state";
 const BACKUP_PREFS_KEY = "bullet-journal-backup-prefs";
 const BACKLOG_PREFS_KEY = "bullet-journal-backlog-prefs";
 const STORAGE_BACKEND_KEY = "bullet-journal-storage-backend";
@@ -105,6 +106,7 @@ export {
   THEME_KEY,
   ACCENT_KEY,
   FLOATING_SPHERE_POSITION_KEY,
+  POMODORO_STATE_KEY,
   BACKUP_PREFS_KEY,
   BACKLOG_PREFS_KEY,
   STORAGE_BACKEND_KEY,
