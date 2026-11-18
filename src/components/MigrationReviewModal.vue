@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import type { MigrationCandidate, MigrationReviewAction, MigrationReviewActionType } from '@/types'
+import { computed, ref, watch } from 'vue'
+import type { MigrationReviewAction, MigrationReviewActionType, MigrationCandidate } from '@/types'
 import { formatDisplayDate, todayString } from '@/utils/date'
 
 const props = defineProps<{
@@ -14,47 +14,13 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const rowActions = ref<Record<string, MigrationReviewActionType>>({})
-
-function initRowActions() {
-  const next: Record<string, MigrationReviewActionType> = {}
-  for (const candidate of props.candidates) {
-    next[candidate.task.id] = 'migrate'
-  }
-  rowActions.value = next
-}
-
-function getAction(taskId: string): MigrationReviewActionType {
-  return rowActions.value[taskId] ?? 'migrate'
-}
-
-function onActionChange(taskId: string, event: Event) {
-  const value = (event.target as HTMLSelectElement).value as MigrationReviewActionType
-  rowActions.value[taskId] = value
-}
+const current = computed(() => props.candidates[0] ?? null)
+const action = ref<MigrationReviewActionType>('migrate')
 
 watch(
-  () => props.visible,
-  (visible) => {
-    if (!visible) {
-      rowActions.value = {}
-      return
-    }
-    initRowActions()
-  },
-  { immediate: true },
-)
-
-watch(
-  () => props.candidates.map((c) => c.task.id).join(','),
+  () => (props.visible ? current.value?.task.id ?? null : null),
   () => {
-    if (!props.visible) return
-    // 開啟中若候選清單變動，新列預設遷移到今天，已選過的保留
-    const next: Record<string, MigrationReviewActionType> = {}
-    for (const candidate of props.candidates) {
-      next[candidate.task.id] = rowActions.value[candidate.task.id] ?? 'migrate'
-    }
-    rowActions.value = next
+    action.value = 'migrate'
   },
 )
 
@@ -63,62 +29,53 @@ function formatShortDate(dateStr: string): string {
   return `${date.getMonth() + 1}/${date.getDate()}`
 }
 
-function setAllMigrate() {
-  for (const candidate of props.candidates) {
-    rowActions.value[candidate.task.id] = 'migrate'
-  }
-  confirm()
-}
-
-function confirm() {
-  const actions: MigrationReviewAction[] = props.candidates.map((candidate) => ({
-    taskId: candidate.task.id,
-    action: rowActions.value[candidate.task.id] ?? 'migrate',
-    targetDate: todayString(),
-  }))
-  emit('confirm', actions)
+function confirmCurrent() {
+  const candidate = current.value
+  if (!candidate) return
+  emit('confirm', [
+    {
+      taskId: candidate.task.id,
+      action: action.value,
+      targetDate: todayString(),
+    },
+  ])
 }
 </script>
 
 <template>
   <Teleport to="body">
-    <div v-if="visible" class="overlay" @click.self="emit('snooze')">
+    <div v-if="visible && current" class="overlay" @click.self="emit('snooze')">
       <div class="modal" role="dialog" aria-modal="true" aria-labelledby="migration-review-title">
         <header class="header">
           <h2 id="migration-review-title">延期任務處理 · {{ formatDisplayDate(todayString()) }}</h2>
-          <p class="subtitle">
-            你有 {{ candidates.length }} 項未完成的延期任務，請決定如何處理
-          </p>
+          <p class="subtitle">尚餘 {{ candidates.length }} 項，一次只處理一項</p>
         </header>
 
-        <ul class="list">
-          <li v-for="candidate in candidates" :key="candidate.task.id" class="row">
-            <div class="task-info">
-              <p class="task-title">{{ candidate.task.title }}</p>
-              <p class="task-meta">
-                原排程 {{ formatShortDate(candidate.overdueFrom) }}
-                <span v-if="candidate.daysOverdue > 1" class="overdue">
-                  · 逾期 {{ candidate.daysOverdue }} 天
-                </span>
-              </p>
-            </div>
+        <div class="card" aria-live="polite">
+          <p class="task-title">{{ current.task.title }}</p>
+          <p class="task-meta">
+            原排程 {{ formatShortDate(current.overdueFrom) }}
+            <span v-if="current.daysOverdue > 1" class="overdue">
+              · 逾期 {{ current.daysOverdue }} 天
+            </span>
+          </p>
+          <label class="field">
+            <span class="hint">處理方式</span>
             <select
+              v-model="action"
               class="action-select"
-              :value="getAction(candidate.task.id)"
-              :aria-label="`處理 ${candidate.task.title}`"
-              @change="onActionChange(candidate.task.id, $event)"
+              :aria-label="`處理 ${current.task.title}`"
             >
               <option value="migrate">遷移到今天</option>
               <option value="keep">保留在原日</option>
               <option value="complete">標記完成</option>
             </select>
-          </li>
-        </ul>
+          </label>
+        </div>
 
         <div class="actions">
           <button type="button" class="btn-text" @click="emit('snooze')">稍後再說</button>
-          <button type="button" class="btn-secondary" @click="setAllMigrate">全部遷移到今天</button>
-          <button type="button" class="btn-primary" @click="confirm">確認</button>
+          <button type="button" class="btn-primary" @click="confirmCurrent">確認</button>
         </div>
       </div>
     </div>
@@ -144,8 +101,7 @@ function confirm() {
   border-radius: $radius;
   box-shadow: $shadow-lg;
   width: 100%;
-  max-width: 520px;
-  max-height: min(80vh, 640px);
+  max-width: 420px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -167,39 +123,23 @@ function confirm() {
   line-height: 1.5;
 }
 
-.list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px;
+.card {
+  margin: 8px 24px 0;
+  padding: 16px;
   border: 1px solid $border;
   border-radius: $radius-sm;
   background: $bg;
 }
 
-.task-info {
-  flex: 1;
-  min-width: 0;
-}
-
 .task-title {
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.45;
 }
 
 .task-meta {
-  margin-top: 4px;
-  font-size: 12px;
+  margin-top: 6px;
+  font-size: 13px;
   color: $text-muted;
 }
 
@@ -207,15 +147,26 @@ function confirm() {
   color: #d97706;
 }
 
-.action-select {
-  flex-shrink: 0;
-  padding: 6px 8px;
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.hint {
   font-size: 12px;
+  color: $text-muted;
+}
+
+.action-select {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 14px;
   border: 1px solid $border;
   border-radius: $radius-sm;
   background: $surface;
   color: $text;
-  max-width: 130px;
 
   &:focus {
     outline: none;
@@ -230,7 +181,6 @@ function confirm() {
   align-items: center;
   gap: 8px;
   padding: 16px 24px 24px;
-  border-top: 1px solid $border;
 }
 
 .btn-text {
@@ -258,19 +208,6 @@ function confirm() {
   }
 }
 
-.btn-secondary {
-  padding: 8px 14px;
-  color: $primary;
-  border: 1px solid $primary;
-  border-radius: $radius-sm;
-  font-weight: 600;
-  font-size: 13px;
-
-  &:hover {
-    background: $primary-light;
-  }
-}
-
 @media (max-width: $breakpoint-sm) {
   .overlay {
     padding: 12px;
@@ -278,36 +215,16 @@ function confirm() {
   }
 
   .modal {
-    max-height: 90vh;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }
 
-  .row {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-
-  .action-select {
-    max-width: none;
-    width: 100%;
+  .card {
+    margin: 8px 16px 0;
   }
 
   .actions {
-    flex-wrap: wrap;
     padding: 12px 16px 16px;
-  }
-
-  .btn-text {
-    margin-right: 0;
-    flex: 1 1 100%;
-    text-align: center;
-  }
-
-  .btn-secondary,
-  .btn-primary {
-    flex: 1 1 auto;
   }
 }
 </style>

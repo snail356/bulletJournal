@@ -707,8 +707,11 @@ export const useTaskStore = defineStore("task", () => {
     migrationReviewState.value.lastReviewedDate = today;
     migrationReviewState.value.snoozedUntil = null;
     persistMigrationReviewState();
-    migrationReviewVisible.value = false;
-    checkReflectionPrompt();
+    // 一次只處理一項；還有未確認的延期任務時視窗留著
+    if (getMigrationCandidates(today).length === 0) {
+      migrationReviewVisible.value = false;
+      checkReflectionPrompt();
+    }
   }
 
   function getReflectionByDate(date: string): DailyReflection | undefined {
