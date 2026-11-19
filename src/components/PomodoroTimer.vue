@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, useId } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   clampMinutes,
@@ -61,7 +61,6 @@ const DIAL_LABELS: DialLabel[] = Array.from({ length: 12 }, (_, index) => {
   return { text: String(minute), x: point.x, y: point.y }
 })
 
-const bodyId = `tomato-body-${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`
 const router = useRouter()
 
 const open = ref(false)
@@ -114,7 +113,6 @@ const fabLabel = computed(() => {
   if (phase.value === 'done') return '番茄鐘時間到'
   return '開啟番茄鐘'
 })
-const fabTime = computed(() => (phase.value === 'done' ? '到了' : readout.value))
 const orangeLabel = computed(() => {
   if (phase.value === 'running') return '暫停'
   if (phase.value === 'paused') return '繼續'
@@ -391,34 +389,28 @@ onUnmounted(() => {
         :aria-label="fabLabel"
         @click="onFabClick"
       >
-      <svg class="fab-svg" viewBox="0 0 64 64" aria-hidden="true">
-        <circle class="ring-track" cx="32" cy="32" r="29" />
+      <svg class="fab-svg" viewBox="0 0 80 80" aria-hidden="true">
+        <circle class="fab-disc" cx="40" cy="40" r="30.2" />
+        <circle class="ring-track" cx="40" cy="40" r="33.4" />
         <circle
-          v-if="phase !== 'idle'"
+          v-if="ringOffset < 100"
           class="ring-prog"
-          cx="32"
-          cy="32"
-          r="29"
+          cx="40"
+          cy="40"
+          r="33.4"
           pathLength="100"
           stroke-dasharray="100"
           :stroke-dashoffset="ringOffset"
         />
         <g class="tomato" :class="{ pulse: phase === 'done' }">
-          <ellipse cx="32" cy="36" rx="14" ry="13" :fill="`url(#${bodyId})`" />
-          <ellipse cx="27.5" cy="32" rx="4.2" ry="2.6" fill="#fff" opacity="0.38" />
-          <path d="M32 24c-1.2-6 6.4-8.4 7.8-3.1-3.1.2-5.4 1.2-7.8 3.1z" fill="#3fa34c" />
-          <path d="M32 24c1.2-6-6.4-8.4-7.8-3.1 3.1.2 5.4 1.2 7.8 3.1z" fill="#2d8a3c" />
-          <path d="M32 23.6c.2-5.2 1.5-7.6 1.5-7.6s.5 2.5-.2 7.6" fill="#1f6b32" />
+          <circle cx="40" cy="28.6" r="6.6" />
+          <path class="stem" d="M40 22.6v-3.4" />
+          <path class="leaf" d="M40 22.8c-.5-3.2-.2-5.4.2-6.6.3 1.2.6 3.4-.2 6.6z" />
+          <path class="leaf side" d="M39.2 23.2c-2.4-1.1-6.2-1.3-8.2.2 2.4.2 5.4 1.2 8.2 2.4z" />
+          <path class="leaf pale" d="M40.8 23.2c2.4-1.1 6.2-1.3 8.2.2-2.4.2-5.4 1.2-8.2 2.4z" />
         </g>
-        <defs>
-          <radialGradient :id="bodyId" cx="38%" cy="34%" r="72%">
-            <stop offset="0%" stop-color="#ff7a7a" />
-            <stop offset="52%" stop-color="#ef3b3b" />
-            <stop offset="100%" stop-color="#c81e1e" />
-          </radialGradient>
-        </defs>
+        <text class="fab-readout" x="40" y="51.5">{{ readout }}</text>
       </svg>
-      <span v-if="phase !== 'idle'" class="fab-time">{{ fabTime }}</span>
       </button>
     </div>
 
@@ -529,17 +521,19 @@ onUnmounted(() => {
   z-index: 40;
   right: max(18px, env(safe-area-inset-right));
   bottom: calc(80px + env(safe-area-inset-bottom));
-  width: 64px;
-  height: 64px;
+  width: 76px;
+  height: 76px;
   overflow: visible;
 }
 
 .fab {
   position: relative;
-  width: 64px;
-  height: 64px;
+  width: 76px;
+  height: 76px;
   padding: 0;
   overflow: visible;
+  border-radius: 50%;
+  box-shadow: 0 8px 18px rgba(90, 30, 30, 0.16);
 }
 
 .silence {
@@ -574,73 +568,78 @@ onUnmounted(() => {
 
 .fab-svg {
   display: block;
-  width: 64px;
-  height: 64px;
-  overflow: visible;
-  filter: drop-shadow(0 8px 12px rgba(180, 40, 40, 0.28));
+  width: 76px;
+  height: 76px;
+}
+
+.fab-disc {
+  fill: #fffdfb;
 }
 
 .ring-track,
 .ring-prog {
   fill: none;
-  stroke-width: 3.5;
+  stroke-width: 6.6;
 }
 
 .ring-track {
-  stroke: rgba(47, 158, 79, 0.28);
+  stroke: #e4e4e4;
 }
 
 .ring-prog {
-  stroke: #2f9e4f;
+  stroke: #e23b32;
   stroke-linecap: round;
   transform: rotate(-90deg);
-  transform-origin: 32px 32px;
+  transform-origin: 40px 40px;
 }
 
 .fab.is-paused .ring-prog {
-  stroke: #86b896;
+  stroke: #ef8d86;
 }
 
-.fab.is-done .ring-track {
-  stroke: rgba(240, 164, 60, 0.45);
+.tomato circle {
+  fill: #e23b32;
 }
 
-.fab.is-open .ring-track {
-  stroke: rgba(47, 158, 79, 0.55);
+.stem {
+  fill: none;
+  stroke: #3d8f46;
+  stroke-width: 1.35;
+  stroke-linecap: round;
+}
+
+.leaf {
+  fill: #43a047;
+}
+
+.leaf.side {
+  fill: #2e7d32;
+}
+
+.leaf.pale {
+  fill: #66bb6a;
 }
 
 .tomato.pulse {
-  transform-origin: 32px 36px;
+  transform-origin: 40px 28px;
   animation: tomato-pulse 1.1s ease-in-out infinite;
 }
 
-.fab-time {
-  position: absolute;
-  left: 50%;
-  bottom: -7px;
-  transform: translateX(-50%);
-  padding: 0 6px;
-  border-radius: 999px;
-  background: #fffdf8;
-  color: #1f6b34;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 16px;
+.fab-readout {
+  fill: #e23b32;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  text-anchor: middle;
+  dominant-baseline: middle;
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0.02em;
-  box-shadow: 0 1px 4px rgba(40, 30, 10, 0.16);
-  pointer-events: none;
-}
-
-.fab.is-done .fab-time {
-  color: #c2410c;
 }
 
 .panel {
   position: fixed;
   z-index: 41;
   right: max(16px, env(safe-area-inset-right));
-  bottom: calc(172px + env(safe-area-inset-bottom));
+  bottom: calc(188px + env(safe-area-inset-bottom));
   opacity: 1;
   width: min(304px, calc(100vw - 24px));
   max-height: calc(100dvh - 176px);
