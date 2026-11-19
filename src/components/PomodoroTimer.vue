@@ -402,12 +402,11 @@ onUnmounted(() => {
           stroke-dasharray="100"
           :stroke-dashoffset="ringOffset"
         />
-        <g class="tomato" :class="{ pulse: phase === 'done' }">
-          <circle cx="40" cy="28.6" r="6.6" />
-          <path class="stem" d="M40 22.6v-3.4" />
-          <path class="leaf" d="M40 22.8c-.5-3.2-.2-5.4.2-6.6.3 1.2.6 3.4-.2 6.6z" />
-          <path class="leaf side" d="M39.2 23.2c-2.4-1.1-6.2-1.3-8.2.2 2.4.2 5.4 1.2 8.2 2.4z" />
-          <path class="leaf pale" d="M40.8 23.2c2.4-1.1 6.2-1.3 8.2.2-2.4.2-5.4 1.2-8.2 2.4z" />
+        <g class="alarm" :class="{ pulse: phase === 'done' }">
+          <path
+            transform="translate(29 16) scale(0.04296875)"
+            d="M504.4 132.5c-4.5 10.5-18.4 9.8-24.9.4-27.8-40-66.1-72.2-111-92.6-10.4-4.7-13.7-18.3-4.1-24.6 15-9.9 33-15.7 52.3-15.7 52.6 0 95.2 42.6 95.2 95.2 0 13.2-2.7 25.8-7.6 37.3zm-471.9.4c-6.5 9.4-20.5 10.1-24.9-.4-4.9-11.5-7.6-24.1-7.6-37.3 0-52.6 42.6-95.2 95.2-95.2 19.3 0 37.3 5.8 52.3 15.7 9.6 6.3 6.3 19.9-4.1 24.6-44.8 20.4-83.1 52.6-111 92.6zM390.2 467.4C352.8 495.4 306.3 512 256 512s-96.8-16.6-134.1-44.6L86.6 502.6c-12.5 12.5-32.8 12.5-45.3 0s-12.5-32.8 0-45.3l35.2-35.2C48.6 384.8 32 338.3 32 288 32 164.3 132.3 64 256 64S480 164.3 480 288c0 50.3-16.6 96.8-44.6 134.2l35.2 35.2c12.5 12.5 12.5 32.8 0 45.3s-32.8 12.5-45.3 0l-35.2-35.2zM280 184c0-13.3-10.7-24-24-24s-24 10.7-24 24l0 104c0 6.4 2.5 12.5 7 17l56 56c9.4 9.4 24.6 9.4 33.9 0s9.4-24.6 0-33.9l-49-49 0-94.1z"
+          />
         </g>
         <text class="fab-readout" x="40" y="51.5">{{ readout }}</text>
       </svg>
@@ -597,32 +596,13 @@ onUnmounted(() => {
   stroke: #ef8d86;
 }
 
-.tomato circle {
+.alarm {
   fill: #e23b32;
 }
 
-.stem {
-  fill: none;
-  stroke: #3d8f46;
-  stroke-width: 1.35;
-  stroke-linecap: round;
-}
-
-.leaf {
-  fill: #43a047;
-}
-
-.leaf.side {
-  fill: #2e7d32;
-}
-
-.leaf.pale {
-  fill: #66bb6a;
-}
-
-.tomato.pulse {
-  transform-origin: 40px 28px;
-  animation: tomato-pulse 1.1s ease-in-out infinite;
+.alarm.pulse {
+  transform-origin: 40px 27px;
+  animation: alarm-pulse 1.1s ease-in-out infinite;
 }
 
 .fab-readout {
@@ -910,7 +890,7 @@ onUnmounted(() => {
   transform: translateY(8px) scale(0.98);
 }
 
-@keyframes tomato-pulse {
+@keyframes alarm-pulse {
   0%,
   100% {
     transform: scale(1);
@@ -921,7 +901,7 @@ onUnmounted(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tomato.pulse,
+  .alarm.pulse,
   .panel-pop-enter-active,
   .panel-pop-leave-active {
     animation: none;
